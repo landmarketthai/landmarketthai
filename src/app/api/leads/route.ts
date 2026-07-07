@@ -9,6 +9,24 @@ import {
 
 const MAX_BODY = 10_000;
 
+// ponytail: in-memory per-IP rate limit — per-instance only; move to Vercel WAF
+// or Upstash if spam outgrows this
+const RATE_LIMIT = 10; // requests per window
+const RATE_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  if (rateBuckets.size > 10_000) rateBuckets.clear();
+  const bucket = rateBuckets.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT;
+}
+
 async function fireWebhook(leadId: string, leadType: string, name: string): Promise<void> {
   const webhookUrl = process.env.N8N_WEBHOOK_LEADS;
   if (!webhookUrl) return;
@@ -74,6 +92,12 @@ async function insertAttribution(
 
 export async function POST(req: NextRequest) {
   try {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (isRateLimited(ip)) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const text = await req.text();
     if (text.length > MAX_BODY) {
       return NextResponse.json({ error: "Request too large" }, { status: 413 });

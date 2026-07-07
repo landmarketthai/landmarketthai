@@ -39,10 +39,14 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
     offset,
   }).catch(() => []);
 
-  const listings = mergeWithSeedListings(dbListings, {
-    province_slug: provinceSlug,
-    land_type: type ?? undefined,
-  });
+  // Seed fallback listings only join page 1 — appending them per-page would duplicate them
+  const listings =
+    page === 1
+      ? mergeWithSeedListings(dbListings, {
+          province_slug: provinceSlug,
+          land_type: type ?? undefined,
+        })
+      : dbListings;
 
   if (listings.length === 0) {
     return (
@@ -65,7 +69,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
 
   return (
     <div>
-      <div className="mb-4 text-sm text-slate-500">{listings.length} แปลง</div>
+      <div className="mb-4 text-sm text-slate-500">แสดง {listings.length} แปลง</div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {listings.map((land) => {
           const presentation = resolveListingPresentation(land);

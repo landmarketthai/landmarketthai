@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createSessionClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -40,9 +41,11 @@ export default async function ProfilePage() {
           {/* Avatar + name */}
           <div className="flex items-center gap-4 mb-8">
             {avatarUrl ? (
-              <img
+              <Image
                 src={avatarUrl}
                 alt={displayName}
+                width={128}
+                height={128}
                 className="h-16 w-16 rounded-full object-cover ring-2 ring-brand-100"
               />
             ) : (

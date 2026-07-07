@@ -23,7 +23,7 @@ function parseRef(slug: string): number | null {
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { slug } = await params;
   const ref = parseRef(slug);
-  if (!ref) return {};
+  if (ref === null) return {};
   const land = await getListingByRef(ref).catch(() => null);
   if (!land) return {};
   return {
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 export default async function ListingDetailPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params;
   const ref = parseRef(slug);
-  if (!ref) notFound();
+  if (ref === null) notFound();
 
   const land = await getListingByRef(ref).catch(() => null);
   if (!land) notFound();

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -92,9 +93,11 @@ export default function LoginClient() {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link href="/" className="flex items-center gap-2">
-              <img
+              <Image
                 src="/images/site-logo.jpg"
                 alt="ตลาดที่ดินไทย.com"
+                width={96}
+                height={96}
                 className="h-12 w-12 rounded-full object-cover ring-1 ring-slate-200"
               />
             </Link>

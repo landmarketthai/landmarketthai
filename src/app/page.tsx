@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -119,11 +120,13 @@ export default async function HomePage() {
       <section className="bg-white pt-0 pb-0">
         {/* Banner — full viewport width, capped height */}
         <div className="hero-banner">
-          <img
+          <Image
             src="/images/final-banner.png"
             alt="LandmarketThai referral income hero banner"
-            className="block h-full w-full object-cover object-[center_43%]"
-            fetchPriority="high"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[center_43%]"
           />
           {/* ── Sales copy — left overlay (md+) ── */}
           <div className="absolute left-5 top-5 hidden w-[360px] md:block lg:left-8 lg:top-7 lg:w-[520px] xl:left-16 xl:top-8 xl:w-[560px]">
@@ -172,9 +175,11 @@ export default async function HomePage() {
                 </p>
               </div>
               <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-white p-1.5 shadow-[0_10px_26px_rgba(15,52,120,0.12)] ring-1 ring-slate-200 lg:h-32 lg:w-32 lg:p-2 xl:h-36 xl:w-36">
-                <img
+                <Image
                   src="/images/line-qr.png"
                   alt="คิวอาร์โค้ด LINE OA"
+                  width={288}
+                  height={288}
                   className="h-full w-full rounded-lg object-contain"
                 />
               </div>
@@ -521,9 +526,11 @@ export default async function HomePage() {
             {/* QR card */}
             <div className="relative z-10 hidden items-center gap-3 sm:flex">
               <div className="flex h-[92px] w-[92px] shrink-0 items-center justify-center rounded-xl bg-white p-2">
-                <img
+                <Image
                   src="/images/line-qr.png"
                   alt="คิวอาร์โค้ด LINE OA"
+                  width={288}
+                  height={288}
                   className="h-full w-full rounded-lg object-contain"
                 />
               </div>

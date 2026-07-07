@@ -141,7 +141,6 @@ export async function getDemandBySlug(slug: string): Promise<BuyerDemand | null>
 export async function getPublishedPosts(opts?: {
   category_slug?: string;
   limit?: number;
-  offset?: number;
 }): Promise<BlogPost[]> {
   const db = getClient();
   let query = db

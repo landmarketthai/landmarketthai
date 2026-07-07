@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import LineIcon from "@/components/ui/LineIcon";
 import { LINE_OA } from "@/lib/constants/site";
@@ -33,9 +34,11 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" className="inline-flex items-center gap-3 text-xl font-bold text-white">
-              <img
+              <Image
                 src="/images/site-logo.jpg"
                 alt="ตลาดที่ดินไทย.com"
+                width={96}
+                height={96}
                 className="h-12 w-12 rounded-full object-cover ring-1 ring-white/15"
               />
               <span>ตลาดที่ดินไทย<span className="text-gold-400">.com</span></span>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, LogOut, User } from "lucide-react";
@@ -47,9 +48,11 @@ function UserMenu({ onClose }: { onClose?: () => void }) {
         aria-label="เมนูผู้ใช้"
       >
         {avatarUrl ? (
-          <img
+          <Image
             src={avatarUrl}
             alt={displayName}
+            width={56}
+            height={56}
             className="h-7 w-7 rounded-full object-cover ring-1 ring-slate-200"
           />
         ) : (
@@ -105,9 +108,11 @@ export default function Navbar() {
       <div className="container-xl flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <img
+          <Image
             src="/images/site-logo.jpg"
             alt="ตลาดที่ดินไทย.com"
+            width={88}
+            height={88}
             className="h-11 w-11 rounded-full object-cover ring-1 ring-slate-200"
           />
           <span className="hidden sm:inline text-lg font-bold tracking-tight">
