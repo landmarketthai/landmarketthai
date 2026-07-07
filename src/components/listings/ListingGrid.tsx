@@ -14,11 +14,23 @@ interface Props {
   provinceSlug?: string;
   landType?: string;
   page?: number;
+  basePath?: string;
 }
 
-export default async function ListingGrid({ provinceSlug, landType, page = 1 }: Props) {
+export default async function ListingGrid({ provinceSlug, landType, page = 1, basePath = "/land" }: Props) {
   const offset = (page - 1) * PAGE_SIZE;
   const type = landType ? slugToLandType(landType) : undefined;
+
+  function pageHref(targetPage: number): string {
+    const params = new URLSearchParams();
+    if (basePath === "/land") {
+      if (provinceSlug) params.set("province", provinceSlug);
+      if (landType) params.set("type", landType);
+    }
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  }
 
   const dbListings = await getActiveListings({
     province_slug: provinceSlug,
@@ -72,7 +84,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1 }: 
         <div className="mt-10 flex justify-center gap-2">
           {page > 1 && (
             <Link
-              href={`/land?page=${page - 1}`}
+              href={pageHref(page - 1)}
               className="btn-outline px-4 py-2 text-sm"
             >
               ← ก่อนหน้า
@@ -80,7 +92,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1 }: 
           )}
           {listings.length === PAGE_SIZE && (
             <Link
-              href={`/land?page=${page + 1}`}
+              href={pageHref(page + 1)}
               className="btn-primary px-4 py-2 text-sm"
             >
               ถัดไป →

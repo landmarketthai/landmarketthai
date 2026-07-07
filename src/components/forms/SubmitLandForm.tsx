@@ -62,13 +62,14 @@ export default function SubmitLandForm() {
       if (!presignRes.ok) return null;
       const { uploadUrl, storageKey } = await presignRes.json();
 
-      await fetch(uploadUrl, {
+      const putRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": item.file.type },
         body: item.file,
       });
+      if (!putRes.ok) return null;
 
-      await fetch("/api/uploads/confirm", {
+      const confirmRes = await fetch("/api/uploads/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,6 +81,7 @@ export default function SubmitLandForm() {
           originalName: item.file.name,
         }),
       });
+      if (!confirmRes.ok) return null;
 
       return storageKey;
     } catch {

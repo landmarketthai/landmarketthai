@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, Ruler, Tag, Award, Share2, ChevronRight } from "lucide-react";
+import { MapPin, Ruler, Tag, Award, ChevronRight } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
+import ShareButton from "@/components/listings/ShareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import LeadForm from "@/components/forms/LeadForm";
 import { getListingByRef, getRelatedListings } from "@/lib/supabase/queries";
@@ -241,17 +242,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
 
             <LineButton size="md" label="สอบถามผ่าน LINE OA" className="w-full justify-center" />
 
-            <button
-              className="btn-outline w-full text-sm flex items-center justify-center gap-2"
-              onClick={() => {
-                if (typeof navigator !== "undefined") {
-                  navigator.share?.({ title: land.title_th, url: window.location.href });
-                }
-              }}
-            >
-              <Share2 size={15} />
-              แชร์ที่ดินนี้ · รับค่าคอม
-            </button>
+            <ShareButton title={land.title_th} />
           </div>
         </div>
       </div>

@@ -17,14 +17,18 @@ export async function getActiveListings(opts?: {
   const db = getClient();
   let query = db
     .from("lands")
-    .select("*, province:provinces(*), images:land_images(*)")
+    .select(
+      opts?.province_slug
+        ? "*, province:provinces!inner(*), images:land_images(*)"
+        : "*, province:provinces(*), images:land_images(*)"
+    )
     .eq("status", "active")
     .is("deleted_at", null)
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (opts?.province_slug) {
-    query = query.eq("provinces.slug", opts.province_slug);
+    query = query.eq("province.slug", opts.province_slug);
   }
   if (opts?.land_type) {
     query = query.eq("land_type", opts.land_type);
@@ -142,12 +146,16 @@ export async function getPublishedPosts(opts?: {
   const db = getClient();
   let query = db
     .from("blog_posts")
-    .select("*, category:categories(*)")
+    .select(
+      opts?.category_slug
+        ? "*, category:categories!inner(*)"
+        : "*, category:categories(*)"
+    )
     .eq("status", "published")
     .order("published_at", { ascending: false });
 
   if (opts?.category_slug) {
-    query = query.eq("categories.slug", opts.category_slug);
+    query = query.eq("category.slug", opts.category_slug);
   }
   if (opts?.limit) query = query.limit(opts.limit);
 

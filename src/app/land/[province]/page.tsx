@@ -11,6 +11,7 @@ import type { LandType } from "@/lib/types/database";
 export const revalidate = 3600;
 
 interface Params { province: string }
+interface SearchParams { page?: string }
 
 export async function generateStaticParams() {
   const provinces = await getAllProvinces().catch(() => []);
@@ -30,8 +31,15 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 
 const LAND_TYPES = Object.keys(LAND_TYPE_LABELS) as LandType[];
 
-export default async function ProvincePage({ params }: { params: Promise<Params> }) {
+export default async function ProvincePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<SearchParams>;
+}) {
   const { province: slug } = await params;
+  const { page } = await searchParams;
   const province = await getProvinceBySlug(slug).catch(() => null);
   if (!province) notFound();
 
@@ -92,7 +100,11 @@ export default async function ProvincePage({ params }: { params: Promise<Params>
           </p>
         </div>
 
-        <ListingGrid provinceSlug={slug} />
+        <ListingGrid
+          provinceSlug={slug}
+          page={Number(page ?? 1)}
+          basePath={`/land/${slug}`}
+        />
       </div>
     </div>
   );

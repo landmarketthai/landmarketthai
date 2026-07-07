@@ -10,6 +10,7 @@ import { LAND_TYPE_LABELS, slugToLandType } from "@/lib/utils";
 export const revalidate = 3600;
 
 interface Params { province: string; type: string }
+interface SearchParams { page?: string }
 
 export async function generateStaticParams() {
   const provinces = await getAllProvinces().catch(() => []);
@@ -32,8 +33,15 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   };
 }
 
-export default async function ProvinceTypePage({ params }: { params: Promise<Params> }) {
+export default async function ProvinceTypePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<SearchParams>;
+}) {
   const { province: slug, type } = await params;
+  const { page } = await searchParams;
   const [province, landType] = await Promise.all([
     getProvinceBySlug(slug).catch(() => null),
     Promise.resolve(slugToLandType(type)),
@@ -83,7 +91,12 @@ export default async function ProvinceTypePage({ params }: { params: Promise<Par
             พื้นที่โดยไม่มีค่าใช้จ่าย
           </p>
         </div>
-        <ListingGrid provinceSlug={slug} landType={type} />
+        <ListingGrid
+          provinceSlug={slug}
+          landType={type}
+          page={Number(page ?? 1)}
+          basePath={`/land/${slug}/${type}`}
+        />
       </div>
     </div>
   );
