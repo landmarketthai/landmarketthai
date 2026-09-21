@@ -118,6 +118,7 @@ create table if not exists leads (
   referral_code text,
   status        lead_status_enum not null default 'new',
   assigned_to   text,
+  next_action_at timestamptz,
   details       jsonb not null default '{}',
   consent_pdpa  boolean not null default false,
   consent_at    timestamptz,
@@ -129,6 +130,7 @@ create index if not exists idx_leads_type on leads(lead_type);
 create index if not exists idx_leads_status on leads(status);
 create index if not exists idx_leads_created on leads(created_at desc);
 create index if not exists idx_leads_referral on leads(referral_code) where referral_code is not null;
+create index if not exists idx_leads_next_action on leads(next_action_at) where next_action_at is not null;
 
 -- ── Lead Attachments ──────────────────────────────────────────────────────────
 create table if not exists lead_attachments (
@@ -144,6 +146,18 @@ create table if not exists lead_attachments (
 );
 
 create index if not exists idx_lead_attachments_lead on lead_attachments(lead_id);
+
+-- ── Lead Activities ───────────────────────────────────────────────────────────
+create table if not exists lead_activities (
+  id            uuid primary key default gen_random_uuid(),
+  lead_id       uuid not null references leads(id) on delete cascade,
+  activity_type text not null default 'note' check (activity_type in ('note','call','line','site_visit','other')),
+  note          text not null check (char_length(note) between 1 and 2000),
+  created_by    text,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists idx_lead_activities_lead_created on lead_activities(lead_id, created_at desc);
 
 -- ── Partners ──────────────────────────────────────────────────────────────────
 create type partner_status_enum as enum ('pending','active','inactive');
@@ -309,6 +323,7 @@ alter table land_images       enable row level security;
 alter table land_documents    enable row level security;
 alter table leads             enable row level security;
 alter table lead_attachments  enable row level security;
+alter table lead_activities   enable row level security;
 alter table partners          enable row level security;
 alter table deals             enable row level security;
 alter table referral_attributions enable row level security;

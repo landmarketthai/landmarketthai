@@ -113,11 +113,21 @@ export interface Lead {
   referral_code: string | null;
   status: LeadStatus;
   assigned_to: string | null;
+  next_action_at: string | null;
   details: Record<string, unknown>;
   consent_pdpa: boolean;
   consent_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface LeadActivity {
+  id: string;
+  lead_id: string;
+  activity_type: "note" | "call" | "line" | "site_visit" | "other";
+  note: string;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface LeadAttachment {

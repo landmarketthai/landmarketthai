@@ -233,7 +233,7 @@ export default async function PropertyDetailPage({
                   className="w-full text-sm"
                 />
 
-                <LeadForm compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
+                <LeadForm compact defaultType="buyer" listingId={property.slug} submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
 
                 <div className="grid gap-2 border-t border-slate-100 pt-4">
                   <Link href="/contact" className="btn-outline w-full text-sm">

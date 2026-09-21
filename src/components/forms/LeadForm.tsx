@@ -4,9 +4,19 @@ import { useState } from "react";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
+import { THAI_PROVINCES } from "@/lib/constants/provinces";
 
 type LeadType = "buyer" | "partner" | "owner";
 type FieldErrors = Record<string, string[]>;
+
+const BUYER_LAND_TYPES = [
+  ["industrial", "ที่ดินอุตสาหกรรม"],
+  ["eec", "ที่ดิน EEC"],
+  ["factory", "โรงงาน"],
+  ["warehouse", "คลังสินค้า"],
+  ["logistics", "โลจิสติกส์"],
+  ["investment", "ลงทุน"],
+] as const;
 
 interface Props {
   listingId?: string;
@@ -45,6 +55,13 @@ export default function LeadForm({
       name: data.name,
       phone: data.phone,
       line_id: data.line_id || undefined,
+      province: data.province || undefined,
+      land_type: data.land_type || undefined,
+      size_min_rai: data.size_min_rai ? Number(data.size_min_rai) : undefined,
+      size_max_rai: data.size_max_rai ? Number(data.size_max_rai) : undefined,
+      budget_min: data.budget_min ? Number(data.budget_min) : undefined,
+      budget_max: data.budget_max ? Number(data.budget_max) : undefined,
+      notes: data.notes || undefined,
       listing_id: listingId,
       referral_code: referralCode || data.referral_code || undefined,
       consent_pdpa: data.consent_pdpa === "on" ? true : undefined,
@@ -152,6 +169,59 @@ export default function LeadForm({
         />
         <FieldError id="err-lead-line" errors={fieldErrors.line_id} />
       </div>
+
+      {defaultType === "buyer" && !listingId && !compact && (
+        <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="lead-province">จังหวัดที่ต้องการ</label>
+              <select id="lead-province" name="province" className="input" disabled={isLoading}>
+                <option value="">ยังไม่ระบุ</option>
+                {THAI_PROVINCES.map((province) => (
+                  <option key={province} value={province}>{province}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="lead-land-type">ประเภทที่ดิน</label>
+              <select id="lead-land-type" name="land_type" className="input" disabled={isLoading}>
+                <option value="">ยังไม่ระบุ</option>
+                {BUYER_LAND_TYPES.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="lead-size-min">ขนาดเริ่มต้น (ไร่)</label>
+              <input id="lead-size-min" name="size_min_rai" type="number" min="0" step="0.01" className="input" placeholder="เช่น 20" disabled={isLoading} aria-describedby={fieldErrors.size_min_rai?.length ? "err-lead-size-min" : undefined} />
+              <FieldError id="err-lead-size-min" errors={fieldErrors.size_min_rai} />
+            </div>
+            <div>
+              <label className="label" htmlFor="lead-size-max">ขนาดสูงสุด (ไร่)</label>
+              <input id="lead-size-max" name="size_max_rai" type="number" min="0" step="0.01" className="input" placeholder="เช่น 50" disabled={isLoading} aria-describedby={fieldErrors.size_max_rai?.length ? "err-lead-size-max" : undefined} />
+              <FieldError id="err-lead-size-max" errors={fieldErrors.size_max_rai} />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="lead-budget-min">งบเริ่มต้น (บาท)</label>
+              <input id="lead-budget-min" name="budget_min" type="number" min="0" step="100000" className="input" placeholder="เช่น 50000000" disabled={isLoading} aria-describedby={fieldErrors.budget_min?.length ? "err-lead-budget-min" : undefined} />
+              <FieldError id="err-lead-budget-min" errors={fieldErrors.budget_min} />
+            </div>
+            <div>
+              <label className="label" htmlFor="lead-budget-max">งบสูงสุด (บาท)</label>
+              <input id="lead-budget-max" name="budget_max" type="number" min="0" step="100000" className="input" placeholder="เช่น 100000000" disabled={isLoading} aria-describedby={fieldErrors.budget_max?.length ? "err-lead-budget-max" : undefined} />
+              <FieldError id="err-lead-budget-max" errors={fieldErrors.budget_max} />
+            </div>
+          </div>
+          <div>
+            <label className="label" htmlFor="lead-notes">รายละเอียดความต้องการ</label>
+            <textarea id="lead-notes" name="notes" rows={3} maxLength={1000} className="input resize-y" placeholder="เช่น ต้องการสร้างโรงงาน ถนนรถเทรลเลอร์เข้าได้" disabled={isLoading} />
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="flex cursor-pointer items-start gap-3 rounded-lg py-1 text-xs leading-relaxed text-slate-600">

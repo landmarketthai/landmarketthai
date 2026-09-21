@@ -13,15 +13,24 @@ export const buyerLeadSchema = z.object({
   name: z.string().min(2, "กรุณากรอกชื่อ"),
   phone: thaiPhone,
   line_id: z.string().optional(),
-  province: z.string().optional(),
-  land_type: z.string().optional(),
-  budget_min: z.number().optional(),
-  budget_max: z.number().optional(),
-  notes: z.string().optional(),
-  listing_id: z.string().optional(),
+  province: z.string().max(100).optional(),
+  land_type: z.enum(["industrial", "eec", "factory", "warehouse", "logistics", "data_center", "investment"]).optional(),
+  size_min_rai: z.number().positive().max(100000).optional(),
+  size_max_rai: z.number().positive().max(100000).optional(),
+  budget_min: z.number().nonnegative().max(1_000_000_000_000).optional(),
+  budget_max: z.number().nonnegative().max(1_000_000_000_000).optional(),
+  notes: z.string().max(2000).optional(),
+  listing_id: z.string().max(150).optional(),
   referral_code: z.string().optional(),
   consent_pdpa: consentPdpa,
-  source: z.string().optional(),
+  source: z.string().max(500).optional(),
+}).superRefine((value, ctx) => {
+  if (value.size_min_rai !== undefined && value.size_max_rai !== undefined && value.size_min_rai > value.size_max_rai) {
+    ctx.addIssue({ code: "custom", path: ["size_max_rai"], message: "ขนาดสูงสุดต้องไม่น้อยกว่าขนาดเริ่มต้น" });
+  }
+  if (value.budget_min !== undefined && value.budget_max !== undefined && value.budget_min > value.budget_max) {
+    ctx.addIssue({ code: "custom", path: ["budget_max"], message: "งบสูงสุดต้องไม่น้อยกว่างบเริ่มต้น" });
+  }
 });
 
 export const partnerLeadSchema = z.object({

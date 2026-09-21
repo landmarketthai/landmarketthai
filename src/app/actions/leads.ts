@@ -269,6 +269,8 @@ export async function submitBuyerLead(
     line_id: str(formData, "line_id"),
     province: str(formData, "province"),
     land_type: str(formData, "land_type"),
+    size_min_rai: num(formData, "size_min_rai"),
+    size_max_rai: num(formData, "size_max_rai"),
     budget_min: num(formData, "budget_min"),
     budget_max: num(formData, "budget_max"),
     notes: str(formData, "notes"),
@@ -295,6 +297,8 @@ export async function submitBuyerLead(
   const details: Record<string, unknown> = {
     province: result.data.province,
     land_type: result.data.land_type,
+    size_min_rai: result.data.size_min_rai,
+    size_max_rai: result.data.size_max_rai,
     budget_min: result.data.budget_min,
     budget_max: result.data.budget_max,
     notes: result.data.notes,
