@@ -29,6 +29,8 @@ export type DocType = "title_deed" | "map" | "brochure" | "other";
 export type DemandStatus = "active" | "matched" | "closed";
 
 export type DealStatus = "in_progress" | "closed" | "cancelled";
+export type DealStage = "qualified" | "property_sent" | "site_visit" | "negotiation" | "offer" | "deposit" | "won" | "lost";
+export type CommissionStatus = "estimated" | "approved" | "payable" | "paid" | "cancelled";
 
 export type PartnerStatus = "pending" | "active" | "inactive";
 
@@ -73,6 +75,7 @@ export interface Land {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  owner_lead_id?: string | null;
   // joined
   province?: Province;
   images?: LandImage[];
@@ -114,6 +117,7 @@ export interface Lead {
   status: LeadStatus;
   assigned_to: string | null;
   next_action_at: string | null;
+  last_reminded_at: string | null;
   details: Record<string, unknown>;
   consent_pdpa: boolean;
   consent_at: string | null;
@@ -160,16 +164,40 @@ export interface Partner {
 
 export interface Deal {
   id: string;
-  land_id: string;
+  land_id: string | null;
+  listing_ref: string | null;
+  listing_title: string | null;
   buyer_lead_id: string | null;
   partner_id: string | null;
   referral_code: string | null;
-  deal_value: number;
+  deal_value: number | null;
   commission_paid: number | null;
+  expected_commission: number | null;
   status: DealStatus;
+  stage: DealStage;
+  assigned_to: string | null;
   closed_at: string | null;
   notes: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface Commission {
+  id: string;
+  deal_id: string;
+  source_lead_id: string | null;
+  source_type: "buyer" | "owner";
+  partner_id: string | null;
+  referral_code: string | null;
+  amount_estimated: number | null;
+  amount_approved: number | null;
+  amount_paid: number;
+  status: CommissionStatus;
+  approved_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ReferralAttribution {

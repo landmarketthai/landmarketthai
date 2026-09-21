@@ -1,5 +1,7 @@
 "use server";
 
+import { cookies } from "next/headers";
+import { ATTRIBUTION_SOURCE_COOKIE, REFERRAL_COOKIE } from "@/lib/lead-attribution";
 import { createServerClient } from "@/lib/supabase/server";
 import { partnerLeadSchema, ownerLeadSchema, buyerLeadSchema, normalizePhone } from "@/lib/validations";
 
@@ -18,6 +20,14 @@ function num(formData: FormData, field: string): number | undefined {
   if (!v || typeof v !== "string" || !v.trim()) return undefined;
   const n = Number(v);
   return isNaN(n) ? undefined : n;
+}
+
+async function attributionInput(formData: FormData) {
+  const cookieStore = await cookies();
+  return {
+    referral_code: cookieStore.get(REFERRAL_COOKIE)?.value ?? str(formData, "referral_code"),
+    source: cookieStore.get(ATTRIBUTION_SOURCE_COOKIE)?.value ?? str(formData, "source"),
+  };
 }
 
 function toFieldErrors(
@@ -115,6 +125,7 @@ export async function submitPartnerLead(
 ): Promise<LeadActionState> {
   if (formData.get("_hp")) return { status: "success", id: "" };
 
+  const attribution = await attributionInput(formData);
   const raw = {
     name: str(formData, "name") ?? "",
     phone: normalizePhone(str(formData, "phone") ?? ""),
@@ -122,9 +133,9 @@ export async function submitPartnerLead(
     working_area: str(formData, "working_area"),
     experience: str(formData, "experience"),
     network_size: str(formData, "network_size"),
-    referral_code: str(formData, "referral_code"),
+    referral_code: attribution.referral_code,
     consent_pdpa: formData.get("consent_pdpa") === "on",
-    source: str(formData, "source"),
+    source: attribution.source,
   };
 
   const result = partnerLeadSchema.safeParse(raw);
@@ -184,6 +195,7 @@ export async function submitOwnerLead(
 ): Promise<LeadActionState> {
   if (formData.get("_hp")) return { status: "success", id: "" };
 
+  const attribution = await attributionInput(formData);
   const raw = {
     name: str(formData, "name") ?? "",
     phone: normalizePhone(str(formData, "phone") ?? ""),
@@ -194,9 +206,9 @@ export async function submitOwnerLead(
     asking_price: num(formData, "asking_price"),
     deed_type: str(formData, "deed_type"),
     notes: str(formData, "notes"),
-    referral_code: str(formData, "referral_code"),
+    referral_code: attribution.referral_code,
     consent_pdpa: formData.get("consent_pdpa") === "on",
-    source: str(formData, "source"),
+    source: attribution.source,
   };
 
   const result = ownerLeadSchema.safeParse(raw);
@@ -263,6 +275,7 @@ export async function submitBuyerLead(
 ): Promise<LeadActionState> {
   if (formData.get("_hp")) return { status: "success", id: "" };
 
+  const attribution = await attributionInput(formData);
   const raw = {
     name: str(formData, "name") ?? "",
     phone: normalizePhone(str(formData, "phone") ?? ""),
@@ -275,9 +288,9 @@ export async function submitBuyerLead(
     budget_max: num(formData, "budget_max"),
     notes: str(formData, "notes"),
     listing_id: str(formData, "listing_id"),
-    referral_code: str(formData, "referral_code"),
+    referral_code: attribution.referral_code,
     consent_pdpa: formData.get("consent_pdpa") === "on",
-    source: str(formData, "source"),
+    source: attribution.source,
   };
 
   const result = buyerLeadSchema.safeParse(raw);

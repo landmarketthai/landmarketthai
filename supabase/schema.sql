@@ -119,6 +119,7 @@ create table if not exists leads (
   status        lead_status_enum not null default 'new',
   assigned_to   text,
   next_action_at timestamptz,
+  last_reminded_at timestamptz,
   details       jsonb not null default '{}',
   consent_pdpa  boolean not null default false,
   consent_at    timestamptz,
@@ -159,6 +160,10 @@ create table if not exists lead_activities (
 
 create index if not exists idx_lead_activities_lead_created on lead_activities(lead_id, created_at desc);
 
+-- Owner lead → canonical land link (added after leads exists so the FK is valid).
+alter table lands add column if not exists owner_lead_id uuid references leads(id) on delete set null;
+create unique index if not exists idx_lands_owner_lead_unique on lands(owner_lead_id) where owner_lead_id is not null;
+
 -- ── Partners ──────────────────────────────────────────────────────────────────
 create type partner_status_enum as enum ('pending','active','inactive');
 
@@ -183,17 +188,63 @@ create type deal_status_enum as enum ('in_progress','closed','cancelled');
 
 create table if not exists deals (
   id             uuid primary key default gen_random_uuid(),
-  land_id        uuid not null references lands(id),
+  land_id        uuid references lands(id),
+  listing_ref    text,
+  listing_title  text,
   buyer_lead_id  uuid references leads(id),
   partner_id     uuid references partners(id),
   referral_code  text,
-  deal_value     numeric(18,2) not null,
+  deal_value     numeric(18,2),
   commission_paid numeric(18,2),
+  expected_commission numeric(18,2),
   status         deal_status_enum not null default 'in_progress',
+  stage          text not null default 'qualified' check (stage in ('qualified','property_sent','site_visit','negotiation','offer','deposit','won','lost')),
+  assigned_to    text,
   closed_at      timestamptz,
   notes          text,
-  created_at     timestamptz not null default now()
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
 );
+
+create index if not exists idx_deals_stage on deals(stage);
+create index if not exists idx_deals_buyer_lead on deals(buyer_lead_id) where buyer_lead_id is not null;
+create index if not exists idx_deals_listing_ref on deals(listing_ref) where listing_ref is not null;
+
+create table if not exists commissions (
+  id               uuid primary key default gen_random_uuid(),
+  deal_id          uuid not null references deals(id) on delete cascade,
+  source_lead_id   uuid references leads(id) on delete set null,
+  source_type      text not null check (source_type in ('buyer','owner')),
+  partner_id       uuid references partners(id) on delete set null,
+  referral_code    text,
+  amount_estimated numeric(18,2),
+  amount_approved  numeric(18,2),
+  amount_paid      numeric(18,2) not null default 0,
+  status           text not null default 'estimated' check (status in ('estimated','approved','payable','paid','cancelled')),
+  approved_at      timestamptz,
+  paid_at          timestamptz,
+  notes            text,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  unique(deal_id, source_type, source_lead_id)
+);
+
+create index if not exists idx_commissions_status on commissions(status);
+create index if not exists idx_commissions_partner on commissions(partner_id) where partner_id is not null;
+create index if not exists idx_commissions_deal on commissions(deal_id);
+
+create table if not exists crm_automation_runs (
+  id         uuid primary key default gen_random_uuid(),
+  job_key    text not null,
+  run_date   date not null,
+  status     text not null default 'pending' check (status in ('pending','sent','failed')),
+  sent_at    timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(job_key, run_date)
+);
+
+create index if not exists idx_crm_automation_runs_status on crm_automation_runs(status, run_date desc);
 
 -- ── Referral Attributions ─────────────────────────────────────────────────────
 create type entity_type_enum as enum ('buyer','owner');
@@ -326,6 +377,8 @@ alter table lead_attachments  enable row level security;
 alter table lead_activities   enable row level security;
 alter table partners          enable row level security;
 alter table deals             enable row level security;
+alter table commissions       enable row level security;
+alter table crm_automation_runs enable row level security;
 alter table referral_attributions enable row level security;
 alter table buyer_demand      enable row level security;
 alter table categories        enable row level security;

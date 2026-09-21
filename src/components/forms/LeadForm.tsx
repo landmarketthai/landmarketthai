@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
 import { THAI_PROVINCES } from "@/lib/constants/provinces";
+import { leadSourceFromUrl, referralCodeFromUrl } from "@/lib/lead-attribution";
 
 type LeadType = "buyer" | "partner" | "owner";
 type FieldErrors = Record<string, string[]>;
@@ -50,6 +51,7 @@ export default function LeadForm({
 
     if (data._hp) { setState("success"); return; }
 
+    const currentUrl = typeof window !== "undefined" ? window.location.href : "/";
     const payload = {
       lead_type: defaultType,
       name: data.name,
@@ -63,9 +65,9 @@ export default function LeadForm({
       budget_max: data.budget_max ? Number(data.budget_max) : undefined,
       notes: data.notes || undefined,
       listing_id: listingId,
-      referral_code: referralCode || data.referral_code || undefined,
+      referral_code: referralCode || data.referral_code || referralCodeFromUrl(currentUrl),
       consent_pdpa: data.consent_pdpa === "on" ? true : undefined,
-      source: typeof window !== "undefined" ? window.location.pathname : undefined,
+      source: leadSourceFromUrl(currentUrl),
     };
 
     try {

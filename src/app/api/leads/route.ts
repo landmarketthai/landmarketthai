@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { ATTRIBUTION_SOURCE_COOKIE, REFERRAL_COOKIE } from "@/lib/lead-attribution";
 import {
   buyerLeadSchema,
   partnerLeadSchema,
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
     // The resolved partnerId is reused for attribution — no second lookup needed.
     let validatedRefCode: string | null = null;
     let resolvedPartnerId: string | null = null;
-    const rawRefCode = parsed.referral_code as string | undefined;
+    const rawRefCode = req.cookies.get(REFERRAL_COOKIE)?.value ?? (parsed.referral_code as string | undefined);
 
     if (rawRefCode) {
       resolvedPartnerId = await resolveActivePartner(db, rawRefCode);
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
         phone: parsed.phone,
         line_id: parsed.line_id ?? null,
         referral_code: validatedRefCode,
-        source: (parsed.source as string) ?? req.headers.get("referer") ?? null,
+        source: req.cookies.get(ATTRIBUTION_SOURCE_COOKIE)?.value ?? (parsed.source as string) ?? req.headers.get("referer") ?? null,
         details,
         consent_pdpa: parsed.consent_pdpa,
         consent_at: parsed.consent_pdpa ? new Date().toISOString() : null,

@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, Loader2, Upload, X } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
 import { THAI_PROVINCES, EEC_PROVINCES } from "@/lib/constants/provinces";
+import { leadSourceFromUrl, referralCodeFromUrl } from "@/lib/lead-attribution";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_FILES = 10;
@@ -100,6 +101,7 @@ export default function SubmitLandForm() {
     if (data._hp) { setState("success"); return; }
 
     try {
+      const currentUrl = window.location.href;
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,8 +116,9 @@ export default function SubmitLandForm() {
           asking_price: data.asking_price ? Number(data.asking_price) : undefined,
           deed_type: data.deed_type || undefined,
           notes: data.notes || undefined,
+          referral_code: referralCodeFromUrl(currentUrl),
           consent_pdpa: data.consent_pdpa === "on" ? true : undefined,
-          source: window.location.pathname,
+          source: leadSourceFromUrl(currentUrl),
         }),
       });
 
