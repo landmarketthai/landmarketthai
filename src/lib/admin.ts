@@ -1,14 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import { isAdminEmail } from "@/lib/admin-access";
 import { createSessionClient } from "@/lib/supabase/server";
-
-function getAdminEmails(): Set<string> {
-  return new Set(
-    (process.env.LANDMARKETTHAI_ADMIN_EMAILS ?? "")
-      .split(/[\s,;]+/)
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
 
 export async function requireAdmin(nextPath = "/admin/leads") {
   const sessionClient = await createSessionClient();
@@ -22,9 +14,7 @@ export async function requireAdmin(nextPath = "/admin/leads") {
   } = await sessionClient.auth.getUser();
 
   if (!user) redirect(loginPath);
-
-  const email = user.email?.trim().toLowerCase();
-  if (!email || !getAdminEmails().has(email)) notFound();
+  if (!isAdminEmail(user.email, process.env.LANDMARKETTHAI_ADMIN_EMAILS)) notFound();
 
   return user;
 }
