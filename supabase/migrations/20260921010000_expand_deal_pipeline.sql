@@ -1,5 +1,15 @@
 -- Expand the existing deals table into a human-controlled sales pipeline.
 -- Keeps legacy status for compatibility while adding a finer stage and seed-listing support.
+-- This is an incremental migration and expects the schema baseline to exist first.
+do $$
+begin
+  if to_regclass('public.deals') is null
+     or to_regclass('public.leads') is null
+     or to_regclass('public.partners') is null
+     or to_regclass('public.referral_attributions') is null then
+    raise exception 'Deal pipeline migration requires the LandmarketThai schema baseline';
+  end if;
+end $$;
 
 alter table deals
   alter column land_id drop not null,

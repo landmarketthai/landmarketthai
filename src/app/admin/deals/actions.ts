@@ -4,11 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { sendCrmEvent } from "@/lib/crm-webhook";
-import {
-  commissionStatusAllowedForDealStage,
-  dealStageRequiresValue,
-  dealStatusForStage,
-} from "@/lib/deal-pipeline";
+import { dealStageRequiresValue, dealStatusForStage } from "@/lib/deal-pipeline";
 import { listingStatusForDealStages } from "@/lib/property-pipeline";
 import { createServerClient } from "@/lib/supabase/server";
 import type { CommissionStatus, DealStage } from "@/lib/types/database";
@@ -165,53 +161,28 @@ export async function createDealFromLead(formData: FormData) {
       ? [{ source_lead_id: ownerLeadId, source_type: "owner" as const, partner_id: ownerAttribution.partner_id, referral_code: ownerAttribution.referral_code }]
       : []),
   ];
-  const primaryReferral = referralSources[0] ?? null;
-  const commissionEstimate = referralSources.length === 1 ? expectedCommission : null;
+  const { data: dealRows, error: createError } = await db.rpc("create_deal_with_commissions", {
+    p_buyer_lead_id: leadId,
+    p_land_id: landId,
+    p_listing_ref: listingRef,
+    p_listing_title: listingTitle,
+    p_expected_commission: expectedCommission,
+    p_assigned_to: lead.assigned_to,
+    p_referral_sources: referralSources,
+  });
+  if (createError) throw new Error(`Create deal failed: ${createError.message}`);
 
-  const { data: deal, error } = await db
-    .from("deals")
-    .insert({
-      land_id: landId,
-      listing_ref: listingRef,
-      listing_title: listingTitle,
-      buyer_lead_id: leadId,
-      partner_id: primaryReferral?.partner_id ?? null,
-      referral_code: primaryReferral?.referral_code ?? null,
-      deal_value: null,
-      commission_paid: null,
-      expected_commission: referralSources.length > 0 ? expectedCommission : null,
-      status: "in_progress",
-      stage: "qualified",
-      assigned_to: lead.assigned_to,
-      notes: null,
-      updated_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error || !deal) throw new Error(`Create deal failed: ${error?.message ?? "Unknown error"}`);
-
-  if (referralSources.length > 0) {
-    const { error: commissionError } = await db.from("commissions").insert(
-      referralSources.map((source) => ({
-        deal_id: deal.id,
-        source_lead_id: source.source_lead_id,
-        source_type: source.source_type,
-        partner_id: source.partner_id,
-        referral_code: source.referral_code,
-        amount_estimated: commissionEstimate,
-        status: "estimated",
-        amount_paid: 0,
-      }))
-    );
-    if (commissionError) console.error(`Create commission estimate failed deal_id=${deal.id}:`, commissionError.message);
-  }
+  const dealResult = Array.isArray(dealRows) ? dealRows[0] : dealRows;
+  const dealId = dealResult?.deal_id as string | undefined;
+  const created = Boolean(dealResult?.created);
+  if (!dealId) throw new Error("Create deal failed: no deal id returned");
+  if (!created) redirect(`/admin/deals/${dealId}`);
 
   await syncBuyerLeadStatus(db, leadId);
 
   await addAuditNote(leadId, `เปิด Deal${listingTitle ? `: ${listingTitle}` : ""}`, admin.email);
   await sendCrmEvent("deal_created", {
-    deal_id: deal.id,
+    deal_id: dealId,
     lead_id: leadId,
     listing_ref: listingRef,
     stage: "qualified",
@@ -222,7 +193,7 @@ export async function createDealFromLead(formData: FormData) {
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
   revalidatePath("/admin/deals");
-  redirect(`/admin/deals/${deal.id}`);
+  redirect(`/admin/deals/${dealId}`);
 }
 
 export async function updateDealStage(formData: FormData) {
@@ -236,49 +207,38 @@ export async function updateDealStage(formData: FormData) {
   const notes = optionalText(formData, "notes", 4000);
 
   const db = createServerClient();
-  const { data: existing, error: loadError } = await db
-    .from("deals")
-    .select("buyer_lead_id,land_id,stage")
-    .eq("id", dealId)
-    .maybeSingle();
-  if (loadError) throw new Error(`Load deal failed: ${loadError.message}`);
-  if (!existing) throw new Error("Deal not found");
-
   if (dealStageRequiresValue(stage) && (dealValue === null || dealValue <= 0)) {
     throw new Error("Deal value is required before marking a deal as won");
   }
 
   const status = dealStatusForStage(stage);
-  const now = new Date().toISOString();
-  const { error } = await db
-    .from("deals")
-    .update({
-      stage,
-      status,
-      deal_value: dealValue,
-      assigned_to: assignedTo,
-      notes,
-      closed_at: stage === "won" || stage === "lost" ? now : null,
-      updated_at: now,
-    })
-    .eq("id", dealId);
+  const { data: stageRows, error } = await db.rpc("update_deal_stage_atomic", {
+    p_deal_id: dealId,
+    p_stage: stage,
+    p_deal_value: dealValue,
+    p_assigned_to: assignedTo,
+    p_notes: notes,
+  });
   if (error) throw new Error(`Update deal failed: ${error.message}`);
 
-  if (stage === "lost") {
-    await db.from("commissions").update({ status: "cancelled", updated_at: now }).eq("deal_id", dealId).neq("status", "paid");
+  const stageResult = Array.isArray(stageRows) ? stageRows[0] : stageRows;
+  const buyerLeadId = (stageResult?.buyer_lead_id as string | null | undefined) ?? null;
+  const landId = (stageResult?.land_id as string | null | undefined) ?? null;
+  const previousStage = stageResult?.previous_stage as string | undefined;
+  if (!previousStage) throw new Error("Update deal failed: no previous stage returned");
+
+  if (buyerLeadId) {
+    await syncBuyerLeadStatus(db, buyerLeadId);
   }
-  if (existing.buyer_lead_id) {
-    await syncBuyerLeadStatus(db, existing.buyer_lead_id);
-  }
-  if (existing.land_id) {
-    await syncLandStatus(db, existing.land_id);
+  if (landId) {
+    await syncLandStatus(db, landId);
   }
 
-  await addAuditNote(existing.buyer_lead_id, `อัปเดต Deal stage: ${stage}`, admin.email);
+  await addAuditNote(buyerLeadId, `อัปเดต Deal stage: ${stage}`, admin.email);
   await sendCrmEvent("deal_stage_changed", {
     deal_id: dealId,
-    lead_id: existing.buyer_lead_id,
-    previous_stage: existing.stage,
+    lead_id: buyerLeadId,
+    previous_stage: previousStage,
     stage,
     status,
     deal_value: dealValue,
@@ -286,7 +246,7 @@ export async function updateDealStage(formData: FormData) {
   });
   revalidatePath("/admin/deals");
   revalidatePath(`/admin/deals/${dealId}`);
-  if (existing.buyer_lead_id) revalidatePath(`/admin/leads/${existing.buyer_lead_id}`);
+  if (buyerLeadId) revalidatePath(`/admin/leads/${buyerLeadId}`);
 }
 
 export async function updateCommission(formData: FormData) {
@@ -307,68 +267,28 @@ export async function updateCommission(formData: FormData) {
     throw new Error("Paid amount cannot exceed approved commission");
   }
 
-  const now = new Date().toISOString();
   const db = createServerClient();
-  const { data: commission, error: loadError } = await db
-    .from("commissions")
-    .select("deal_id,partner_id,deal:deals(stage)")
-    .eq("id", commissionId)
-    .maybeSingle();
-  if (loadError) throw new Error(`Load commission failed: ${loadError.message}`);
-  if (!commission) throw new Error("Commission not found");
-
-  const deal = Array.isArray(commission.deal) ? commission.deal[0] : commission.deal;
-  if (!deal || !commissionStatusAllowedForDealStage(deal.stage as DealStage, status)) {
-    throw new Error("Commission can only become payable or paid after the deal is won");
-  }
-
-  const { error } = await db.from("commissions").update({
-    status,
-    amount_approved: amountApproved,
-    amount_paid: amountPaid,
-    approved_at: ["approved", "payable", "paid"].includes(status) ? now : null,
-    paid_at: status === "paid" ? now : null,
-    updated_at: now,
-  }).eq("id", commissionId);
+  const effectiveAmountPaid = status === "paid" ? amountPaid : 0;
+  const { data: updateRows, error } = await db.rpc("update_commission_atomic", {
+    p_commission_id: commissionId,
+    p_status: status,
+    p_amount_approved: amountApproved,
+    p_amount_paid: effectiveAmountPaid,
+  });
   if (error) throw new Error(`Update commission failed: ${error.message}`);
 
-  const { data: paidDealRows, error: paidDealRowsError } = await db
-    .from("commissions")
-    .select("amount_paid")
-    .eq("deal_id", commission.deal_id)
-    .eq("status", "paid");
-  if (paidDealRowsError) throw new Error(`Recalculate deal commission failed: ${paidDealRowsError.message}`);
-  const totalDealCommissionPaid = (paidDealRows ?? []).reduce((sum, row) => sum + Number(row.amount_paid ?? 0), 0);
-
-  const { error: dealCommissionError } = await db
-    .from("deals")
-    .update({ commission_paid: totalDealCommissionPaid, updated_at: now })
-    .eq("id", commission.deal_id);
-  if (dealCommissionError) throw new Error(`Update deal commission total failed: ${dealCommissionError.message}`);
-
-  if (commission.partner_id) {
-    const { data: paidRows, error: paidRowsError } = await db
-      .from("commissions")
-      .select("amount_paid")
-      .eq("partner_id", commission.partner_id)
-      .eq("status", "paid");
-    if (paidRowsError) throw new Error(`Recalculate partner total failed: ${paidRowsError.message}`);
-    const totalPaid = (paidRows ?? []).reduce((sum, row) => sum + Number(row.amount_paid ?? 0), 0);
-    const { error: partnerError } = await db
-      .from("partners")
-      .update({ total_paid: totalPaid, updated_at: now })
-      .eq("id", commission.partner_id);
-    if (partnerError) throw new Error(`Update partner total failed: ${partnerError.message}`);
-  }
+  const updateResult = Array.isArray(updateRows) ? updateRows[0] : updateRows;
+  const dealId = updateResult?.deal_id as string | undefined;
+  if (!dealId) throw new Error("Update commission failed: no deal id returned");
 
   await sendCrmEvent("commission_changed", {
     commission_id: commissionId,
-    deal_id: commission.deal_id,
+    deal_id: dealId,
     status,
     amount_approved: amountApproved,
-    amount_paid: amountPaid,
+    amount_paid: effectiveAmountPaid,
   });
 
   revalidatePath("/admin/deals");
-  revalidatePath(`/admin/deals/${commission.deal_id}`);
+  revalidatePath(`/admin/deals/${dealId}`);
 }

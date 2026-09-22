@@ -26,34 +26,34 @@ export async function GET(req: NextRequest) {
   const runDate = bangkokDate();
   const jobKey = "crm_daily_summary";
 
-  const { data: existing, error: existingError } = await db
-    .from("crm_automation_runs")
-    .select("id,status")
-    .eq("job_key", jobKey)
-    .eq("run_date", runDate)
-    .maybeSingle();
-  if (existingError && existingError.code !== "PGRST116") {
-    return NextResponse.json({ error: "Automation ledger query failed" }, { status: 500 });
-  }
-  if (existing?.status === "sent") {
-    return NextResponse.json({ ok: true, skipped: true, reason: "already_sent", run_date: runDate });
+  const { data: claimRows, error: claimError } = await db.rpc("claim_crm_automation_run", {
+    p_job_key: jobKey,
+    p_run_date: runDate,
+  });
+  if (claimError) {
+    console.error("CRM daily summary claim failed:", claimError.message);
+    return NextResponse.json({ error: "Automation claim failed" }, { status: 500 });
   }
 
-  let runId = existing?.id as string | undefined;
-  if (!runId) {
-    const { data: created, error: createError } = await db
-      .from("crm_automation_runs")
-      .insert({ job_key: jobKey, run_date: runDate, status: "pending", updated_at: new Date().toISOString() })
-      .select("id")
-      .single();
-    if (createError) {
-      if (createError.code === "23505") {
-        return NextResponse.json({ ok: true, skipped: true, reason: "concurrent_run", run_date: runDate });
-      }
-      return NextResponse.json({ error: "Automation ledger create failed" }, { status: 500 });
-    }
-    runId = created.id;
+  const claim = Array.isArray(claimRows) ? claimRows[0] : claimRows;
+  const runId = claim?.run_id as string | undefined;
+  const claimToken = claim?.run_claim_token as string | undefined;
+  if (!runId || !claimToken) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "already_claimed_or_sent", run_date: runDate });
   }
+
+  const finishRun = async (success: boolean) => {
+    const { data, error } = await db.rpc("finish_crm_automation_run", {
+      p_run_id: runId,
+      p_claim_token: claimToken,
+      p_success: success,
+    });
+    if (error) {
+      console.error("CRM daily summary finish failed:", error.message);
+      return false;
+    }
+    return data === true;
+  };
 
   const [newLeads, qualifiedLeads, activeDeals, wonDeals, payableCommissions, pendingCommissions] = await Promise.all([
     db.from("leads").select("id", { count: "exact", head: true }).eq("status", "new"),
@@ -67,11 +67,12 @@ export async function GET(req: NextRequest) {
   const results = [newLeads, qualifiedLeads, activeDeals, wonDeals, payableCommissions, pendingCommissions];
   const failure = results.find((result) => result.error);
   if (failure?.error) {
-    await db.from("crm_automation_runs").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", runId);
+    await finishRun(false);
     return NextResponse.json({ error: "Summary query failed" }, { status: 500 });
   }
 
   const summary = {
+    idempotency_key: `${jobKey}:${runDate}`,
     run_date: runDate,
     new_leads: newLeads.count ?? 0,
     qualified_leads: qualifiedLeads.count ?? 0,
@@ -82,11 +83,10 @@ export async function GET(req: NextRequest) {
   };
 
   const delivered = await sendCrmEvent("crm_daily_summary", summary);
-  const now = new Date().toISOString();
-  await db
-    .from("crm_automation_runs")
-    .update({ status: delivered ? "sent" : "failed", sent_at: delivered ? now : null, updated_at: now })
-    .eq("id", runId);
+  const stateSaved = await finishRun(delivered);
+  if (!stateSaved) {
+    return NextResponse.json({ error: "Automation state update failed", delivered, ...summary }, { status: 500 });
+  }
 
   if (!delivered) {
     return NextResponse.json({ ok: false, delivered: false, ...summary }, { status: 502 });
