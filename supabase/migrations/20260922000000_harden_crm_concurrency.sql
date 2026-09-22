@@ -94,7 +94,10 @@ begin
       updated_at = now()
   where job_key = p_job_key
     and run_date = p_run_date
-    and status in ('pending','failed')
+    and (
+      status in ('pending','failed')
+      or (status = 'running' and (claimed_at is null or claimed_at < now() - interval '15 minutes'))
+    )
   returning id into v_id;
 
   if v_id is null then

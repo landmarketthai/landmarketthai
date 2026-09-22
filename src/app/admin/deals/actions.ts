@@ -64,6 +64,21 @@ async function addAuditNote(leadId: string | null, note: string, createdBy: stri
   if (error) console.error(`Deal audit note failed lead_id=${leadId}:`, error.message);
 }
 
+async function resolveActivePartnerId(
+  db: ReturnType<typeof createServerClient>,
+  referralCode: string | null,
+): Promise<string | null> {
+  if (!referralCode) return null;
+  const { data, error } = await db
+    .from("partners")
+    .select("id")
+    .eq("referral_code", referralCode)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw new Error(`Resolve referral partner failed: ${error.message}`);
+  return data?.id ?? null;
+}
+
 async function syncBuyerLeadStatus(db: ReturnType<typeof createServerClient>, leadId: string) {
   const { data, error } = await db
     .from("deals")
@@ -130,20 +145,30 @@ export async function createDealFromLead(formData: FormData) {
   if (attributionError && attributionError.code !== "PGRST116") throw new Error(`Load attribution failed: ${attributionError.message}`);
 
   let ownerLeadId: string | null = null;
-  let ownerAttribution: { partner_id: string | null; referral_code: string } | null = null;
+  let ownerReferralCode: string | null = null;
+  let ownerPartnerId: string | null = null;
   if (landId) {
     const { data: land, error: landError } = await db.from("lands").select("owner_lead_id").eq("id", landId).maybeSingle();
     if (landError) throw new Error(`Load land owner source failed: ${landError.message}`);
     ownerLeadId = land?.owner_lead_id ?? null;
     if (ownerLeadId) {
-      const { data: source, error: sourceError } = await db
-        .from("referral_attributions")
-        .select("partner_id,referral_code")
-        .eq("lead_id", ownerLeadId)
-        .limit(1)
-        .maybeSingle();
-      if (sourceError && sourceError.code !== "PGRST116") throw new Error(`Load owner attribution failed: ${sourceError.message}`);
-      ownerAttribution = source ?? null;
+      const [sourceResult, ownerLeadResult] = await Promise.all([
+        db
+          .from("referral_attributions")
+          .select("partner_id,referral_code")
+          .eq("lead_id", ownerLeadId)
+          .limit(1)
+          .maybeSingle(),
+        db.from("leads").select("referral_code").eq("id", ownerLeadId).maybeSingle(),
+      ]);
+      if (sourceResult.error && sourceResult.error.code !== "PGRST116") {
+        throw new Error(`Load owner attribution failed: ${sourceResult.error.message}`);
+      }
+      if (ownerLeadResult.error && ownerLeadResult.error.code !== "PGRST116") {
+        throw new Error(`Load owner referral fallback failed: ${ownerLeadResult.error.message}`);
+      }
+      ownerReferralCode = sourceResult.data?.referral_code ?? ownerLeadResult.data?.referral_code ?? null;
+      ownerPartnerId = sourceResult.data?.partner_id ?? await resolveActivePartnerId(db, ownerReferralCode);
     }
   }
 
@@ -154,11 +179,11 @@ export async function createDealFromLead(formData: FormData) {
   if (existingDeal?.id) redirect(`/admin/deals/${existingDeal.id}`);
 
   const buyerReferralCode = buyerAttribution?.referral_code ?? lead.referral_code ?? null;
-  const buyerPartnerId = buyerAttribution?.partner_id ?? null;
+  const buyerPartnerId = buyerAttribution?.partner_id ?? await resolveActivePartnerId(db, buyerReferralCode);
   const referralSources = [
     ...(buyerReferralCode ? [{ source_lead_id: leadId, source_type: "buyer" as const, partner_id: buyerPartnerId, referral_code: buyerReferralCode }] : []),
-    ...(ownerLeadId && ownerAttribution?.referral_code
-      ? [{ source_lead_id: ownerLeadId, source_type: "owner" as const, partner_id: ownerAttribution.partner_id, referral_code: ownerAttribution.referral_code }]
+    ...(ownerLeadId && ownerReferralCode
+      ? [{ source_lead_id: ownerLeadId, source_type: "owner" as const, partner_id: ownerPartnerId, referral_code: ownerReferralCode }]
       : []),
   ];
   const { data: dealRows, error: createError } = await db.rpc("create_deal_with_commissions", {

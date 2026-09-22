@@ -81,55 +81,35 @@ export async function createDraftLandFromOwnerLead(formData: FormData) {
   const isEec = formData.get("is_eec") === "on";
 
   const db = createServerClient();
-  const [{ data: lead, error: leadError }, { data: existing, error: existingError }] = await Promise.all([
-    db.from("leads").select("id,lead_type,status").eq("id", leadId).maybeSingle(),
-    db.from("lands").select("id").eq("owner_lead_id", leadId).maybeSingle(),
-  ]);
-  if (leadError) throw new Error(`Load owner lead failed: ${leadError.message}`);
-  if (!lead || lead.lead_type !== "owner") throw new Error("Only owner leads can create property drafts");
-  if (existingError && existingError.code !== "PGRST116") throw new Error(`Check property draft failed: ${existingError.message}`);
-  if (existing?.id) redirect(`/admin/properties/${existing.id}`);
-
-  const { data: land, error } = await db.from("lands").insert({
-    title_th: title,
-    slug,
-    province_id: provinceId,
-    district,
-    land_type: type,
-    size_rai: sizeRai,
-    zoning: zone,
-    frontage_m: null,
-    price_per_rai: pricePerRai,
-    referral_reward_max: reward,
-    is_eec: isEec,
-    nearby_landmarks: null,
-    description: null,
-    lat: null,
-    lng: null,
-    location_precision: "approx",
-    status: "draft",
-    is_featured: false,
-    seo_title: null,
-    seo_description: null,
-    owner_lead_id: leadId,
-  }).select("id").single();
-  if (error || !land) throw new Error(`Create property draft failed: ${error?.message ?? "Unknown error"}`);
-
-  const now = new Date().toISOString();
-  await db.from("leads").update({ status: "qualified", updated_at: now }).eq("id", leadId);
-  await db.from("lead_activities").insert({
-    lead_id: leadId,
-    activity_type: "note",
-    note: `สร้าง Draft Property: ${title}`,
-    created_by: admin.email ?? null,
+  const { data: draftRows, error } = await db.rpc("create_property_draft_from_owner_lead", {
+    p_lead_id: leadId,
+    p_province_id: provinceId,
+    p_title: title,
+    p_slug: slug,
+    p_district: district,
+    p_land_type: type,
+    p_size_rai: sizeRai,
+    p_zoning: zone,
+    p_price_per_rai: pricePerRai,
+    p_referral_reward_max: reward,
+    p_is_eec: isEec,
+    p_created_by: admin.email ?? null,
   });
-  await sendCrmEvent("property_draft_created", { land_id: land.id, owner_lead_id: leadId, slug });
+  if (error) throw new Error(`Create property draft failed: ${error.message}`);
+
+  const draftResult = Array.isArray(draftRows) ? draftRows[0] : draftRows;
+  const landId = draftResult?.land_id as string | undefined;
+  const created = Boolean(draftResult?.created);
+  if (!landId) throw new Error("Create property draft failed: no land id returned");
+  if (!created) redirect(`/admin/properties/${landId}`);
+
+  await sendCrmEvent("property_draft_created", { land_id: landId, owner_lead_id: leadId, slug });
 
   revalidatePath("/admin");
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
   revalidatePath("/admin/properties");
-  redirect(`/admin/properties/${land.id}`);
+  redirect(`/admin/properties/${landId}`);
 }
 
 export async function updateProperty(formData: FormData) {
