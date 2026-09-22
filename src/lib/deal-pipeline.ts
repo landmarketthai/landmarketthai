@@ -1,4 +1,4 @@
-import type { DealStage, DealStatus } from "@/lib/types/database";
+import type { CommissionStatus, DealStage, DealStatus } from "@/lib/types/database";
 
 export const DEAL_STAGE_LABELS: Record<DealStage, string> = {
   qualified: "Qualified",
@@ -19,4 +19,13 @@ export function dealStatusForStage(stage: DealStage): DealStatus {
 
 export function isTerminalDealStage(stage: DealStage): boolean {
   return stage === "won" || stage === "lost";
+}
+
+export function dealStageRequiresValue(stage: DealStage): boolean {
+  return stage === "won";
+}
+
+export function commissionStatusAllowedForDealStage(stage: DealStage, status: CommissionStatus): boolean {
+  if (status === "payable" || status === "paid") return stage === "won";
+  return true;
 }

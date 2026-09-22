@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { safeNextPath } from "@/lib/safe-next";
+import { supabase } from "@/lib/supabase/client";
 
 function GoogleIcon() {
   return (
@@ -38,7 +39,7 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null);
 
   const authError = searchParams.get("error");
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const authErrorMessage =
     authError === "auth_failed"

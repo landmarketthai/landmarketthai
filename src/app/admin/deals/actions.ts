@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { sendCrmEvent } from "@/lib/crm-webhook";
-import { dealStatusForStage } from "@/lib/deal-pipeline";
+import {
+  commissionStatusAllowedForDealStage,
+  dealStageRequiresValue,
+  dealStatusForStage,
+} from "@/lib/deal-pipeline";
 import { listingStatusForDealStages } from "@/lib/property-pipeline";
 import { createServerClient } from "@/lib/supabase/server";
 import type { CommissionStatus, DealStage } from "@/lib/types/database";
@@ -240,6 +244,10 @@ export async function updateDealStage(formData: FormData) {
   if (loadError) throw new Error(`Load deal failed: ${loadError.message}`);
   if (!existing) throw new Error("Deal not found");
 
+  if (dealStageRequiresValue(stage) && (dealValue === null || dealValue <= 0)) {
+    throw new Error("Deal value is required before marking a deal as won");
+  }
+
   const status = dealStatusForStage(stage);
   const now = new Date().toISOString();
   const { error } = await db
@@ -301,9 +309,18 @@ export async function updateCommission(formData: FormData) {
 
   const now = new Date().toISOString();
   const db = createServerClient();
-  const { data: commission, error: loadError } = await db.from("commissions").select("deal_id,partner_id").eq("id", commissionId).maybeSingle();
+  const { data: commission, error: loadError } = await db
+    .from("commissions")
+    .select("deal_id,partner_id,deal:deals(stage)")
+    .eq("id", commissionId)
+    .maybeSingle();
   if (loadError) throw new Error(`Load commission failed: ${loadError.message}`);
   if (!commission) throw new Error("Commission not found");
+
+  const deal = Array.isArray(commission.deal) ? commission.deal[0] : commission.deal;
+  if (!deal || !commissionStatusAllowedForDealStage(deal.stage as DealStage, status)) {
+    throw new Error("Commission can only become payable or paid after the deal is won");
+  }
 
   const { error } = await db.from("commissions").update({
     status,
@@ -315,10 +332,19 @@ export async function updateCommission(formData: FormData) {
   }).eq("id", commissionId);
   if (error) throw new Error(`Update commission failed: ${error.message}`);
 
-  await db
+  const { data: paidDealRows, error: paidDealRowsError } = await db
+    .from("commissions")
+    .select("amount_paid")
+    .eq("deal_id", commission.deal_id)
+    .eq("status", "paid");
+  if (paidDealRowsError) throw new Error(`Recalculate deal commission failed: ${paidDealRowsError.message}`);
+  const totalDealCommissionPaid = (paidDealRows ?? []).reduce((sum, row) => sum + Number(row.amount_paid ?? 0), 0);
+
+  const { error: dealCommissionError } = await db
     .from("deals")
-    .update({ commission_paid: status === "paid" ? amountPaid : null, updated_at: now })
+    .update({ commission_paid: totalDealCommissionPaid, updated_at: now })
     .eq("id", commission.deal_id);
+  if (dealCommissionError) throw new Error(`Update deal commission total failed: ${dealCommissionError.message}`);
 
   if (commission.partner_id) {
     const { data: paidRows, error: paidRowsError } = await db

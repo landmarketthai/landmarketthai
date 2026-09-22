@@ -18,6 +18,9 @@ create index if not exists idx_deals_stage on deals(stage);
 create index if not exists idx_deals_buyer_lead on deals(buyer_lead_id) where buyer_lead_id is not null;
 create index if not exists idx_deals_listing_ref on deals(listing_ref) where listing_ref is not null;
 
+alter table referral_attributions
+  add column if not exists deal_id uuid references deals(id);
+
 create table if not exists commissions (
   id uuid primary key default gen_random_uuid(),
   deal_id uuid not null references deals(id) on delete cascade,

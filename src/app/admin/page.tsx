@@ -44,7 +44,7 @@ export default async function AdminHomePage() {
           <Stat label="Commission รอจ่าย" value={payableCommissions} />
         </div>
 
-        <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <div className="mt-7 grid gap-5 md:grid-cols-3">
           <Link href="/admin/leads" className="card p-6 transition-shadow hover:shadow-md">
             <div className="text-sm font-medium text-brand-600">01 · CRM</div>
             <h2 className="mt-1 text-xl font-bold text-slate-900">Lead & Follow-up</h2>
@@ -56,6 +56,12 @@ export default async function AdminHomePage() {
             <h2 className="mt-1 text-xl font-bold text-slate-900">Deal & Commission</h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-500">เดิน Pipeline ตั้งแต่ส่งแปลง นัดดู เจรจา มัดจำ ปิดดีล และควบคุมค่าตอบแทนแบบ Human Approval</p>
             <div className="mt-4 text-sm font-semibold text-brand-600">เปิด Deal Pipeline →</div>
+          </Link>
+          <Link href="/admin/properties" className="card p-6 transition-shadow hover:shadow-md">
+            <div className="text-sm font-medium text-brand-600">03 · INVENTORY</div>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">Property Operations</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">ตรวจ Owner Lead, สร้าง Draft Property, ควบคุมสถานะเผยแพร่ และดู Inventory กลางก่อนนำไป Matching</p>
+            <div className="mt-4 text-sm font-semibold text-brand-600">เปิด Property Backoffice →</div>
           </Link>
         </div>
 
