@@ -2,7 +2,6 @@ import type { Land, LandType, Province } from "@/lib/types/database";
 import { propertyHref } from "@/lib/property-detail-data";
 
 export const SEED_37_RAI_SLUG = "37-rai-eec-rayong";
-export const SEED_109_RAI_SLUG = "109-rai-eec-rayong";
 export const SEED_101_KABIN_SLUG = "101-rai-kabin-buri";
 
 const SEED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
@@ -72,51 +71,6 @@ export const SEED_37_RAI_LAND: Land = {
   images: [SEED_37_RAI_IMAGE],
 };
 
-/** Sold 109-rai — homepage deal-history only, excluded from /land active inventory. */
-export const SEED_109_RAI_LAND: Land = {
-  id: "seed-land-109-rai-eec-rayong",
-  public_ref: 0,
-  title_th: "ที่ดินอุตสาหกรรม EEC ระยอง",
-  slug: SEED_109_RAI_SLUG,
-  province_id: SEED_RAYONG_PROVINCE.id,
-  district: "นิคมพัฒนา ระยอง",
-  land_type: "industrial",
-  size_rai: 109,
-  zoning: "purple",
-  frontage_m: 240,
-  price_per_rai: 2_750_000,
-  total_price: null,
-  referral_reward_max: 4_000_000,
-  is_eec: true,
-  nearby_landmarks: ["ใกล้ WHA · BYD"],
-  description: null,
-  lat: null,
-  lng: null,
-  location_precision: "approx",
-  status: "sold",
-  is_featured: false,
-  seo_title: null,
-  seo_description: null,
-  created_at: SEED_TIMESTAMP,
-  updated_at: SEED_TIMESTAMP,
-  deleted_at: null,
-  province: SEED_RAYONG_PROVINCE,
-  images: [
-    {
-      id: "seed-img-109-rai",
-      land_id: "seed-land-109-rai-eec-rayong",
-      storage_key: "listings/109-rai-home-thumbnail.png",
-      url_or_cdn_path: "/images/listings/109-rai-home-thumbnail.png",
-      width: null,
-      height: null,
-      alt_th: "ภาพโดรนที่ดินอุตสาหกรรม 109 ไร่ ระยอง",
-      sort_order: 0,
-      is_cover: true,
-      created_at: SEED_TIMESTAMP,
-    },
-  ],
-};
-
 const SEED_101_KABIN_IMAGE = {
   id: "seed-img-101-kabin-buri",
   land_id: "seed-land-101-kabin-buri",
@@ -164,16 +118,12 @@ export const SEED_101_KABIN_LAND: Land = {
 
 export const SEED_ACTIVE_LISTINGS: Land[] = [SEED_37_RAI_LAND, SEED_101_KABIN_LAND];
 
-export const SEED_SOLD_SLUGS = new Set<string>([SEED_109_RAI_SLUG]);
+export const SEED_SOLD_SLUGS = new Set<string>();
 
 export const SEED_LISTING_IMAGES = {
   rayong37: {
     src: "/images/listings/37-rai-home-thumbnail.png",
     alt: "ภาพโดรนที่ดินอุตสาหกรรม 37 ไร่ ระยอง",
-  },
-  rayong109: {
-    src: "/images/listings/109-rai-home-thumbnail.png",
-    alt: "ภาพโดรนที่ดินอุตสาหกรรม 109 ไร่ ระยอง",
   },
   kabin101: {
     src: "/images/listings/kabin-buri-101-rai-home-thumbnail.png",
@@ -196,9 +146,6 @@ export function getSeedListingImage(land: Land) {
   if (land.slug === SEED_37_RAI_SLUG) {
     return SEED_LISTING_IMAGES.rayong37;
   }
-  if (land.slug === SEED_109_RAI_SLUG) {
-    return SEED_LISTING_IMAGES.rayong109;
-  }
   if (land.slug === SEED_101_KABIN_SLUG) {
     return SEED_LISTING_IMAGES.kabin101;
   }
@@ -209,9 +156,6 @@ export function getSeedListingHref(land: Land): string | undefined {
   if (land.slug === SEED_37_RAI_SLUG) {
     return propertyHref(SEED_37_RAI_SLUG);
   }
-  if (land.slug === SEED_109_RAI_SLUG) {
-    return propertyHref(SEED_109_RAI_SLUG);
-  }
   if (land.slug === SEED_101_KABIN_SLUG) {
     return propertyHref(SEED_101_KABIN_SLUG);
   }
@@ -219,7 +163,7 @@ export function getSeedListingHref(land: Land): string | undefined {
 }
 
 export function isSeedSoldOutListing(land: Land) {
-  return land.slug === SEED_109_RAI_SLUG || land.status === "sold";
+  return land.status === "sold";
 }
 
 export function isSeedFeaturedListing(land: Land) {

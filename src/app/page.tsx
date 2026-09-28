@@ -16,7 +16,6 @@ import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
 import { getFeaturedListings, getActiveDemands } from "@/lib/supabase/queries";
 import {
-  SEED_109_RAI_LAND,
   mergeWithSeedListings,
   resolveListingPresentation,
   sortSeedListings,
@@ -101,7 +100,6 @@ export default async function HomePage() {
   ]);
 
   const sortedListings = sortSeedListings(mergeWithSeedListings(featuredListings));
-  const showHomepageExtras = featuredListings.length === 0;
 
   const orgSchema = {
     "@context": "https://schema.org",
@@ -304,18 +302,6 @@ export default async function HomePage() {
                 />
               );
             })}
-            {showHomepageExtras && (
-              <>
-                <ListingCard
-                  key={SEED_109_RAI_LAND.id}
-                  land={SEED_109_RAI_LAND}
-                  ctaLabel="ดูรายละเอียดแปลง"
-                  {...resolveListingPresentation(SEED_109_RAI_LAND)}
-                  rewardLabel="ค่าตอบแทนผู้แนะนำ (ดีลสำเร็จ)"
-                  rewardSuffix={undefined}
-                />
-              </>
-            )}
           </div>
         </div>
       </section>

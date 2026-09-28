@@ -3,10 +3,8 @@ import assert from "node:assert/strict";
 import type { Land } from "@/lib/types/database";
 import {
   mergeWithSeedListings,
-  filterSeedActiveListings,
   SEED_37_RAI_SLUG,
   SEED_101_KABIN_SLUG,
-  SEED_109_RAI_SLUG,
 } from "./seed-listings.ts";
 
 const slugs = (lands: Land[]) => lands.map((land) => land.slug);
@@ -45,12 +43,6 @@ test("eec and industrial type filters include the 37-rai seed", () => {
 test("non-matching province filter returns empty results", () => {
   const result = mergeWithSeedListings([], { province_slug: "chiang-mai" });
   assert.equal(result.length, 0);
-});
-
-// 4. The sold 109-rai listing must never appear in active /land results.
-test("sold 109-rai never appears in active /land results", () => {
-  assert.ok(!slugs(filterSeedActiveListings()).includes(SEED_109_RAI_SLUG));
-  assert.ok(!slugs(mergeWithSeedListings([])).includes(SEED_109_RAI_SLUG));
 });
 
 // 5. Active 101-rai Kabin Buri must appear in default /land results.
