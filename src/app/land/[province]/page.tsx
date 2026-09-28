@@ -8,6 +8,7 @@ import { getProvinceBySlug, getAllProvinces } from "@/lib/supabase/queries";
 import { LAND_TYPE_LABELS } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 interface Params { province: string }
