@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ListingGrid from "@/components/listings/ListingGrid";
 import JsonLd from "@/components/seo/JsonLd";
-import { getProvinceBySlug, getAllProvinces } from "@/lib/supabase/queries";
+import { getProvinceBySlug } from "@/lib/supabase/queries";
+import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
 import { LAND_TYPE_LABELS } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
 
@@ -14,14 +15,13 @@ export const revalidate = 3600;
 interface Params { province: string }
 interface SearchParams { page?: string }
 
-export async function generateStaticParams() {
-  const provinces = await getAllProvinces().catch(() => []);
-  return provinces.map((p) => ({ province: p.slug }));
+async function resolveProvince(slug: string) {
+  return (await getProvinceBySlug(slug).catch(() => null)) ?? getFallbackProvinceBySlug(slug);
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { province: slug } = await params;
-  const province = await getProvinceBySlug(slug).catch(() => null);
+  const province = await resolveProvince(slug);
   if (!province) return {};
   return {
     title: `ที่ดินอุตสาหกรรม${province.name_th} – ที่ดิน EEC ${province.name_en}`,
@@ -41,7 +41,7 @@ export default async function ProvincePage({
 }) {
   const { province: slug } = await params;
   const { page } = await searchParams;
-  const province = await getProvinceBySlug(slug).catch(() => null);
+  const province = await resolveProvince(slug);
   if (!province) notFound();
 
   const breadcrumb = {
