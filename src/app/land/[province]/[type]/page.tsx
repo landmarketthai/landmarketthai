@@ -4,25 +4,23 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ListingGrid from "@/components/listings/ListingGrid";
 import JsonLd from "@/components/seo/JsonLd";
-import { getProvinceBySlug, getAllProvinces } from "@/lib/supabase/queries";
+import { getProvinceBySlug } from "@/lib/supabase/queries";
+import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
 import { LAND_TYPE_LABELS, slugToLandType } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 interface Params { province: string; type: string }
 interface SearchParams { page?: string }
 
-export async function generateStaticParams() {
-  const provinces = await getAllProvinces().catch(() => []);
-  const types = Object.keys(LAND_TYPE_LABELS);
-  return provinces.flatMap((p) =>
-    types.map((t) => ({ province: p.slug, type: t.replace(/_/g, "-") }))
-  );
+async function resolveProvince(slug: string) {
+  return (await getProvinceBySlug(slug).catch(() => null)) ?? getFallbackProvinceBySlug(slug);
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { province: slug, type } = await params;
-  const province = await getProvinceBySlug(slug).catch(() => null);
+  const province = await resolveProvince(slug);
   const landType = slugToLandType(type);
   if (!province || !landType) return {};
   const typeName = LAND_TYPE_LABELS[landType];
@@ -43,7 +41,7 @@ export default async function ProvinceTypePage({
   const { province: slug, type } = await params;
   const { page } = await searchParams;
   const [province, landType] = await Promise.all([
-    getProvinceBySlug(slug).catch(() => null),
+    resolveProvince(slug),
     Promise.resolve(slugToLandType(type)),
   ]);
   if (!province || !landType) notFound();
