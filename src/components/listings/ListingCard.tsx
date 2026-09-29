@@ -22,6 +22,7 @@ interface Props {
   ctaLabel?: string;
   metaTagLabel?: string;
   rewardLabel?: string;
+  pricePerRaiLabel?: string;
 }
 
 export default function ListingCard({
@@ -33,6 +34,7 @@ export default function ListingCard({
   ctaLabel = "ดูรายละเอียดแปลง",
   metaTagLabel,
   rewardLabel,
+  pricePerRaiLabel,
 }: Props) {
   const isSoldOut = soldOut ?? land.status === "sold";
   const coverImage = land.images?.find((img) => img.is_cover) ?? land.images?.[0];
@@ -87,7 +89,7 @@ export default function ListingCard({
           )}
 
           {isSoldOut && (
-            <span className="absolute right-3 top-3 z-20 rounded-md bg-red-600 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
+            <span className="absolute right-3 top-3 z-20 rounded-md bg-red-600 px-3 py-1.5 text-xs font-black tracking-wide text-white shadow-lg">
               Sold out
             </span>
           )}
@@ -140,7 +142,7 @@ export default function ListingCard({
           <div className="min-w-0">
             <div className="text-xs text-slate-400">ราคา/ไร่</div>
             <div className="text-sm font-bold text-gold-500">
-              {formatMoney(land.price_per_rai)} ฿
+              {pricePerRaiLabel ?? `${formatMoney(land.price_per_rai)} ฿`}
             </div>
           </div>
           <Link

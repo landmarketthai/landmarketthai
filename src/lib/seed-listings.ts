@@ -239,6 +239,7 @@ export function resolveListingPresentation(land: Land) {
     soldOut: isSeedSoldOutListing(land),
     featured,
     metaTagLabel: land.slug === SEED_37_RAI_SLUG ? SEED_37_RAI_META.zoningLabel : undefined,
+    pricePerRaiLabel: land.slug === SEED_109_RAI_SLUG ? "2.75 ล้าน ฿" : undefined,
     rewardLabel:
       land.slug === SEED_37_RAI_SLUG
         ? SEED_37_RAI_META.rewardLabel

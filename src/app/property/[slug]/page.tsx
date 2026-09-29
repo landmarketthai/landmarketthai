@@ -81,7 +81,7 @@ export default async function PropertyDetailPage({
                 {property.zoning}
               </span>
               {isSoldOut && (
-                <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white shadow-sm">
+                <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black tracking-wide text-white shadow-sm">
                   Sold out
                 </span>
               )}
@@ -220,7 +220,7 @@ export default async function PropertyDetailPage({
               {isSoldOut ? (
                 <>
                   <div className="bg-[#071d4a] p-5 text-white">
-                    <div className="inline-flex rounded-md bg-red-600 px-3 py-1.5 text-sm font-black uppercase tracking-wide text-white">
+                    <div className="inline-flex rounded-md bg-red-600 px-3 py-1.5 text-sm font-black tracking-wide text-white">
                       Sold out
                     </div>
                     <p className="mt-3 text-sm leading-relaxed text-blue-50">
@@ -304,7 +304,7 @@ export default async function PropertyDetailPage({
             {isSoldOut ? (
               <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
-                  <div className="mb-2 inline-flex rounded-md bg-red-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                  <div className="mb-2 inline-flex rounded-md bg-red-600 px-3 py-1 text-xs font-black tracking-wide text-white">
                     Sold out
                   </div>
                   <h2 className="text-xl font-black sm:text-2xl">
