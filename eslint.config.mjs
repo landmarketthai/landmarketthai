@@ -1,13 +1,12 @@
-import { createRequire } from "module";
+import { FlatCompat } from "@eslint/eslintrc";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 
-// eslint-config-next v16 exports flat config arrays directly.
-// Using createRequire avoids FlatCompat, which has a circular-JSON bug with ESLint 9.
-const require = createRequire(import.meta.url);
-const nextCoreWebVitals = require("eslint-config-next/core-web-vitals");
-const nextTypescript = require("eslint-config-next/typescript");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default [
   { ignores: ["**/*.test.ts"] },
-  ...nextCoreWebVitals,
-  ...nextTypescript,
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];

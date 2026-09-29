@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ListingCard from "./ListingCard";
 import LineButton from "@/components/ui/LineButton";
-import { getActiveListings } from "@/lib/supabase/queries";
+import { getActiveListings } from "@/lib/neon/queries";
 import {
   mergeWithSeedListings,
   resolveListingPresentation,

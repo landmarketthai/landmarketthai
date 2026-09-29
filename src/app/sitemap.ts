@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getActiveListings, getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/supabase/queries";
+import { getActiveListings, getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/neon/queries";
 import { LAND_TYPE_LABELS, listingHref, landTypeSlug } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
 

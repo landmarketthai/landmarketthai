@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import { createSessionClient } from "@/lib/supabase/server";
 
+// Legacy callback kept for old bookmarks. Neon Auth handles OAuth callbacks on its
+// managed endpoint and redirects directly to the requested LandmarketThai URL.
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const url = new URL(request.url);
+  const requestedNext = url.searchParams.get("next") ?? "/";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//")
+    ? requestedNext
+    : "/";
 
-  if (code) {
-    const supabase = await createSessionClient();
-    if (!supabase) {
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`);
-    }
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
-  }
-
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  return NextResponse.redirect(new URL(next, url.origin));
 }
