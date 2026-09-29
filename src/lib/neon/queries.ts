@@ -100,7 +100,7 @@ const LAND_SELECT = `
   left join land_images i on i.land_id = l.id
 `;
 
-async function activeListingRows(opts?: {
+async function publicListingRows(opts?: {
   province_slug?: string;
   land_type?: string;
   limit?: number;
@@ -115,10 +115,10 @@ async function activeListingRows(opts?: {
   if (opts?.province_slug && opts?.land_type) {
     return sql.query(
       `${LAND_SELECT}
-       where l.status = 'active' and l.deleted_at is null
+       where l.status in ('active', 'sold') and l.deleted_at is null
          and p.slug = $1 and l.land_type = $2
        group by l.id, p.id
-       order by l.is_featured desc, l.created_at desc
+       order by case when l.status = 'active' then 0 else 1 end, l.is_featured desc, l.created_at desc
        limit $3 offset $4`,
       [opts.province_slug, opts.land_type, limit, offset],
     );
@@ -127,9 +127,9 @@ async function activeListingRows(opts?: {
   if (opts?.province_slug) {
     return sql.query(
       `${LAND_SELECT}
-       where l.status = 'active' and l.deleted_at is null and p.slug = $1
+       where l.status in ('active', 'sold') and l.deleted_at is null and p.slug = $1
        group by l.id, p.id
-       order by l.is_featured desc, l.created_at desc
+       order by case when l.status = 'active' then 0 else 1 end, l.is_featured desc, l.created_at desc
        limit $2 offset $3`,
       [opts.province_slug, limit, offset],
     );
@@ -138,9 +138,9 @@ async function activeListingRows(opts?: {
   if (opts?.land_type) {
     return sql.query(
       `${LAND_SELECT}
-       where l.status = 'active' and l.deleted_at is null and l.land_type = $1
+       where l.status in ('active', 'sold') and l.deleted_at is null and l.land_type = $1
        group by l.id, p.id
-       order by l.is_featured desc, l.created_at desc
+       order by case when l.status = 'active' then 0 else 1 end, l.is_featured desc, l.created_at desc
        limit $2 offset $3`,
       [opts.land_type, limit, offset],
     );
@@ -148,21 +148,21 @@ async function activeListingRows(opts?: {
 
   return sql.query(
     `${LAND_SELECT}
-     where l.status = 'active' and l.deleted_at is null
+     where l.status in ('active', 'sold') and l.deleted_at is null
      group by l.id, p.id
-     order by l.is_featured desc, l.created_at desc
+     order by case when l.status = 'active' then 0 else 1 end, l.is_featured desc, l.created_at desc
      limit $1 offset $2`,
     [limit, offset],
   );
 }
 
-export async function getActiveListings(opts?: {
+export async function getPublicListings(opts?: {
   province_slug?: string;
   land_type?: string;
   limit?: number;
   offset?: number;
 }): Promise<Land[]> {
-  const rows = await activeListingRows(opts);
+  const rows = await publicListingRows(opts);
   return rows.map(normalizeLand);
 }
 
@@ -173,9 +173,9 @@ export async function getFeaturedListings(limit = 6): Promise<Land[]> {
   const safeLimit = Math.min(Math.max(limit, 1), 50);
   const rows = await sql.query(
     `${LAND_SELECT}
-     where l.status = 'active' and l.deleted_at is null and l.is_featured = true
+     where l.status in ('active', 'sold') and l.deleted_at is null and l.is_featured = true
      group by l.id, p.id
-     order by l.created_at desc
+     order by case when l.status = 'active' then 0 else 1 end, l.created_at desc
      limit $1`,
     [safeLimit],
   );
@@ -189,7 +189,7 @@ export async function getListingByRef(publicRef: number): Promise<Land | null> {
 
   const rows = await sql.query(
     `${LAND_SELECT}
-     where l.public_ref = $1 and l.status = 'active' and l.deleted_at is null
+     where l.public_ref = $1 and l.status in ('active', 'sold') and l.deleted_at is null
      group by l.id, p.id
      limit 1`,
     [publicRef],

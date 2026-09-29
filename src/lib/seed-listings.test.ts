@@ -4,6 +4,7 @@ import type { Land } from "@/lib/types/database";
 import {
   mergeWithSeedListings,
   SEED_37_RAI_SLUG,
+  SEED_109_RAI_SLUG,
   SEED_101_KABIN_SLUG,
 } from "./seed-listings.ts";
 
@@ -48,6 +49,19 @@ test("non-matching province filter returns empty results", () => {
 // 5. Active 101-rai Kabin Buri must appear in default /land results.
 test("default /land includes the 101-rai Kabin Buri seed when DB is empty", () => {
   assert.ok(slugs(mergeWithSeedListings([])).includes(SEED_101_KABIN_SLUG));
+});
+
+// Sold 109-rai Rayong is intentionally public as a completed-deal portfolio listing.
+test("default /land includes the sold 109-rai Rayong listing", () => {
+  const result = mergeWithSeedListings([]);
+  assert.ok(slugs(result).includes(SEED_109_RAI_SLUG));
+  assert.equal(result.find((land) => land.slug === SEED_109_RAI_SLUG)?.status, "sold");
+});
+
+test("rayong filter includes both active 37-rai and sold 109-rai listings", () => {
+  const result = mergeWithSeedListings([], { province_slug: "rayong" });
+  assert.ok(slugs(result).includes(SEED_37_RAI_SLUG));
+  assert.ok(slugs(result).includes(SEED_109_RAI_SLUG));
 });
 
 // Real DB rows must be preserved alongside the seed fallback (single pipeline).

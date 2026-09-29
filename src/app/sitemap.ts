@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getActiveListings, getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/neon/queries";
+import { getPublicListings, getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/neon/queries";
 import { LAND_TYPE_LABELS, listingHref, landTypeSlug } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
 
@@ -7,7 +7,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://landmarketthai.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [listings, provinces, demands, posts] = await Promise.all([
-    getActiveListings({ limit: 500 }).catch(() => []),
+    getPublicListings({ limit: 500 }).catch(() => []),
     getAllProvinces().catch(() => []),
     getActiveDemands(200).catch(() => []),
     getPublishedPosts({ limit: 200 }).catch(() => []),

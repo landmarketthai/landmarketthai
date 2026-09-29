@@ -45,6 +45,8 @@ export default async function PropertyDetailPage({
 
   if (!property) notFound();
 
+  const isSoldOut = property.soldOut === true;
+
   return (
     <main className="bg-white">
       <section className="relative overflow-hidden bg-slate-950 text-white">
@@ -78,6 +80,11 @@ export default async function PropertyDetailPage({
               <span className="rounded-full bg-purple-500/90 px-3 py-1 text-xs font-bold text-white">
                 {property.zoning}
               </span>
+              {isSoldOut && (
+                <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white shadow-sm">
+                  Sold out
+                </span>
+              )}
             </div>
 
             <h1 className="text-[2rem] font-black leading-tight sm:text-4xl lg:text-5xl">
@@ -98,15 +105,17 @@ export default async function PropertyDetailPage({
                 <div className="text-xs font-semibold text-slate-500">ราคา/ไร่</div>
                 <div className="mt-1 text-xl font-black sm:text-2xl">{property.pricePerRai}</div>
               </div>
-              <div className="rounded-2xl border border-gold-400/60 bg-[#071d4a]/92 px-4 py-4 shadow-lg sm:px-5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-blue-100">
-                  <BadgeDollarSign size={16} className="text-gold-400" />
-                  ค่าแนะนำ
+              {!isSoldOut && property.referralReward && (
+                <div className="rounded-2xl border border-gold-400/60 bg-[#071d4a]/92 px-4 py-4 shadow-lg sm:px-5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-100">
+                    <BadgeDollarSign size={16} className="text-gold-400" />
+                    ค่าแนะนำ
+                  </div>
+                  <div className="mt-1 text-xl font-black text-gold-400 sm:text-2xl">
+                    {property.referralReward}
+                  </div>
                 </div>
-                <div className="mt-1 text-xl font-black text-gold-400 sm:text-2xl">
-                  {property.referralReward}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -208,44 +217,81 @@ export default async function PropertyDetailPage({
 
           <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <div className="card overflow-hidden">
-              <div className="bg-[#071d4a] p-5 text-white">
-                <div className="text-sm font-semibold text-blue-100">สนใจที่ดินแปลงนี้?</div>
-                <p className="mt-2 text-sm leading-relaxed text-blue-50">
-                  ฝากเบอร์โทรหรือเพิ่ม LINE OA เพื่อรับข้อมูลทำเล ราคา เอกสาร และนัดหมายเข้าชมพื้นที่
-                </p>
-              </div>
-
-              <div className="space-y-4 p-4 sm:p-5" id="inquiry">
-                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <div className="text-xs text-slate-400">ขนาดที่ดิน</div>
-                    <div className="wrap-break-word font-bold text-slate-800">{property.size}</div>
+              {isSoldOut ? (
+                <>
+                  <div className="bg-[#071d4a] p-5 text-white">
+                    <div className="inline-flex rounded-md bg-red-600 px-3 py-1.5 text-sm font-black uppercase tracking-wide text-white">
+                      Sold out
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-blue-50">
+                      แปลงนี้ปิดการขายเรียบร้อยแล้ว และไม่ได้เปิดรับข้อเสนอหรือผู้แนะนำเพิ่มเติม
+                    </p>
                   </div>
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <div className="text-xs text-slate-400">ค่าแนะนำ</div>
-                    <div className="wrap-break-word font-bold text-gold-500">{property.referralReward}</div>
+                  <div className="space-y-4 p-4 sm:p-5">
+                    <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <div className="text-xs text-slate-400">ขนาดที่ดิน</div>
+                        <div className="wrap-break-word font-bold text-slate-800">{property.size}</div>
+                      </div>
+                      <div className="rounded-xl bg-red-50 p-3">
+                        <div className="text-xs text-red-500">สถานะ</div>
+                        <div className="font-black text-red-600">Sold out</div>
+                      </div>
+                    </div>
+                    <Link href="/land" className="btn-green w-full text-sm">
+                      ดูที่ดินที่ยังเปิดขาย
+                    </Link>
+                    <LineButton
+                      size="md"
+                      label="สอบถามแปลงใกล้เคียงผ่าน LINE"
+                      className="w-full text-sm"
+                    />
                   </div>
-                </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-[#071d4a] p-5 text-white">
+                    <div className="text-sm font-semibold text-blue-100">สนใจที่ดินแปลงนี้?</div>
+                    <p className="mt-2 text-sm leading-relaxed text-blue-50">
+                      ฝากเบอร์โทรหรือเพิ่ม LINE OA เพื่อรับข้อมูลทำเล ราคา เอกสาร และนัดหมายเข้าชมพื้นที่
+                    </p>
+                  </div>
 
-                <LineButton
-                  size="md"
-                  label="สอบถามผ่าน LINE OA"
-                  className="w-full text-sm"
-                />
+                  <div className="space-y-4 p-4 sm:p-5" id="inquiry">
+                    <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <div className="text-xs text-slate-400">ขนาดที่ดิน</div>
+                        <div className="wrap-break-word font-bold text-slate-800">{property.size}</div>
+                      </div>
+                      {property.referralReward && (
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <div className="text-xs text-slate-400">ค่าแนะนำ</div>
+                          <div className="wrap-break-word font-bold text-gold-500">{property.referralReward}</div>
+                        </div>
+                      )}
+                    </div>
 
-                <LeadForm compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
+                    <LineButton
+                      size="md"
+                      label="สอบถามผ่าน LINE OA"
+                      className="w-full text-sm"
+                    />
 
-                <div className="grid gap-2 border-t border-slate-100 pt-4">
-                  <Link href="/contact" className="btn-outline w-full text-sm">
-                    <CalendarDays size={16} />
-                    นัดหมายเข้าชมพื้นที่
-                  </Link>
-                  <Link href="/become-partner" className="btn-green w-full text-sm opacity-90">
-                    <Handshake size={16} />
-                    แนะนำลูกค้า รับค่าแนะนำ
-                  </Link>
-                </div>
-              </div>
+                    <LeadForm compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
+
+                    <div className="grid gap-2 border-t border-slate-100 pt-4">
+                      <Link href="/contact" className="btn-outline w-full text-sm">
+                        <CalendarDays size={16} />
+                        นัดหมายเข้าชมพื้นที่
+                      </Link>
+                      <Link href="/become-partner" className="btn-green w-full text-sm opacity-90">
+                        <Handshake size={16} />
+                        แนะนำลูกค้า รับค่าแนะนำ
+                      </Link>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         </div>
@@ -255,35 +301,61 @@ export default async function PropertyDetailPage({
         <div className="container-xl">
           <div className="relative overflow-hidden rounded-[26px] bg-[#071d4a] p-5 text-white shadow-[0_14px_36px_rgba(13,30,70,0.10)] sm:p-7 lg:p-9">
             <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[#00A859]/20" />
-            <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <h2 className="text-xl font-black sm:text-2xl">
-                  ต้องการข้อมูลเพิ่มเติมหรือนัดชมพื้นที่?
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-blue-100">
-                  ติดต่อทีมงาน LandmarketThai เพื่อรับข้อมูลทำเล ราคา เอกสาร หรือนัดเข้าชมพื้นที่
-                </p>
+            {isSoldOut ? (
+              <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <div className="mb-2 inline-flex rounded-md bg-red-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                    Sold out
+                  </div>
+                  <h2 className="text-xl font-black sm:text-2xl">
+                    แปลงนี้ปิดการขายเรียบร้อยแล้ว
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-blue-100">
+                    ดูรายการที่ยังเปิดขาย หรือสอบถามทีมงาน LandmarketThai เพื่อหาแปลงใกล้เคียงตามความต้องการ
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-end">
+                  <Link href="/land" className="btn-white w-full sm:w-auto">
+                    ดูที่ดินที่ยังเปิดขาย
+                  </Link>
+                  <LineButton
+                    size="md"
+                    label="สอบถามแปลงใกล้เคียง"
+                    className="w-full sm:w-auto text-sm"
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-end">
-                <LineButton
-                  size="md"
-                  label="สอบถามผ่าน LINE OA"
-                  className="w-full sm:w-auto text-sm"
-                />
-                <Link href="#inquiry" className="btn-white w-full sm:w-auto">
-                  <Send size={16} />
-                  ขอข้อมูลที่ดินแปลงนี้
-                </Link>
-                <Link href="/contact" className="btn-outline w-full border-white/30 text-white hover:bg-white/10 sm:w-auto">
-                  <CalendarDays size={16} />
-                  นัดหมายเข้าชมพื้นที่
-                </Link>
-                <Link href="/become-partner" className="btn-green w-full opacity-90 sm:w-auto">
-                  <Handshake size={16} />
-                  แนะนำลูกค้า รับค่าแนะนำ
-                </Link>
+            ) : (
+              <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <h2 className="text-xl font-black sm:text-2xl">
+                    ต้องการข้อมูลเพิ่มเติมหรือนัดชมพื้นที่?
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-blue-100">
+                    ติดต่อทีมงาน LandmarketThai เพื่อรับข้อมูลทำเล ราคา เอกสาร หรือนัดเข้าชมพื้นที่
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-end">
+                  <LineButton
+                    size="md"
+                    label="สอบถามผ่าน LINE OA"
+                    className="w-full sm:w-auto text-sm"
+                  />
+                  <Link href="#inquiry" className="btn-white w-full sm:w-auto">
+                    <Send size={16} />
+                    ขอข้อมูลที่ดินแปลงนี้
+                  </Link>
+                  <Link href="/contact" className="btn-outline w-full border-white/30 text-white hover:bg-white/10 sm:w-auto">
+                    <CalendarDays size={16} />
+                    นัดหมายเข้าชมพื้นที่
+                  </Link>
+                  <Link href="/become-partner" className="btn-green w-full opacity-90 sm:w-auto">
+                    <Handshake size={16} />
+                    แนะนำลูกค้า รับค่าแนะนำ
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </section>

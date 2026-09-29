@@ -18,12 +18,10 @@ interface Props {
   };
   hrefOverride?: string;
   soldOut?: boolean;
-  dealHistory?: boolean;
   featured?: boolean;
   ctaLabel?: string;
   metaTagLabel?: string;
   rewardLabel?: string;
-  rewardSuffix?: string;
 }
 
 export default function ListingCard({
@@ -31,12 +29,10 @@ export default function ListingCard({
   imageOverride,
   hrefOverride,
   soldOut,
-  dealHistory,
   featured,
   ctaLabel = "ดูรายละเอียดแปลง",
   metaTagLabel,
   rewardLabel,
-  rewardSuffix,
 }: Props) {
   const isSoldOut = soldOut ?? land.status === "sold";
   const coverImage = land.images?.find((img) => img.is_cover) ?? land.images?.[0];
@@ -76,7 +72,7 @@ export default function ListingCard({
             </span>
           )}
 
-          {featured && (
+          {featured && !isSoldOut && (
             <span className="absolute right-3 top-3 z-10 rounded-md bg-gold-400 px-2.5 py-1 text-[11px] font-black text-[#001B48] shadow-sm">
               เปิดรับแนะนำ
             </span>
@@ -91,25 +87,18 @@ export default function ListingCard({
           )}
 
           {isSoldOut && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/50">
-              <span className="rounded-md bg-red-600 px-4 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-lg">
-                {dealHistory ? "ปิดดีลแล้ว" : "Sold out"}
-              </span>
-              {dealHistory && (
-                <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-slate-700">
-                  ดีลสำเร็จ – ไม่เปิดขายแล้ว
-                </span>
-              )}
-            </div>
+            <span className="absolute right-3 top-3 z-20 rounded-md bg-red-600 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
+              Sold out
+            </span>
           )}
 
-          {land.referral_reward_max ? (
+          {!isSoldOut && land.referral_reward_max ? (
             <div className="absolute inset-x-0 bottom-0 z-10 bg-[#001B48]/92 px-4 py-2.5">
               <div className="text-[11px] font-medium text-white/85">
                 {rewardLabel ?? "ค่าคอมสูงสุด"}
               </div>
               <div className="text-xl font-black leading-tight text-gold-400">
-                {formatMoney(land.referral_reward_max)} บาท{rewardSuffix ?? ""}
+                {formatMoney(land.referral_reward_max)} บาท
               </div>
             </div>
           ) : null}
@@ -157,10 +146,10 @@ export default function ListingCard({
           <Link
             href={href}
             className={`w-full shrink-0 px-3 py-2 text-xs min-[360px]:w-auto ${
-              dealHistory ? "btn-outline" : "btn-green"
+              isSoldOut ? "btn-outline" : "btn-green"
             }`}
           >
-            {dealHistory ? "ดูประวัติดีล" : ctaLabel}
+            {ctaLabel}
           </Link>
         </div>
       </div>
