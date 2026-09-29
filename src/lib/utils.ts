@@ -32,7 +32,7 @@ export const ZONING_COLORS: Record<ZoningColor, string> = {
 
 export function formatRai(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}k ไร่`;
-  return `${n.toLocaleString("th-TH")} ไร่`;
+  return `${n.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่`;
 }
 
 export function formatMoney(n: number): string {
