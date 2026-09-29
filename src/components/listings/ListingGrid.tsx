@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ListingCard from "./ListingCard";
 import LineButton from "@/components/ui/LineButton";
-import { getActiveListings } from "@/lib/neon/queries";
+import { getPublicListings } from "@/lib/neon/queries";
 import {
   mergeWithSeedListings,
   resolveListingPresentation,
@@ -32,7 +32,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
     return qs ? `${basePath}?${qs}` : basePath;
   }
 
-  const dbListings = await getActiveListings({
+  const dbListings = await getPublicListings({
     province_slug: provinceSlug,
     land_type: type ?? undefined,
     limit: PAGE_SIZE,
