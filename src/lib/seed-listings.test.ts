@@ -26,6 +26,12 @@ test("rayong province filter includes the 37-rai seed", () => {
   assert.ok(slugs(result).includes(SEED_37_RAI_SLUG));
 });
 
+test("37-rai seed preserves the exact legal area and total price", () => {
+  const land = mergeWithSeedListings([]).find((item) => item.slug === SEED_37_RAI_SLUG);
+  assert.equal(land?.size_rai, 36.91825);
+  assert.equal(land?.total_price, 84_911_975);
+});
+
 // 2b. EEC / industrial type filters must include the 37-rai seed.
 test("eec and industrial type filters include the 37-rai seed", () => {
   assert.ok(
