@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { getSqlIfConfigured } from "@/lib/neon/server";
 import type {
   BlogPost,
@@ -156,14 +157,42 @@ async function publicListingRows(opts?: {
   );
 }
 
+const PUBLIC_LISTINGS_CACHE_SECONDS = 60;
+
+const getCachedPublicListings = unstable_cache(
+  async (
+    provinceSlug: string | null,
+    landType: string | null,
+    limit: number,
+    offset: number,
+  ): Promise<Land[]> => {
+    const rows = await publicListingRows({
+      province_slug: provinceSlug ?? undefined,
+      land_type: landType ?? undefined,
+      limit,
+      offset,
+    });
+    return rows.map(normalizeLand);
+  },
+  ["neon-public-listings-v1"],
+  { revalidate: PUBLIC_LISTINGS_CACHE_SECONDS },
+);
+
 export async function getPublicListings(opts?: {
   province_slug?: string;
   land_type?: string;
   limit?: number;
   offset?: number;
 }): Promise<Land[]> {
-  const rows = await publicListingRows(opts);
-  return rows.map(normalizeLand);
+  const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 100);
+  const offset = Math.max(opts?.offset ?? 0, 0);
+
+  return getCachedPublicListings(
+    opts?.province_slug ?? null,
+    opts?.land_type ?? null,
+    limit,
+    offset,
+  );
 }
 
 export async function getFeaturedListings(limit = 6): Promise<Land[]> {
@@ -226,12 +255,20 @@ export async function getAllProvinces(): Promise<Province[]> {
     .filter((row): row is Province => Boolean(row));
 }
 
-export async function getProvinceBySlug(slug: string): Promise<Province | null> {
-  const sql = getSqlIfConfigured();
-  if (!sql) return null;
+const getCachedProvinceBySlug = unstable_cache(
+  async (slug: string): Promise<Province | null> => {
+    const sql = getSqlIfConfigured();
+    if (!sql) return null;
 
-  const rows = await sql`select * from provinces where slug = ${slug} limit 1`;
-  return rows[0] ? normalizeProvince(rows[0]) ?? null : null;
+    const rows = await sql`select * from provinces where slug = ${slug} limit 1`;
+    return rows[0] ? normalizeProvince(rows[0]) ?? null : null;
+  },
+  ["neon-province-by-slug-v1"],
+  { revalidate: 3600 },
+);
+
+export async function getProvinceBySlug(slug: string): Promise<Province | null> {
+  return getCachedProvinceBySlug(slug);
 }
 
 function normalizeDemand(value: unknown): BuyerDemand {
