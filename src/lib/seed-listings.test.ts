@@ -7,6 +7,7 @@ import {
   SEED_109_RAI_SLUG,
   SEED_101_KABIN_SLUG,
 } from "./seed-listings.ts";
+import { formatRai } from "./utils.ts";
 
 const slugs = (lands: Land[]) => lands.map((land) => land.slug);
 
@@ -30,6 +31,7 @@ test("37-rai seed preserves the exact legal area and total price", () => {
   const land = mergeWithSeedListings([]).find((item) => item.slug === SEED_37_RAI_SLUG);
   assert.equal(land?.size_rai, 36.91825);
   assert.equal(land?.total_price, 84_911_975);
+  assert.equal(formatRai(36.91825), "36.91825 ไร่");
 });
 
 // 2b. EEC / industrial type filters must include the 37-rai seed.
