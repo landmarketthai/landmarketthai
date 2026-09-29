@@ -14,7 +14,7 @@ import ListingCard from "@/components/listings/ListingCard";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getFeaturedListings, getActiveDemands } from "@/lib/supabase/queries";
+import { getFeaturedListings, getActiveDemands } from "@/lib/neon/queries";
 import {
   mergeWithSeedListings,
   resolveListingPresentation,

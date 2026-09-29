@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { insertEvent } from "@/lib/neon/mutations";
 import { z } from "zod";
 
 const schema = z.object({
@@ -14,16 +14,18 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const result = schema.safeParse(body);
-    if (!result.success) return NextResponse.json({ ok: true }); // Silent ignore bad events
+    if (!result.success) return NextResponse.json({ ok: true });
 
-    const db = createServerClient();
-    await db.from("events").insert({
-      ...result.data,
+    await insertEvent({
+      eventType: result.data.event_type,
+      entityType: result.data.entity_type,
+      entityId: result.data.entity_id,
+      sessionId: result.data.session_id,
       meta: result.data.meta ?? {},
     });
 
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ ok: true }); // Never error on analytics
+    return NextResponse.json({ ok: true });
   }
 }

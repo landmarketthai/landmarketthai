@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Calendar, ChevronRight } from "lucide-react";
-import { getPostBySlug, getPublishedPosts } from "@/lib/supabase/queries";
+import { getPostBySlug, getPublishedPosts } from "@/lib/neon/queries";
 import { cdnUrl } from "@/lib/utils";
 import JsonLd from "@/components/seo/JsonLd";
 

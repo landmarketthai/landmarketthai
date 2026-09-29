@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { leadExists } from "@/lib/neon/mutations";
 import { generatePresignedUpload } from "@/lib/storage/provider";
-import { presignSchema } from "@/lib/validations";
-import { createServerClient } from "@/lib/supabase/server";
 import type { StorageFolder } from "@/lib/storage/provider";
+import { presignSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,21 +14,11 @@ export async function POST(req: NextRequest) {
 
     const { leadId, mimeType, fileSize, originalName } = result.data;
 
-    // Verify the lead exists before issuing a presigned URL
-    const db = createServerClient();
-    const { data: lead, error: leadError } = await db
-      .from("leads")
-      .select("id")
-      .eq("id", leadId)
-      .single();
-
-    if (leadError || !lead) {
+    if (!(await leadExists(leadId))) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    // Construct folder server-side — never trust folder from client
     const folder: StorageFolder = `leads/${leadId}/attachments`;
-
     const { uploadUrl, storageKey } = await generatePresignedUpload({
       folder,
       mimeType,
@@ -36,10 +26,9 @@ export async function POST(req: NextRequest) {
       originalName,
     });
 
-    // cdnUrl is omitted — attachments are private
     return NextResponse.json({ uploadUrl, storageKey });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Server error";
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Server error";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

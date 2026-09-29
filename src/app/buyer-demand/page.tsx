@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Users, ArrowRight } from "lucide-react";
-import { getActiveDemands } from "@/lib/supabase/queries";
+import { getActiveDemands } from "@/lib/neon/queries";
 import { LAND_TYPE_LABELS } from "@/lib/utils";
 import LineButton from "@/components/ui/LineButton";
 import JsonLd from "@/components/seo/JsonLd";

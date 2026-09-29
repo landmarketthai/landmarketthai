@@ -8,7 +8,7 @@ import ListingCard from "@/components/listings/ListingCard";
 import ShareButton from "@/components/listings/ShareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import LeadForm from "@/components/forms/LeadForm";
-import { getListingByRef, getRelatedListings } from "@/lib/supabase/queries";
+import { getListingByRef, getRelatedListings } from "@/lib/neon/queries";
 import { LAND_TYPE_LABELS, ZONING_LABELS, formatRai, formatMoney, formatMoneyFull, listingHref } from "@/lib/utils";
 
 export const revalidate = 3600;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Calendar } from "lucide-react";
-import { getPublishedPosts } from "@/lib/supabase/queries";
+import { getPublishedPosts } from "@/lib/neon/queries";
 import { cdnUrl } from "@/lib/utils";
 
 export const revalidate = 3600;

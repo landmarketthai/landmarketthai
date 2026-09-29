@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
+import { authClient, authConfigured } from "@/lib/auth/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 function GoogleIcon() {
@@ -38,7 +38,10 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null);
 
   const authError = searchParams.get("error");
-  const next = searchParams.get("next") ?? "/";
+  const requestedNext = searchParams.get("next") ?? "/";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//")
+    ? requestedNext
+    : "/";
 
   const authErrorMessage =
     authError === "auth_failed"
@@ -54,24 +57,27 @@ export default function LoginClient() {
   }, [user, loading, router, next]);
 
   async function handleGoogleLogin() {
-    if (!supabase) {
-      setError("ระบบยังไม่พร้อมใช้งาน");
+    if (!authConfigured) {
+      setError("ระบบสมาชิกยังไม่ได้ตั้งค่า Neon Auth");
       return;
     }
+
     setIsSigningIn(true);
     setError(null);
 
-    const redirectTo =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-        : "/auth/callback";
+    try {
+      const callbackURL = `${window.location.origin}${next === "/login" ? "/" : next}`;
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL,
+      });
 
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-
-    if (signInError) {
+      if (result.error) {
+        setError("ไม่สามารถเชื่อมต่อกับ Google ได้ กรุณาลองใหม่");
+        setIsSigningIn(false);
+      }
+    } catch (signInError) {
+      console.error("Google sign-in error:", signInError);
       setError("ไม่สามารถเชื่อมต่อกับ Google ได้ กรุณาลองใหม่");
       setIsSigningIn(false);
     }
@@ -88,9 +94,7 @@ export default function LoginClient() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm">
-        {/* Card */}
         <div className="card p-8 sm:p-10">
-          {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link href="/" className="flex items-center gap-2">
               <Image
@@ -110,11 +114,10 @@ export default function LoginClient() {
             ใช้บัญชี Google ของคุณเพื่อเข้าสู่ระบบ
           </p>
 
-          {!supabase && (
+          {!authConfigured && (
             <div className="mb-5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
-              ยังไม่ได้ตั้งค่า Supabase — คัดลอก{" "}
-              <code className="text-xs">.env.local.example</code> เป็น{" "}
-              <code className="text-xs">.env.local</code> แล้วใส่ URL และ Anon Key
+              ยังไม่ได้ตั้งค่า Neon Auth กรุณาตั้งค่า{" "}
+              <code className="text-xs">NEXT_PUBLIC_NEON_AUTH_URL</code>
             </div>
           )}
 
@@ -126,7 +129,7 @@ export default function LoginClient() {
 
           <button
             onClick={handleGoogleLogin}
-            disabled={isSigningIn || !supabase}
+            disabled={isSigningIn || !authConfigured}
             className="w-full flex items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isSigningIn ? (

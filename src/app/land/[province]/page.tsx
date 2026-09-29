@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ListingGrid from "@/components/listings/ListingGrid";
 import JsonLd from "@/components/seo/JsonLd";
-import { getProvinceBySlug } from "@/lib/supabase/queries";
+import { getProvinceBySlug } from "@/lib/neon/queries";
 import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
 import { LAND_TYPE_LABELS } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
