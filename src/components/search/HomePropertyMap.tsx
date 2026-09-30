@@ -94,7 +94,7 @@ export default function HomePropertyMap({ properties }: Props) {
 }
 
 function AssetMeta({ property }: { property: Land }) {
-  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  const price = property.total_price;
   const location = [property.district, property.province?.name_th].filter(Boolean).join(" · ");
   const updatedLabel = formatUpdatedDate(property.updated_at);
   return (
@@ -106,7 +106,7 @@ function AssetMeta({ property }: { property: Land }) {
         <span className="flex items-center gap-1"><Ruler size={12} className="shrink-0" />{formatRai(property.size_rai)}</span>
       )}
       {price != null && <span className="font-bold text-[#0d1f44]">{formatMoneyFull(price)}</span>}
-      {property.transaction_type === "sale" && property.price_per_rai != null && (
+      {property.price_per_rai != null && (
         <span>{formatMoneyFull(property.price_per_rai)} / ไร่</span>
       )}
       {updatedLabel && <span className="text-slate-400">อัปเดต {updatedLabel}</span>}

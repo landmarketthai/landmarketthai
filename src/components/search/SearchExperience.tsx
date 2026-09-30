@@ -10,7 +10,6 @@ import SearchPropertyCard from "./SearchPropertyCard";
 
 export interface SearchValues {
   q?: string;
-  transaction_type?: "sale" | "rent";
   property_type?: "land" | "factory" | "warehouse";
   status?: "active" | "sold";
   province?: string;
@@ -99,9 +98,8 @@ export default function SearchExperience({ initialProperties, provinces, initial
     const zoning = zoningOptions.find(([value]) => value === values.zoning)?.[1];
 
     if (values.q) items.push({ key: "q", label: `คำค้น: ${values.q}` });
-    if (values.transaction_type) items.push({ key: "transaction_type", label: values.transaction_type === "sale" ? "ซื้อ" : "เช่า" });
     if (values.property_type) items.push({ key: "property_type", label: propertyTypes.find(([value]) => value === values.property_type)?.[1] ?? values.property_type });
-    if (values.status) items.push({ key: "status", label: values.status === "active" ? "พร้อมขาย/เช่า" : "ขายแล้ว" });
+    if (values.status) items.push({ key: "status", label: values.status === "active" ? "พร้อมขาย" : "ขายแล้ว" });
     if (values.province) items.push({ key: "province", label: province?.name_th ?? values.province });
     if (values.district) items.push({ key: "district", label: `อำเภอ: ${values.district}` });
     if (values.min_price) items.push({ key: "min_price", label: `ราคา ≥ ${numberLabel(values.min_price)}` });
@@ -203,7 +201,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
 
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-[minmax(260px,1.4fr)_150px_160px_180px_auto]">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-[minmax(260px,1.4fr)_160px_180px_auto]">
             <label className="relative col-span-2 lg:col-span-1">
               <span className="sr-only">ค้นหาทำเล</span>
               <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -215,15 +213,6 @@ export default function SearchExperience({ initialProperties, provinces, initial
                 placeholder="จังหวัด / อำเภอ / ตำบล / นิคม / ทำเล"
               />
             </label>
-            <select
-              className="input"
-              value={values.transaction_type ?? ""}
-              onChange={(event) => setValues((current) => ({ ...current, transaction_type: (event.target.value || undefined) as SearchValues["transaction_type"] }))}
-            >
-              <option value="">ซื้อ / เช่า</option>
-              <option value="sale">ซื้อ</option>
-              <option value="rent">เช่า</option>
-            </select>
             <select
               className="input"
               value={values.property_type ?? ""}
@@ -258,7 +247,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
                 <input className="input" placeholder="อำเภอ" value={values.district ?? ""} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined }))} />
                 <select className="input" value={values.status ?? ""} onChange={(e) => setValues((v) => ({ ...v, status: (e.target.value || undefined) as SearchValues["status"] }))}>
                   <option value="">ทุกสถานะ</option>
-                  <option value="active">พร้อมขาย / พร้อมเช่า</option>
+                  <option value="active">พร้อมขาย</option>
                   <option value="sold">ขายแล้ว</option>
                 </select>
                 <input className="input" inputMode="decimal" placeholder="ราคาต่ำสุด" value={values.min_price ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_price: e.target.value || undefined }))} />

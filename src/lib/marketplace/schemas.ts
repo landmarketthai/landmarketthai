@@ -17,7 +17,7 @@ const optionalThaiPhone = z.string().trim().max(32).transform(normalizePhone).re
 export const draftSchema = z.object({
   token: z.string().uuid(),
   property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
-  transaction_type: z.enum(["sale", "rent"]).nullable().optional(),
+  transaction_type: z.literal("sale").nullable().optional(),
   title: z.string().trim().max(180).nullable().optional(),
   province_id: z.string().uuid().nullable().optional(),
   district: z.string().trim().max(120).nullable().optional(),
@@ -36,7 +36,6 @@ export const draftSchema = z.object({
   zoning: z.enum(["purple", "purple_light", "brown", "orange", "yellow", "green", "other"]).nullable().optional(),
   sale_price: optionalNumber.optional(),
   price_per_rai: optionalNumber.optional(),
-  rent_price_monthly: optionalNumber.optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   contact_name: z.string().trim().max(120).nullable().optional(),
   contact_phone: optionalThaiPhone.nullable().optional(),
@@ -59,7 +58,7 @@ export const submissionUploadSchema = z.object({
 
 export const buyerRequirementSchema = z.object({
   property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
-  transaction_type: z.enum(["sale", "rent"]),
+  transaction_type: z.literal("sale").default("sale"),
   preferred_locations: z.array(z.string().trim().min(1).max(120)).max(10).default([]),
   province_ids: z.array(z.string().uuid()).max(10).default([]),
   min_size_rai: optionalNumber.optional(),

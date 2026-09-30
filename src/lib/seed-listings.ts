@@ -19,7 +19,6 @@ const LEGACY_MARKETPLACE_FIELDS = {
   depth_max_m: null,
   road_name: null,
   road_width_m: null,
-  rent_price_monthly: null,
   verification_status: "verified",
   published_at: SEED_TIMESTAMP,
 } as const;

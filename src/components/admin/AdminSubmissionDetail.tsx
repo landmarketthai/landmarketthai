@@ -32,7 +32,6 @@ export default function AdminSubmissionDetail({ id }: { id: string }) {
     ["ขนาด", item.total_rai != null ? `${item.total_rai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่` : "-"],
     ["ราคาขาย", item.sale_price != null ? `${item.sale_price.toLocaleString("th-TH")} บาท` : "-"],
     ["ราคา / ไร่", item.price_per_rai != null ? `${item.price_per_rai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท` : "-"],
-    ["ค่าเช่า", item.rent_price_monthly != null ? `${item.rent_price_monthly.toLocaleString("th-TH")} บาท/เดือน` : "-"],
     ["พิกัด", item.lat != null && item.lng != null ? `${item.lat.toFixed(7)}, ${item.lng.toFixed(7)} · ${item.location_precision === "exact" ? "ยืนยันพิกัด" : "โดยประมาณ"}` : "ไม่ได้ระบุ"],
     ["ผู้ติดต่อ", [item.contact_name, item.contact_phone, item.contact_line].filter(Boolean).join(" · ") || "-"],
   ];

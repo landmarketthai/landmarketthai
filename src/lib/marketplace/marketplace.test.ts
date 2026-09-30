@@ -4,6 +4,7 @@ import { classifyBuyerMatch } from "./matching.ts";
 import { submissionReadinessIssues } from "./submission-readiness.ts";
 import { SEED_PUBLIC_LISTINGS } from "../seed-listings.ts";
 import { sortPropertyResults } from "./search-sort.ts";
+import { buyerRequirementSchema, draftSchema } from "./schemas.ts";
 import type { PropertySubmission } from "../types/database.ts";
 
 const rayong = SEED_PUBLIC_LISTINGS.find((property) => property.slug === "37-rai-eec-rayong");
@@ -54,12 +55,29 @@ test("seller readiness rejects zero price and zero area", () => {
     contact_name: "เจ้าของทรัพย์",
     contact_phone: "0812345678",
     sale_price: 0,
-    rent_price_monthly: null,
   } as PropertySubmission;
 
   const issues = submissionReadinessIssues(draft);
   assert.ok(issues.includes("ขนาดพื้นที่"));
   assert.ok(issues.includes("ราคาขาย"));
+});
+
+test("sale-only schemas reject rental transactions", () => {
+  const draft = draftSchema.safeParse({
+    token: "00000000-0000-4000-8000-000000000000",
+    transaction_type: "rent",
+  });
+  const buyer = buyerRequirementSchema.safeParse({
+    transaction_type: "rent",
+    preferred_locations: [],
+    province_ids: [],
+    name: "ผู้ซื้อทดสอบ",
+    phone: "0812345678",
+    consent_pdpa: true,
+  });
+
+  assert.equal(draft.success, false);
+  assert.equal(buyer.success, false);
 });
 
 test("seller readiness accepts a complete positive sale draft", () => {
@@ -72,7 +90,6 @@ test("seller readiness accepts a complete positive sale draft", () => {
     contact_name: "เจ้าของทรัพย์",
     contact_phone: "0812345678",
     sale_price: 20_000_000,
-    rent_price_monthly: null,
   } as PropertySubmission;
 
   assert.deepEqual(submissionReadinessIssues(draft), []);

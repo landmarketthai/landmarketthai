@@ -57,7 +57,6 @@ function normalizeSubmission(value: unknown): PropertySubmission {
     zoning: (row.zoning as ZoningColor | null) ?? null,
     sale_price: num(row.sale_price),
     price_per_rai: num(row.price_per_rai),
-    rent_price_monthly: num(row.rent_price_monthly),
     description: str(row.description),
     contact_name: str(row.contact_name),
     contact_phone: str(row.contact_phone),
@@ -124,7 +123,6 @@ export interface SubmissionDraftInput {
   zoning?: ZoningColor | null;
   sale_price?: number | null;
   price_per_rai?: number | null;
-  rent_price_monthly?: number | null;
   description?: string | null;
   contact_name?: string | null;
   contact_phone?: string | null;
@@ -161,7 +159,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
   const totalRai = input.area_rai == null && input.area_ngan == null && input.area_sqwa == null
     ? null
     : (input.area_rai ?? 0) + (input.area_ngan ?? 0) / 4 + (input.area_sqwa ?? 0) / 400;
-  const pricePerRai = input.transaction_type === "sale" && totalRai != null && totalRai > 0 && input.sale_price != null && input.sale_price > 0
+  const pricePerRai = totalRai != null && totalRai > 0 && input.sale_price != null && input.sale_price > 0
     ? Math.round((input.sale_price / totalRai) * 100) / 100
     : null;
   const rows = await sql.query(
@@ -171,17 +169,17 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
        location_precision = case when $10::numeric is not null and $11::numeric is not null then 'exact' else 'approx' end,
        area_rai = $12, area_ngan = $13, area_sqwa = $14, total_rai = $15,
        frontage_m = $16, depth_min_m = $17, depth_max_m = $18, road_name = $19, road_width_m = $20,
-       zoning = $21, sale_price = $22, price_per_rai = $23, rent_price_monthly = $24,
-       description = $25, contact_name = $26, contact_phone = $27, contact_line = $28, updated_at = now()
+       zoning = $21, sale_price = $22, price_per_rai = $23,
+       description = $24, contact_name = $25, contact_phone = $26, contact_line = $27, updated_at = now()
      where id = $1 and draft_token = $2 and status = 'draft'
      returning *`,
     [
-      id, token, input.property_type ?? null, input.transaction_type ?? null, input.title ?? null,
+      id, token, input.property_type ?? null, "sale", input.title ?? null,
       input.province_id ?? null, input.district ?? null, input.subdistrict ?? null, input.address ?? null,
       input.lat ?? null, input.lng ?? null, input.area_rai ?? null, input.area_ngan ?? null,
       input.area_sqwa ?? null, totalRai, input.frontage_m ?? null, input.depth_min_m ?? null,
       input.depth_max_m ?? null, input.road_name ?? null, input.road_width_m ?? null, input.zoning ?? null,
-      input.sale_price ?? null, pricePerRai, input.rent_price_monthly ?? null,
+      input.sale_price ?? null, pricePerRai,
       input.description ?? null, input.contact_name ?? null, input.contact_phone ?? null, input.contact_line ?? null,
     ],
   );
@@ -203,10 +201,7 @@ export async function submitPropertyDraft(input: {
          and title is not null and province_id is not null
          and nullif(trim(contact_name), '') is not null and nullif(trim(contact_phone), '') is not null
          and total_rai is not null and total_rai > 0
-         and (
-           (transaction_type = 'sale' and sale_price is not null and sale_price > 0)
-           or (transaction_type = 'rent' and rent_price_monthly is not null and rent_price_monthly > 0)
-         )
+         and transaction_type = 'sale' and sale_price is not null and sale_price > 0
          and (($3::boolean = true))
      ), new_lead as (
        insert into leads (lead_type, name, phone, line_id, source, details, consent_pdpa, consent_at, status)
@@ -315,10 +310,10 @@ export async function publishSubmission(id: string): Promise<string | null> {
   const sql = getSql();
   const submissionRows = await sql.query(`select * from property_submissions where id=$1 and status='approved' limit 1`, [id]);
   const source = submissionRows[0] as Record<string, unknown> | undefined;
-  if (!source?.id || !source.title || !source.province_id || !source.property_type || !source.transaction_type) return null;
+  if (!source?.id || !source.title || !source.province_id || !source.property_type || source.transaction_type !== "sale") return null;
 
   const propertyType = String(source.property_type) as PropertyType;
-  const transactionType = String(source.transaction_type) as TransactionType;
+  const transactionType: TransactionType = "sale";
   const landType = propertyType;
   const slug = slugify(String(source.title), String(source.id));
   const rows = await sql.query(
@@ -328,11 +323,11 @@ export async function publishSubmission(id: string): Promise<string | null> {
        insert into lands (
        title_th, slug, province_id, district, subdistrict, address, land_type, property_type, transaction_type,
        size_rai, area_rai, area_ngan, area_sqwa, zoning, frontage_m, depth_min_m, depth_max_m, road_name, road_width_m,
-       price_per_rai, total_price, rent_price_monthly, is_eec, description, lat, lng, location_precision,
+       price_per_rai, total_price, is_eec, description, lat, lng, location_precision,
        status, verification_status, is_featured, owner_lead_id, published_at
        ) select
-       $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
-       false,$24,$25,$26,$27,'active','verified',false,$28,now()
+       $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+       false,$23,$24,$25,$26,'active','verified',false,$27,now()
        from source returning id
      ), inserted_images as (
        insert into land_images (land_id, storage_key, url_or_cdn_path, alt_th, sort_order, is_cover)
@@ -356,7 +351,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
       id, String(source.title), slug, String(source.province_id), str(source.district), str(source.subdistrict), str(source.address),
       landType, propertyType, transactionType, num(source.total_rai), num(source.area_rai), num(source.area_ngan), num(source.area_sqwa),
       str(source.zoning), num(source.frontage_m), num(source.depth_min_m), num(source.depth_max_m), str(source.road_name), num(source.road_width_m),
-      num(source.price_per_rai), num(source.sale_price), num(source.rent_price_monthly), str(source.description), num(source.lat), num(source.lng),
+      num(source.price_per_rai), num(source.sale_price), str(source.description), num(source.lat), num(source.lng),
       source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id),
     ],
   );
@@ -414,7 +409,7 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
     [
       input.name, input.phone, input.line_id ?? null,
       JSON.stringify({ preferred_locations: input.preferred_locations, property_type: input.property_type, transaction_type: input.transaction_type }),
-      input.consent_pdpa, input.property_type ?? null, input.transaction_type, input.preferred_locations, input.province_ids,
+      input.consent_pdpa, input.property_type ?? null, "sale", input.preferred_locations, input.province_ids,
       input.min_size_rai ?? null, input.max_size_rai ?? null, input.max_price ?? null, input.max_price_per_rai ?? null,
       input.zoning ?? null, input.purpose ?? null, input.container_access ?? null, input.high_voltage ?? null, input.water_requirement ?? null,
     ],
@@ -424,7 +419,6 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
 
   const candidates = await searchProperties({
     property_type: input.property_type ?? undefined,
-    transaction_type: input.transaction_type,
     limit: 100,
   });
 

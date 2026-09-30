@@ -40,8 +40,7 @@ export function classifyBuyerMatch(property: Land, input: BuyerMatchCriteria): B
 
   const sizeOk = (input.min_size_rai == null || (property.size_rai != null && property.size_rai >= input.min_size_rai))
     && (input.max_size_rai == null || (property.size_rai != null && property.size_rai <= input.max_size_rai));
-  const propertyPrice = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
-  const budgetOk = input.max_price == null || (propertyPrice != null && propertyPrice <= input.max_price);
+  const budgetOk = input.max_price == null || (property.total_price != null && property.total_price <= input.max_price);
   const perRaiOk = input.max_price_per_rai == null || (property.price_per_rai != null && property.price_per_rai <= input.max_price_per_rai);
   const zoningOk = input.zoning == null || property.zoning === input.zoning;
 

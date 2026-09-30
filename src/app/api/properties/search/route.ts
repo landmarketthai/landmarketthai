@@ -11,7 +11,6 @@ function numberParam(params: URLSearchParams, key: string): number | undefined {
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const propertyType = params.get("property_type");
-  const transactionType = params.get("transaction_type");
   const status = params.get("status");
   const sort = params.get("sort");
   const locationPrecision = params.get("location_precision");
@@ -26,7 +25,6 @@ export async function GET(request: NextRequest) {
       propertyType === "land" || propertyType === "factory" || propertyType === "warehouse"
         ? propertyType
         : undefined,
-    transaction_type: transactionType === "rent" ? "rent" : transactionType === "sale" ? "sale" : undefined,
     status: status === "active" || status === "sold" ? status : undefined,
     min_price: numberParam(params, "min_price"),
     max_price: numberParam(params, "max_price"),

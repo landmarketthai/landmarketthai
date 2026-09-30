@@ -94,8 +94,8 @@ export default function ListingCard({
   const location = locationLabel(land);
   const typeLabel = propertyTypeLabel(land);
   const zoningLabel = metaTagLabel ?? (land.zoning ? ZONING_LABELS[land.zoning] : null);
-  const totalPrice = land.transaction_type === "rent" ? land.rent_price_monthly : land.total_price;
-  const totalPriceLabel = land.transaction_type === "rent" ? "ค่าเช่า / เดือน" : "ราคารวม";
+  const totalPrice = land.total_price;
+  const totalPriceLabel = "ราคารวม";
   const updatedLabel = formatUpdatedDate(land.updated_at);
 
   return (
@@ -127,7 +127,7 @@ export default function ListingCard({
               </span>
             )}
             <span className="rounded-md bg-[#071d4a]/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm">
-              {typeLabel} · {land.transaction_type === "rent" ? "ให้เช่า" : "ขาย"}
+              {typeLabel} · ขาย
             </span>
           </div>
 
@@ -220,7 +220,7 @@ export default function ListingCard({
         </Link>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
-          {(pricePerRaiLabel || land.price_per_rai != null) && land.transaction_type !== "rent" && (
+          {(pricePerRaiLabel || land.price_per_rai != null) && (
             <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
               <div className="text-[11px] text-slate-400">ราคา / ไร่</div>
               <div className="mt-0.5 truncate text-sm font-black text-[#0a2a63]">

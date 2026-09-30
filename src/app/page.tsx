@@ -282,16 +282,12 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <form action="/search" method="get" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(260px,1.5fr)_150px_160px_auto]">
+            <form action="/search" method="get" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(260px,1.5fr)_160px_auto]">
               <label className="relative sm:col-span-2 lg:col-span-1">
                 <span className="sr-only">ค้นหาทำเล</span>
                 <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input name="q" className="input pl-10" placeholder="จังหวัด / อำเภอ / ตำบล / นิคม / ทำเล" />
               </label>
-              <select name="transaction_type" className="input" defaultValue="sale" aria-label="ซื้อหรือเช่า">
-                <option value="sale">ซื้อ</option>
-                <option value="rent">เช่า</option>
-              </select>
               <select name="property_type" className="input" defaultValue="" aria-label="ประเภททรัพย์">
                 <option value="">ทุกประเภท</option>
                 <option value="land">ที่ดิน</option>
@@ -305,10 +301,10 @@ export default async function HomePage() {
 
             <div className="mt-4 grid gap-2 min-[390px]:grid-cols-2 lg:grid-cols-3">
               <Link href="/sell" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
-                ฝากขาย / ให้เช่าทรัพย์
+                ฝากขายทรัพย์
               </Link>
               <Link href="/buy-request" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
-                ฝากความต้องการซื้อ / เช่า
+                ฝากความต้องการซื้อ
               </Link>
               <Link href="/land" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 min-[390px]:col-span-2 lg:col-span-1">
                 ดูรายการที่ดินเดิม

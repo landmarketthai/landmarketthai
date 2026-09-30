@@ -19,7 +19,7 @@ export type ZoningColor =
 
 export type LocationPrecision = "exact" | "approx";
 export type PropertyType = "land" | "factory" | "warehouse";
-export type TransactionType = "sale" | "rent";
+export type TransactionType = "sale";
 export type VerificationStatus = "pending" | "verified" | "rejected";
 export type ListingStatus = "draft" | "active" | "reserved" | "sold" | "expired" | "archived";
 export type SubmissionStatus =
@@ -73,7 +73,6 @@ export interface Land {
   road_width_m: number | null;
   price_per_rai: number | null;
   total_price: number | null;
-  rent_price_monthly: number | null;
   referral_reward_max: number | null;
   is_eec: boolean;
   nearby_landmarks: string[] | null;
@@ -147,7 +146,6 @@ export interface PropertySubmission {
   zoning: ZoningColor | null;
   sale_price: number | null;
   price_per_rai: number | null;
-  rent_price_monthly: number | null;
   description: string | null;
   contact_name: string | null;
   contact_phone: string | null;

@@ -83,7 +83,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
   const cover = property.images?.find((image) => image.is_cover) ?? property.images?.[0];
   const area = legalArea(property);
   const location = locationLabel(property);
-  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  const price = property.total_price;
   const updatedLabel = formatUpdatedDate(property.updated_at);
   const gallery = (property.images ?? []).map((image) => ({
     src: image.url_or_cdn_path,
@@ -92,12 +92,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
 
   const facts = [
     area ? ["ขนาด", area] : null,
-    property.transaction_type === "rent" && property.rent_price_monthly != null
-      ? ["ค่าเช่า / เดือน", formatMoneyFull(property.rent_price_monthly)]
-      : null,
-    property.transaction_type === "sale" && property.total_price != null
-      ? ["ราคารวม", formatMoneyFull(property.total_price)]
-      : null,
+    property.total_price != null ? ["ราคารวม", formatMoneyFull(property.total_price)] : null,
     property.price_per_rai != null ? ["ราคา / ไร่", formatMoneyFull(property.price_per_rai)] : null,
     property.zoning ? ["ผังเมือง", ZONING_LABELS[property.zoning]] : null,
     property.is_eec ? ["เขตเศรษฐกิจ", "พื้นที่ EEC"] : null,
@@ -154,7 +149,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
                 </span>
               )}
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
-                {propertyTypeLabel(property)} · {property.transaction_type === "rent" ? "ให้เช่า" : "ขาย"}
+                {propertyTypeLabel(property)} · ขาย
               </span>
               {property.zoning && (
                 <span className="rounded-full bg-purple-500/90 px-3 py-1 text-xs font-bold text-white">
@@ -198,7 +193,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
                 {price != null && (
                   <div className="rounded-2xl bg-white/95 px-4 py-4 text-[#071d4a] shadow-lg sm:px-5">
                     <div className="text-xs font-semibold text-slate-500">
-                      {property.transaction_type === "rent" ? "ค่าเช่า / เดือน" : "ราคารวม"}
+                      ราคารวม
                     </div>
                     <div className="mt-1 text-xl font-black sm:text-2xl">{formatMoneyFull(price)}</div>
                   </div>

@@ -80,7 +80,7 @@ function normalizeLand(value: unknown): Land {
     address: stringOrNull(row.address),
     land_type: landType,
     property_type: propertyType,
-    transaction_type: row.transaction_type === "rent" ? "rent" : "sale",
+    transaction_type: "sale",
     size_rai: numberOrNull(row.size_rai),
     area_rai: numberOrNull(row.area_rai),
     area_ngan: numberOrNull(row.area_ngan),
@@ -93,7 +93,6 @@ function normalizeLand(value: unknown): Land {
     road_width_m: numberOrNull(row.road_width_m),
     price_per_rai: numberOrNull(row.price_per_rai),
     total_price: numberOrNull(row.total_price),
-    rent_price_monthly: numberOrNull(row.rent_price_monthly),
     referral_reward_max: numberOrNull(row.referral_reward_max),
     is_eec: Boolean(row.is_eec),
     nearby_landmarks: Array.isArray(row.nearby_landmarks) ? row.nearby_landmarks.map(String) : null,
@@ -457,7 +456,6 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
 
 export interface PropertySearchFilters {
   q?: string;
-  transaction_type?: "sale" | "rent";
   property_type?: "land" | "factory" | "warehouse";
   status?: "active" | "sold";
   province_slug?: string;
@@ -498,13 +496,12 @@ function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFil
       .toLocaleLowerCase("th-TH");
     if (!haystack.includes(q)) return false;
   }
-  if (filters.transaction_type && property.transaction_type !== filters.transaction_type) return false;
   if (filters.property_type && property.property_type !== filters.property_type) return false;
   if (filters.status && property.status !== filters.status) return false;
   if (filters.province_slug && property.province?.slug !== filters.province_slug) return false;
   if (filters.district?.trim() && !property.district?.toLocaleLowerCase("th-TH").includes(filters.district.trim().toLocaleLowerCase("th-TH"))) return false;
 
-  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  const price = property.total_price;
   if (filters.min_price != null && (price == null || price < filters.min_price)) return false;
   if (filters.max_price != null && (price == null || price > filters.max_price)) return false;
   if (filters.min_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai < filters.min_price_per_rai)) return false;
@@ -545,7 +542,7 @@ function enrichKnownListingCoordinates(property: Land): Land {
 export async function searchProperties(filters: PropertySearchFilters = {}): Promise<Land[]> {
   const sql = getSqlIfConfigured();
 
-  const clauses = ["l.status in ('active', 'sold')", "l.deleted_at is null"];
+  const clauses = ["l.status in ('active', 'sold')", "l.deleted_at is null", "l.transaction_type = 'sale'"];
   const params: unknown[] = [];
   const add = (value: unknown) => {
     params.push(value);

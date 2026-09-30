@@ -3,7 +3,7 @@ import type { Land } from "@/lib/types/database";
 export type PropertySort = "newest" | "price_asc" | "price_desc" | "price_per_rai_asc" | "size_desc";
 
 function propertyPrice(property: Land): number | null {
-  return property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  return property.total_price;
 }
 
 function compareNullable(a: number | null, b: number | null, direction: "asc" | "desc"): number {
@@ -37,10 +37,10 @@ export function sortPropertyResults(properties: Land[], sort: PropertySort = "ne
 export function propertySqlOrder(sort: PropertySort = "newest"): string {
   const activeFirst = "case when l.status = 'active' then 0 else 1 end";
   if (sort === "price_asc") {
-    return `${activeFirst}, (case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) asc nulls last, l.created_at desc`;
+    return `${activeFirst}, l.total_price asc nulls last, l.created_at desc`;
   }
   if (sort === "price_desc") {
-    return `${activeFirst}, (case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) desc nulls last, l.created_at desc`;
+    return `${activeFirst}, l.total_price desc nulls last, l.created_at desc`;
   }
   if (sort === "price_per_rai_asc") return `${activeFirst}, l.price_per_rai asc nulls last, l.created_at desc`;
   if (sort === "size_desc") return `${activeFirst}, l.size_rai desc nulls last, l.created_at desc`;

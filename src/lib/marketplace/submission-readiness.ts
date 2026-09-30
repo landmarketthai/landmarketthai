@@ -10,6 +10,5 @@ export function submissionReadinessIssues(draft: PropertySubmission): string[] {
   if (!draft.contact_name?.trim()) missing.push("ชื่อผู้ติดต่อ");
   if (!draft.contact_phone?.trim()) missing.push("เบอร์โทรศัพท์");
   if (draft.transaction_type === "sale" && (draft.sale_price == null || draft.sale_price <= 0)) missing.push("ราคาขาย");
-  if (draft.transaction_type === "rent" && (draft.rent_price_monthly == null || draft.rent_price_monthly <= 0)) missing.push("ค่าเช่า");
   return missing;
 }

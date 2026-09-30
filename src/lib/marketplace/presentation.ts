@@ -18,5 +18,4 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
 
 export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   sale: "ขาย",
-  rent: "ให้เช่า",
 };

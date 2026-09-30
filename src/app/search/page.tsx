@@ -22,7 +22,6 @@ function num(value: string | undefined): number | undefined {
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<Params> }) {
   const raw = await searchParams;
-  const transaction = one(raw.transaction_type);
   const property = one(raw.property_type);
   const status = one(raw.status);
   const sort = one(raw.sort);
@@ -31,7 +30,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const initialMode = one(raw.view) === "map" ? "map" : "list";
   const values: SearchValues = {
     q: one(raw.q),
-    transaction_type: transaction === "sale" || transaction === "rent" ? transaction : undefined,
     property_type: property === "land" || property === "factory" || property === "warehouse" ? property : undefined,
     status: status === "active" || status === "sold" ? status : undefined,
     province: one(raw.province),
@@ -53,7 +51,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const [initialProperties, provinces] = await Promise.all([
     searchProperties({
       q: values.q,
-      transaction_type: values.transaction_type,
       property_type: values.property_type,
       province_slug: values.province,
       district: values.district,

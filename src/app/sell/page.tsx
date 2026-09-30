@@ -5,7 +5,7 @@ import { getAllProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากขายทรัพย์",
-  description: "ฝากขายหรือให้เช่าที่ดิน โรงงาน และโกดัง ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
+  description: "ฝากขายที่ดิน โรงงาน และโกดัง ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
   alternates: { canonical: "/sell" },
 };
 
@@ -23,8 +23,8 @@ export default async function SellPage() {
     <main className="bg-slate-50">
       <section className="bg-[#071d4a] px-4 py-10 text-white sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl max-w-3xl text-center">
-          <div className="text-xs font-bold tracking-[0.16em] text-gold-400">SELL / RENT</div>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ฝากขายหรือให้เช่าทรัพย์</h1>
+          <div className="text-xs font-bold tracking-[0.16em] text-gold-400">SELL</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ฝากขายทรัพย์</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
             เพิ่มข้อมูลที่ดิน โรงงาน หรือโกดังแบบเป็นขั้นตอน บันทึกไว้ก่อนแล้วกลับมาทำต่อได้
             และทีมงานจะตรวจสอบก่อนเผยแพร่ทุกครั้ง

@@ -21,8 +21,8 @@ interface Props {
 
 export default function SearchPropertyCard({ property, selected, onSelect, cardRef }: Props) {
   const cover = property.images?.find((image) => image.is_cover) ?? property.images?.[0];
-  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
-  const priceLabel = property.transaction_type === "rent" ? "ค่าเช่า/เดือน" : "ราคารวม";
+  const price = property.total_price;
+  const priceLabel = "ราคารวม";
   const updatedLabel = formatUpdatedDate(property.updated_at);
 
   return (

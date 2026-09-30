@@ -4,8 +4,8 @@ import BuyerRequirementForm from "@/components/forms/BuyerRequirementForm";
 import { getAllProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
-  title: "ฝากความต้องการซื้อหรือเช่าทรัพย์",
-  description: "แจ้งเงื่อนไขซื้อหรือเช่าที่ดิน โรงงาน และโกดัง เพื่อจับคู่กับทรัพย์จริงในระบบ LandmarketThai",
+  title: "ฝากความต้องการซื้อทรัพย์",
+  description: "แจ้งเงื่อนไขซื้อที่ดิน โรงงาน และโกดัง เพื่อจับคู่กับทรัพย์จริงในระบบ LandmarketThai",
   alternates: { canonical: "/buy-request" },
 };
 
@@ -27,8 +27,8 @@ export default async function BuyRequestPage({ searchParams }: { searchParams: P
     <main className="bg-slate-50">
       <section className="bg-[#071d4a] px-4 py-10 text-white sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl max-w-3xl text-center">
-          <div className="text-xs font-bold tracking-[0.16em] text-gold-400">BUY / RENT</div>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ฝากความต้องการซื้อหรือเช่า</h1>
+          <div className="text-xs font-bold tracking-[0.16em] text-gold-400">BUY</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ฝากความต้องการซื้อ</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
             แจ้งทำเล ขนาด งบประมาณ และเงื่อนไขที่ต้องการ ระบบจะเทียบกับทรัพย์จริงใน LandmarketThai
             และบันทึกไว้ให้ทีมงานติดตาม
@@ -53,7 +53,6 @@ export default async function BuyRequestPage({ searchParams }: { searchParams: P
             provinces={provinces}
             initial={{
               property_type: one(raw.property_type),
-              transaction_type: one(raw.transaction_type),
               province: one(raw.province),
               min_size_rai: one(raw.min_size_rai),
               max_size_rai: one(raw.max_size_rai),

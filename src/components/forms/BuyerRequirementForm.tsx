@@ -6,13 +6,13 @@ import type { Land, Province } from "@/lib/types/database";
 
 interface Props {
   provinces: Province[];
-  initial?: { property_type?: string; transaction_type?: string; province?: string; min_size_rai?: string; max_size_rai?: string; max_price?: string; max_price_per_rai?: string; zoning?: string };
+  initial?: { property_type?: string; province?: string; min_size_rai?: string; max_size_rai?: string; max_price?: string; max_price_per_rai?: string; zoning?: string };
 }
 
 export default function BuyerRequirementForm({ provinces, initial = {} }: Props) {
   const initialProvince = provinces.find((province) => province.slug === initial.province)?.id ?? "";
   const [form, setForm] = useState({
-    property_type: initial.property_type ?? "", transaction_type: initial.transaction_type === "rent" ? "rent" : "sale",
+    property_type: initial.property_type ?? "",
     province_id: initialProvince, preferred_locations: "", min_size_rai: initial.min_size_rai ?? "", max_size_rai: initial.max_size_rai ?? "",
     max_price: initial.max_price ?? "", max_price_per_rai: initial.max_price_per_rai ?? "", zoning: initial.zoning ?? "", purpose: "",
     container_access: "", high_voltage: "", water_requirement: "", name: "", phone: "", line_id: "", consent_pdpa: false,
@@ -30,7 +30,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
     const response = await fetch("/api/buyer-requirements", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        property_type: form.property_type || null, transaction_type: form.transaction_type,
+        property_type: form.property_type || null, transaction_type: "sale",
         preferred_locations: form.preferred_locations.split(",").map((value) => value.trim()).filter(Boolean),
         province_ids: form.province_id ? [form.province_id] : [], min_size_rai: number(form.min_size_rai), max_size_rai: number(form.max_size_rai),
         max_price: number(form.max_price), max_price_per_rai: number(form.max_price_per_rai), zoning: form.zoning || null,
@@ -49,7 +49,6 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
     <form onSubmit={submit} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
       {error && <div role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <label><span className="label">ต้องการซื้อ / เช่า *</span><select className="input" value={form.transaction_type} onChange={(e) => set("transaction_type", e.target.value)}><option value="sale">ซื้อ</option><option value="rent">เช่า</option></select></label>
         <label><span className="label">ประเภททรัพย์</span><select className="input" value={form.property_type} onChange={(e) => set("property_type", e.target.value)}><option value="">ทั้งหมด</option><option value="land">ที่ดิน</option><option value="factory">โรงงาน</option><option value="warehouse">โกดัง</option></select></label>
         <label><span className="label">จังหวัด</span><select className="input" value={form.province_id} onChange={(e) => set("province_id", e.target.value)}><option value="">ทุกจังหวัด</option>{provinces.map((province) => <option key={province.id} value={province.id}>{province.name_th}</option>)}</select></label>
         <label><span className="label">ทำเลเพิ่มเติม</span><input className="input" value={form.preferred_locations} onChange={(e) => set("preferred_locations", e.target.value)} placeholder="อำเภอ, ตำบล, นิคม (คั่นด้วย ,)" /></label>

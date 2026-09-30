@@ -21,7 +21,7 @@ interface Props {
 }
 
 function markerLabel(property: Land): string {
-  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  const price = property.total_price;
   if (!price) return property.status === "sold" ? "Sold" : "ดูทรัพย์";
   if (price >= 1_000_000) return `${(price / 1_000_000).toLocaleString("th-TH", { maximumFractionDigits: 1 })} ล.`;
   return `${Math.round(price / 1_000).toLocaleString("th-TH")}k`;

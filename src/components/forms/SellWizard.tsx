@@ -28,7 +28,6 @@ type DraftForm = {
   zoning: ZoningColor | null;
   sale_price: number | null;
   price_per_rai: number | null;
-  rent_price_monthly: number | null;
   description: string;
   contact_name: string;
   contact_phone: string;
@@ -56,7 +55,6 @@ const emptyForm: DraftForm = {
   zoning: null,
   sale_price: null,
   price_per_rai: null,
-  rent_price_monthly: null,
   description: "",
   contact_name: "",
   contact_phone: "",
@@ -68,7 +66,7 @@ const steps = ["ประเภททรัพย์", "ตำแหน่ง", 
 function fromDraft(draft: PropertySubmission): DraftForm {
   return {
     property_type: draft.property_type,
-    transaction_type: draft.transaction_type,
+    transaction_type: "sale",
     title: draft.title ?? "",
     province_id: draft.province_id ?? "",
     district: draft.district ?? "",
@@ -87,7 +85,6 @@ function fromDraft(draft: PropertySubmission): DraftForm {
     zoning: draft.zoning,
     sale_price: draft.sale_price,
     price_per_rai: draft.price_per_rai,
-    rent_price_monthly: draft.rent_price_monthly,
     description: draft.description ?? "",
     contact_name: draft.contact_name ?? "",
     contact_phone: draft.contact_phone ?? "",
@@ -140,10 +137,10 @@ export default function SellWizard({ provinces }: Props) {
     return (form.area_rai ?? 0) + (form.area_ngan ?? 0) / 4 + (form.area_sqwa ?? 0) / 400;
   }, [form.area_rai, form.area_ngan, form.area_sqwa]);
   const derivedPricePerRai = useMemo(() => (
-    form.transaction_type === "sale" && totalRai != null && totalRai > 0 && form.sale_price != null && form.sale_price > 0
+    totalRai != null && totalRai > 0 && form.sale_price != null && form.sale_price > 0
       ? Math.round((form.sale_price / totalRai) * 100) / 100
       : null
-  ), [form.sale_price, form.transaction_type, totalRai]);
+  ), [form.sale_price, totalRai]);
 
   async function saveDraft(): Promise<boolean> {
     if (!draftId || !token) return false;
@@ -165,13 +162,12 @@ export default function SellWizard({ provinces }: Props) {
   }
 
   function stepError(): string | null {
-    if (step === 0 && (!form.property_type || !form.transaction_type)) return "กรุณาเลือกประเภททรัพย์และรูปแบบการทำรายการ";
+    if (step === 0 && !form.property_type) return "กรุณาเลือกประเภททรัพย์";
     if (step === 1 && !form.province_id) return "กรุณาเลือกจังหวัด";
     if (step === 2) {
       if (!form.title.trim()) return "กรุณาระบุชื่อทรัพย์";
       if (totalRai == null || totalRai <= 0) return "กรุณาระบุขนาดพื้นที่";
-      if (form.transaction_type === "sale" && (form.sale_price == null || form.sale_price <= 0)) return "กรุณาระบุราคาขายที่มากกว่า 0";
-      if (form.transaction_type === "rent" && (form.rent_price_monthly == null || form.rent_price_monthly <= 0)) return "กรุณาระบุค่าเช่าที่มากกว่า 0";
+      if (form.sale_price == null || form.sale_price <= 0) return "กรุณาระบุราคาขายที่มากกว่า 0";
     }
     if (step === 4 && (!form.contact_name.trim() || !form.contact_phone.trim())) return "กรุณาระบุชื่อและเบอร์โทรศัพท์";
     return null;
@@ -252,15 +248,10 @@ export default function SellWizard({ provinces }: Props) {
 
         {step === 0 && (
           <div>
-            <h2 className="text-xl font-black text-slate-900">ประเภททรัพย์และการทำรายการ</h2>
+            <h2 className="text-xl font-black text-slate-900">ประเภททรัพย์ที่ต้องการขาย</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {([['land','ที่ดิน'],['factory','โรงงาน'],['warehouse','โกดัง']] as const).map(([value,label]) => (
                 <button key={value} type="button" onClick={() => setForm((v) => ({ ...v, property_type: value }))} className={`min-h-20 rounded-2xl border-2 p-4 text-left font-bold ${form.property_type === value ? "border-[#00A859] bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-700"}`}>{label}</button>
-              ))}
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {([['sale','ขาย'],['rent','ให้เช่า']] as const).map(([value,label]) => (
-                <button key={value} type="button" onClick={() => setForm((v) => ({ ...v, transaction_type: value }))} className={`min-h-14 rounded-2xl border-2 font-bold ${form.transaction_type === value ? "border-brand-600 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-700"}`}>{label}</button>
               ))}
             </div>
           </div>
@@ -288,7 +279,7 @@ export default function SellWizard({ provinces }: Props) {
               <label className="sm:col-span-2"><span className="label">ชื่อทรัพย์ *</span><input className="input" value={form.title} onChange={(e) => setForm((v) => ({ ...v, title: e.target.value }))} placeholder="เช่น ที่ดินอุตสาหกรรม อ.นิคมพัฒนา ระยอง" /></label>
               <label><span className="label">ไร่ *</span><input type="number" min="0" className="input" value={numberValue(form.area_rai)} onChange={(e) => setNumber('area_rai', e.target.value)} /></label>
               <div className="grid grid-cols-2 gap-3"><label><span className="label">งาน</span><input type="number" min="0" max="3" className="input" value={numberValue(form.area_ngan)} onChange={(e) => setNumber('area_ngan', e.target.value)} /></label><label><span className="label">ตร.ว.</span><input type="number" min="0" max="99.99" step="0.1" className="input" value={numberValue(form.area_sqwa)} onChange={(e) => setNumber('area_sqwa', e.target.value)} /></label></div>
-              {form.transaction_type === 'rent' ? <label><span className="label">ค่าเช่า / เดือน *</span><input type="number" min="0" className="input" value={numberValue(form.rent_price_monthly)} onChange={(e) => setNumber('rent_price_monthly', e.target.value)} /></label> : <label><span className="label">ราคาขายรวม *</span><input type="number" min="0" className="input" value={numberValue(form.sale_price)} onChange={(e) => setNumber('sale_price', e.target.value)} /></label>}
+              <label><span className="label">ราคาขายรวม *</span><input type="number" min="0" className="input" value={numberValue(form.sale_price)} onChange={(e) => setNumber('sale_price', e.target.value)} /></label>
               <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณจากราคาขายและขนาด" /></label>
               <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ''} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
               <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber('frontage_m', e.target.value)} /></label>
@@ -329,7 +320,7 @@ export default function SellWizard({ provinces }: Props) {
           <div>
             <h2 className="text-xl font-black text-slate-900">ตรวจสอบและส่ง</h2>
             <div className="mt-5 grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm sm:grid-cols-2">
-              <div><span className="text-slate-400">ประเภท</span><div className="font-bold">{form.property_type === 'factory' ? 'โรงงาน' : form.property_type === 'warehouse' ? 'โกดัง' : 'ที่ดิน'} · {form.transaction_type === 'rent' ? 'ให้เช่า' : 'ขาย'}</div></div>
+              <div><span className="text-slate-400">ประเภท</span><div className="font-bold">{form.property_type === 'factory' ? 'โรงงาน' : form.property_type === 'warehouse' ? 'โกดัง' : 'ที่ดิน'} · ขาย</div></div>
               <div><span className="text-slate-400">ชื่อทรัพย์</span><div className="font-bold">{form.title || '-'}</div></div>
               <div><span className="text-slate-400">ขนาด</span><div className="font-bold">{totalRai != null ? `${totalRai.toLocaleString('th-TH',{maximumFractionDigits:5})} ไร่` : '-'}</div></div>
               <div className="min-w-0"><span className="text-slate-400">ผู้ติดต่อ</span><div className="break-words font-bold">{form.contact_name} · {form.contact_phone}</div></div>

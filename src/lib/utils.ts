@@ -51,7 +51,7 @@ export function formatMoneyFull(n: number): string {
 export function listingStatusLabel(land: Pick<Land, "status" | "transaction_type">): string {
   if (land.status === "sold") return "ขายแล้ว";
   if (land.status === "reserved") return "จองแล้ว";
-  if (land.status === "active") return land.transaction_type === "rent" ? "พร้อมให้เช่า" : "พร้อมขาย";
+  if (land.status === "active") return "พร้อมขาย";
   return land.status;
 }
 
