@@ -58,9 +58,9 @@ export const SEED_37_RAI_LAND: Land = {
   is_eec: true,
   nearby_landmarks: ["ถนนเข้าถึง ปี 2569"],
   description: null,
-  lat: null,
-  lng: null,
-  location_precision: "approx",
+  lat: 12.8626284,
+  lng: 101.0948946,
+  location_precision: "exact",
   status: "active",
   is_featured: true,
   seo_title: null,
@@ -148,9 +148,9 @@ export const SEED_101_KABIN_LAND: Land = {
   is_eec: false,
   nearby_landmarks: ["ตรงข้ามสวนอุตสาหกรรมกวางตุ้ง"],
   description: null,
-  lat: null,
-  lng: null,
-  location_precision: "approx",
+  lat: 14.0417619,
+  lng: 101.8310660,
+  location_precision: "exact",
   status: "active",
   is_featured: true,
   seo_title: null,
@@ -283,7 +283,9 @@ export function mergeWithSeedListings(
   const seedListings = filterSeedPublicListings(opts).filter(
     (land) => !dbSlugs.has(land.slug),
   );
-  return [...dbListings, ...seedListings];
+  return [...dbListings, ...seedListings].filter(
+    (land) => (land.status === "active" || land.status === "sold") && !land.deleted_at && matchesSeedListingFilters(land, opts),
+  );
 }
 
 export function seedListingSortOrder(land: Land) {

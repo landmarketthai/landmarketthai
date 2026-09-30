@@ -26,7 +26,6 @@ export interface PropertyDetail {
   soldOut?: boolean;
   frontage: string;
   access: string;
-  status: string;
   nearby: string[];
   heroImage: PropertyDetailImage;
   keyHighlights: string[];
@@ -147,7 +146,6 @@ export const propertyDetails: PropertyDetail[] = [
     referralReward: "ค่าแนะนำสูงสุด 1,200,000 บาท",
     frontage: "ประมาณ 240 เมตร",
     access: "ติดถนน 2026",
-    status: "เปิดรับสอบถาม",
     nearby: ["ด้านหลังติดแหล่งน้ำ"],
     heroImage: {
       src: "/images/listings/37-rai-home-thumbnail.png",
@@ -167,7 +165,6 @@ export const propertyDetails: PropertyDetail[] = [
       { label: "ผังเมือง", value: "ผังสีม่วง" },
       { label: "หน้ากว้าง", value: "ประมาณ 240 เมตร" },
       { label: "ทางเข้าออก", value: "ติดถนน 2026" },
-      { label: "สถานะ", value: "เปิดรับสอบถาม" },
     ],
     highlightCards: [
       {
@@ -230,7 +227,6 @@ export const propertyDetails: PropertyDetail[] = [
     referralReward: "ค่าแนะนำสูงสุด 2,275,000 บาท",
     frontage: "ประมาณ 700 เมตร",
     access: "ติดถนน อบต. ตรงข้ามสวนอุตสาหกรรมกวางตุ้ง",
-    status: "เปิดรับสอบถาม",
     nearby: ["สวนอุตสาหกรรมกวางตุ้ง"],
     heroImage: {
       src: "/images/listings/kabin-buri-101-rai-gallery/01-drone-roadside.png",
@@ -251,7 +247,6 @@ export const propertyDetails: PropertyDetail[] = [
       { label: "ทางเข้าออก", value: "ติดถนน อบต." },
       { label: "เอกสารสิทธิ์", value: "13 ฉบับ (12 โฉนด + ภ.บ.ท.5 จำนวน 2 แปลง)" },
       { label: "ราคารวม (โดยประมาณ)", value: "151.5 ล้านบาท" },
-      { label: "สถานะ", value: "เปิดรับสอบถาม" },
     ],
     highlightCards: [
       {

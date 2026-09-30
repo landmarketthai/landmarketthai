@@ -5,6 +5,8 @@ import Link from "next/link";
 import { MapPin, Ruler, Tag, Award, ChevronRight } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
+import ListingTrust from "@/components/listings/ListingTrust";
+import PropertyMapPreview from "@/components/listings/PropertyMapPreview";
 import ShareButton from "@/components/listings/ShareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import LeadForm from "@/components/forms/LeadForm";
@@ -52,6 +54,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
     "@context": "https://schema.org",
     "@type": "RealEstateListing",
     name: land.title_th,
+    dateModified: land.updated_at,
     description: land.description ?? "",
     url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${listingHref(land.public_ref, land.slug)}`,
     image: land.images?.map((img) => img.url_or_cdn_path) ?? [],
@@ -64,7 +67,11 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
       "@type": "Offer",
       price: land.total_price ?? land.price_per_rai * land.size_rai,
       priceCurrency: "THB",
-      availability: land.status === "active" ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+      availability: land.status === "sold"
+        ? "https://schema.org/SoldOut"
+        : land.status === "reserved"
+          ? "https://schema.org/LimitedAvailability"
+          : "https://schema.org/InStock",
     },
   };
 
@@ -153,6 +160,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
 
           {/* Title */}
           <h1 className="text-2xl font-bold text-slate-900">{land.title_th}</h1>
+          <ListingTrust land={land} />
 
           {/* Key facts grid */}
           {(() => {
@@ -211,6 +219,10 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
           )}
 
           {/* Description */}
+          <section>
+            <h2 className="mb-3 font-semibold text-slate-800">ตำแหน่งบนแผนที่</h2>
+            <PropertyMapPreview listings={[land]} />
+          </section>
           {land.description && (
             <div>
               <h2 className="font-semibold text-slate-800 mb-3">รายละเอียด</h2>

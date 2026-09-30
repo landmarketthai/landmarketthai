@@ -1,4 +1,16 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+.property-map-marker {
+  border: 2px solid white;
+  border-radius: 999px;
+  background: #0f367a;
+  color: white;
+  font: bold 14px/36px system-ui;
+  text-align: center;
+  box-shadow: 0 2px 8px #0005;
+}
+.property-map-marker.selected { background: #008747; outline: 3px solid #fbbf24; }
 
 @theme {
   /* Navy blue primary palette (replaces amber) */
