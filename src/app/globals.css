@@ -156,4 +156,38 @@
   .label {
     @apply block text-sm font-medium text-slate-700 mb-1;
   }
+
+  .property-price-marker-wrap {
+    background: transparent;
+    border: 0;
+  }
+
+  .property-price-marker {
+    display: inline-flex;
+    min-width: 64px;
+    min-height: 32px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    border-radius: 999px;
+    background: #0d1f44;
+    padding: 0 10px;
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 4px 16px rgba(13, 31, 68, 0.28);
+  }
+
+  .property-price-marker.is-selected {
+    background: #00a859;
+    transform: scale(1.08);
+  }
+
+  .property-price-marker.is-sold {
+    background: #64748b;
+  }
+
+  .leaflet-container {
+    font-family: var(--font-sans);
+  }
 }

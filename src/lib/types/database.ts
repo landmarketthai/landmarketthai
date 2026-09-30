@@ -1,4 +1,5 @@
 export type LandType =
+  | "land"
   | "industrial"
   | "eec"
   | "factory"
@@ -17,23 +18,25 @@ export type ZoningColor =
   | "other";
 
 export type LocationPrecision = "exact" | "approx";
-
-export type ListingStatus = "draft" | "active" | "reserved" | "sold" | "archived";
-
+export type PropertyType = "land" | "factory" | "warehouse";
+export type TransactionType = "sale" | "rent";
+export type VerificationStatus = "pending" | "verified" | "rejected";
+export type ListingStatus = "draft" | "active" | "reserved" | "sold" | "expired" | "archived";
+export type SubmissionStatus =
+  | "draft"
+  | "pending_review"
+  | "approved"
+  | "published"
+  | "rejected"
+  | "sold"
+  | "expired";
 export type LeadType = "buyer" | "partner" | "owner";
-
 export type LeadStatus = "new" | "contacting" | "qualified" | "won" | "lost";
-
 export type DocType = "title_deed" | "map" | "brochure" | "other";
-
 export type DemandStatus = "active" | "matched" | "closed";
-
 export type DealStatus = "in_progress" | "closed" | "cancelled";
-
 export type PartnerStatus = "pending" | "active" | "inactive";
-
 export type PostStatus = "draft" | "published";
-
 export type EntityType = "buyer" | "owner";
 
 export interface Province {
@@ -53,12 +56,24 @@ export interface Land {
   slug: string;
   province_id: string;
   district: string | null;
+  subdistrict: string | null;
+  address: string | null;
   land_type: LandType;
-  size_rai: number;
+  property_type: PropertyType;
+  transaction_type: TransactionType;
+  size_rai: number | null;
+  area_rai: number | null;
+  area_ngan: number | null;
+  area_sqwa: number | null;
   zoning: ZoningColor | null;
   frontage_m: number | null;
-  price_per_rai: number;
+  depth_min_m: number | null;
+  depth_max_m: number | null;
+  road_name: string | null;
+  road_width_m: number | null;
+  price_per_rai: number | null;
   total_price: number | null;
+  rent_price_monthly: number | null;
   referral_reward_max: number | null;
   is_eec: boolean;
   nearby_landmarks: string[] | null;
@@ -67,13 +82,14 @@ export interface Land {
   lng: number | null;
   location_precision: LocationPrecision;
   status: ListingStatus;
+  verification_status: VerificationStatus;
   is_featured: boolean;
   seo_title: string | null;
   seo_description: string | null;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  // joined
   province?: Province;
   images?: LandImage[];
 }
@@ -100,6 +116,66 @@ export interface LandDocument {
   size_bytes: number;
   doc_type: DocType;
   is_sensitive: boolean;
+  created_at: string;
+}
+
+export interface PropertySubmission {
+  id: string;
+  draft_token: string;
+  user_id: string | null;
+  owner_lead_id: string | null;
+  linked_land_id: string | null;
+  property_type: PropertyType | null;
+  transaction_type: TransactionType | null;
+  title: string | null;
+  province_id: string | null;
+  district: string | null;
+  subdistrict: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  location_precision: LocationPrecision;
+  area_rai: number | null;
+  area_ngan: number | null;
+  area_sqwa: number | null;
+  total_rai: number | null;
+  frontage_m: number | null;
+  depth_min_m: number | null;
+  depth_max_m: number | null;
+  road_name: string | null;
+  road_width_m: number | null;
+  zoning: ZoningColor | null;
+  sale_price: number | null;
+  price_per_rai: number | null;
+  rent_price_monthly: number | null;
+  description: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_line: string | null;
+  status: SubmissionStatus;
+  verification_status: VerificationStatus;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  published_at: string | null;
+  province?: Province;
+  media?: PropertySubmissionMedia[];
+}
+
+export interface PropertySubmissionMedia {
+  id: string;
+  submission_id: string;
+  media_kind: "image" | "document";
+  file_name: string;
+  storage_key: string;
+  public_url: string | null;
+  mime_type: string;
+  size_bytes: number;
+  doc_type: DocType | null;
+  sort_order: number;
+  is_cover: boolean;
   created_at: string;
 }
 
@@ -187,8 +263,31 @@ export interface BuyerDemand {
   seo_title: string | null;
   seo_description: string | null;
   created_at: string;
-  // joined
   province?: Province;
+}
+
+export interface BuyerRequirement {
+  id: string;
+  lead_id: string | null;
+  property_type: PropertyType | null;
+  transaction_type: TransactionType;
+  preferred_locations: string[];
+  province_ids: string[];
+  min_size_rai: number | null;
+  max_size_rai: number | null;
+  max_price: number | null;
+  max_price_per_rai: number | null;
+  zoning: ZoningColor | null;
+  purpose: string | null;
+  container_access: boolean | null;
+  high_voltage: boolean | null;
+  water_requirement: string | null;
+  name: string;
+  phone: string;
+  line_id: string | null;
+  status: DemandStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Category {
@@ -213,7 +312,6 @@ export interface BlogPost {
   seo_description: string | null;
   created_at: string;
   updated_at: string;
-  // joined
   category?: Category;
 }
 

@@ -20,6 +20,8 @@ export type StorageFolder =
   | `lands/${string}/images`
   | `lands/${string}/documents`
   | `leads/${string}/attachments`
+  | `submissions/${string}/images`
+  | `submissions/${string}/documents`
   | `blog/${string}`
   | "public-assets";
 
@@ -105,4 +107,9 @@ export async function headStorageObject(storageKey: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function storagePublicUrl(storageKey: string): string | null {
+  const cdnBase = process.env.DO_SPACES_CDN_BASE?.replace(/\/$/, "");
+  return cdnBase ? `${cdnBase}/${storageKey}` : null;
 }

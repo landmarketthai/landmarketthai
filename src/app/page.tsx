@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowRight, MapPin,
+  ArrowRight,
   BadgeDollarSign, BarChart3, Smartphone, Wallet, Target, Users,
   Shield, Search, Calendar, Clock,
   Wrench, Briefcase, Building2, Network,
@@ -14,13 +14,12 @@ import ListingCard from "@/components/listings/ListingCard";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getFeaturedListings, getActiveDemands } from "@/lib/neon/queries";
+import { getFeaturedListings, searchProperties } from "@/lib/neon/queries";
+import HomePropertyMap from "@/components/search/HomePropertyMap";
 import {
-  mergeWithSeedListings,
   resolveListingPresentation,
   sortSeedListings,
 } from "@/lib/seed-listings";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
 
 export const revalidate = 3600;
 
@@ -86,20 +85,13 @@ const trustItems: { Icon: LucideIcon; label: string }[] = [
   { Icon: Clock,        label: "ปิดดีลไว\nตรวจสอบ 100%" },
 ];
 
-const fallbackDemands = [
-  { province: "ระยอง",         type: "อุตสาหกรรม",  size: "50–100 ไร่", note: "ใกล้นิคมอุตสาหกรรม สำหรับโรงงานผลิต",         ago: "2 ชม. ที่แล้ว" },
-  { province: "ชลบุรี",        type: "โลจิสติกส์",  size: "20–50 ไร่",  note: "ใกล้ท่าเรือแหลมฉบัง สำหรับคลังสินค้า",         ago: "4 ชม. ที่แล้ว" },
-  { province: "สมุทรปราการ",  type: "ศูนย์ข้อมูล", size: "30–80 ไร่",  note: "บางนา-เทพารักษ์ สำหรับศูนย์ข้อมูล",              ago: "1 วัน ที่แล้ว" },
-  { province: "อยุธยา",        type: "อุตสาหกรรม",  size: "100+ ไร่",   note: "ใกล้นิคมบางปะอิน สำหรับโรงงาน",                 ago: "1 วัน ที่แล้ว" },
-];
-
 export default async function HomePage() {
-  const [featuredListings, demands] = await Promise.all([
+  const [featuredListings, mapProperties] = await Promise.all([
     getFeaturedListings(6).catch(() => []),
-    getActiveDemands(4).catch(() => []),
+    searchProperties({ limit: 100 }).catch(() => []),
   ]);
 
-  const sortedListings = sortSeedListings(mergeWithSeedListings(featuredListings));
+  const sortedListings = sortSeedListings(featuredListings);
 
   const orgSchema = {
     "@context": "https://schema.org",
@@ -275,6 +267,57 @@ export default async function HomePage() {
       {/* ── 2. TRUST STRIP ───────────────────────────────────────────────── */}
       <TrustStrip />
 
+      {/* ── V2 ADD-ON: PROPERTY SEARCH ──────────────────────────────────── */}
+      <section className="bg-[#eef2f9] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <div className="container-xl">
+          <div className="rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_8px_28px_rgba(13,30,70,0.08)] sm:p-6 lg:p-7">
+            <div className="mb-5 flex flex-col gap-2 text-center sm:text-left lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-bold tracking-[0.14em] text-[#2f9e44]">ค้นหาทรัพย์</p>
+                <h2 className="mt-1 text-xl font-bold text-[#0a2a63] sm:text-2xl">ค้นหาที่ดิน โรงงาน และโกดัง</h2>
+                <p className="mt-1 text-sm text-slate-500">ค้นจากข้อมูลจริงในระบบ และเปิดดูตำแหน่งบนแผนที่ได้</p>
+              </div>
+              <Link href="/search?view=map" className="text-sm font-semibold text-blue-700 hover:underline">
+                เปิดค้นหาแบบแผนที่ ›
+              </Link>
+            </div>
+
+            <form action="/search" method="get" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(260px,1.5fr)_150px_160px_auto]">
+              <label className="relative sm:col-span-2 lg:col-span-1">
+                <span className="sr-only">ค้นหาทำเล</span>
+                <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input name="q" className="input pl-10" placeholder="จังหวัด / อำเภอ / ตำบล / นิคม / ทำเล" />
+              </label>
+              <select name="transaction_type" className="input" defaultValue="sale" aria-label="ซื้อหรือเช่า">
+                <option value="sale">ซื้อ</option>
+                <option value="rent">เช่า</option>
+              </select>
+              <select name="property_type" className="input" defaultValue="" aria-label="ประเภททรัพย์">
+                <option value="">ทุกประเภท</option>
+                <option value="land">ที่ดิน</option>
+                <option value="factory">โรงงาน</option>
+                <option value="warehouse">โกดัง</option>
+              </select>
+              <button type="submit" className="btn-green w-full justify-center sm:col-span-2 lg:col-span-1 lg:w-auto">
+                <Search size={16} /> ค้นหาทรัพย์
+              </button>
+            </form>
+
+            <div className="mt-4 grid gap-2 min-[390px]:grid-cols-2 lg:grid-cols-3">
+              <Link href="/sell" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+                ฝากขาย / ให้เช่าทรัพย์
+              </Link>
+              <Link href="/buy-request" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+                ฝากความต้องการซื้อ / เช่า
+              </Link>
+              <Link href="/land" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 min-[390px]:col-span-2 lg:col-span-1">
+                ดูรายการที่ดินเดิม
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── 3. FEATURED LISTINGS ─────────────────────────────────────────── */}
       <section id="featured-listings" className="bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl">
@@ -388,86 +431,35 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 5. BUYER DEMAND ──────────────────────────────────────────────── */}
-      <section className="bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
+      {/* ── 5. PROPERTY MAP ──────────────────────────────────────────────── */}
+      <section id="property-map" className="bg-white px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl">
-          <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
+          <div className="mb-5 flex flex-col items-center gap-2 text-center sm:relative sm:mb-7 sm:block">
             <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
-              ความต้องการที่ดิน <b className="text-[#2f9e44]">(ผู้ซื้อกำลังหา)</b>
+              แผนที่ทรัพย์<b className="text-[#2f9e44]">ทั้งหมด</b>
             </h2>
             <Link
-              href="/buyer-demand"
+              href="/search?view=map"
               className="text-sm font-semibold text-blue-700 hover:underline sm:absolute sm:right-0 sm:bottom-1"
             >
-              ดูทั้งหมด ›
+              เปิดแผนที่เต็ม ›
             </Link>
           </div>
 
-          <p className="mx-auto mb-7 max-w-2xl text-center text-sm leading-relaxed text-slate-600 sm:text-base">
-            ทีมงานกำลังคัดเลือกที่ดินให้ผู้ซื้อและนักลงทุนตามเงื่อนไขด้านล่าง
-            หากมีที่ดินตรงหรือใกล้เคียง ส่งข้อมูลให้ทีมตรวจสอบได้
+          <p className="mx-auto mb-6 max-w-2xl text-center text-sm leading-relaxed text-slate-600 sm:text-base">
+            ดูทำเลทรัพย์ที่เผยแพร่ทั้งหมด {mapProperties.length} รายการ
+            แตะหมุดบนแผนที่หรือรายการเพื่อดูรายละเอียด แสดงเฉพาะทรัพย์ที่มีพิกัดจริง
           </p>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {demands.length > 0
-              ? demands.slice(0, 4).map((d) => (
-                  <Link
-                    key={d.id}
-                    href={`/buyer-demand/${d.slug}`}
-                    className="min-h-32 rounded-[18px] p-4 pb-5 transition-shadow hover:shadow-md"
-                    style={{ background: "#fdf3e5", border: "1px solid #f1ddbd" }}
-                  >
-                    <div className="flex min-w-0 items-center gap-1.5 text-[17px] font-bold text-[#0a2a63]">
-                      <MapPin size={16} className="text-[#2f9e44]" />
-                      <span className="truncate">{d.province?.name_th ?? "ทั่วไทย"}</span>
-                    </div>
-                    <div className="text-sm font-semibold text-slate-800 mt-2 mb-1.5">
-                      ต้องการที่ดิน{" "}
-                      {d.size_min_rai && d.size_max_rai
-                        ? `${d.size_min_rai}–${d.size_max_rai} ไร่`
-                        : d.size_min_rai
-                        ? `${d.size_min_rai}+ ไร่`
-                        : "ทุกขนาด"}
-                    </div>
-                    {d.budget_note && (
-                      <div className="text-xs text-slate-500 leading-relaxed">{d.budget_note}</div>
-                    )}
-                    {d.land_type && (
-                      <div className="mt-3 text-xs text-[#2a8a3c] font-semibold">
-                        {LAND_TYPE_LABELS[d.land_type]}
-                      </div>
-                    )}
-                  </Link>
-                ))
-              : fallbackDemands.map((d) => (
-                  <div
-                    key={d.province}
-                    className="min-h-32 rounded-[18px] p-4 pb-5"
-                    style={{ background: "#fdf3e5", border: "1px solid #f1ddbd" }}
-                  >
-                    <div className="flex min-w-0 items-center gap-1.5 text-[17px] font-bold text-[#0a2a63]">
-                      <MapPin size={16} className="text-[#2f9e44]" />
-                      <span className="truncate">{d.province}</span>
-                    </div>
-                    <div className="text-sm font-semibold text-slate-800 mt-2 mb-1.5">
-                      ต้องการที่ดิน {d.size}
-                    </div>
-                    <div className="text-xs text-slate-500 leading-relaxed">{d.note}</div>
-                    <div className="mt-3 text-xs text-[#2a8a3c] font-semibold">
-                      อัปเดต {d.ago}
-                    </div>
-                  </div>
-                ))}
-
-          </div>
+          <HomePropertyMap properties={mapProperties} />
 
           <div className="mt-8 flex flex-col items-center gap-2 text-center">
-            <Link href="/submit-land" className="btn-green px-8 text-sm">
-              ส่งที่ดินให้ทีมประเมิน
+            <Link href="/search" className="btn-green px-8 text-sm">
+              ค้นหาทรัพย์ทั้งหมด
             </Link>
-            <p className="text-xs text-slate-500">
-              ใช้เวลาแจ้งข้อมูลเบื้องต้นไม่กี่นาที
-            </p>
+            <Link href="/submit-land" className="text-xs font-semibold text-slate-500 hover:underline">
+              มีที่ดิน? ส่งให้ทีมประเมิน ›
+            </Link>
           </div>
         </div>
       </section>

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getPublicListings, getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/neon/queries";
-import { LAND_TYPE_LABELS, listingHref, landTypeSlug } from "@/lib/utils";
+import { LAND_TYPE_LABELS, landTypeSlug } from "@/lib/utils";
 import type { LandType } from "@/lib/types/database";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://landmarketthai.com";
@@ -16,6 +16,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/land`, changeFrequency: "hourly", priority: 0.9 },
+    { url: `${SITE}/search`, changeFrequency: "hourly", priority: 0.9 },
+    { url: `${SITE}/sell`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE}/buy-request`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE}/become-partner`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE}/how-it-works`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE}/submit-land`, changeFrequency: "monthly", priority: 0.8 },
@@ -45,7 +48,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Listing detail pages
   const listingPages: MetadataRoute.Sitemap = listings.map((land) => ({
-    url: `${SITE}${listingHref(land.public_ref, land.slug)}`,
+    url: `${SITE}/properties/${land.slug}`,
     lastModified: new Date(land.updated_at),
     changeFrequency: "weekly" as const,
     priority: 0.85,

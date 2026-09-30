@@ -8,6 +8,11 @@ import type {
   Province,
   SiteStats,
 } from "@/lib/types/database";
+import {
+  SEED_PUBLIC_LISTINGS,
+  mergeWithSeedListings,
+  sortSeedListings,
+} from "@/lib/seed-listings";
 
 function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -52,6 +57,15 @@ function normalizeImage(value: unknown): LandImage {
 function normalizeLand(value: unknown): Land {
   const row = value as Record<string, unknown>;
   const images = Array.isArray(row.images) ? row.images.map(normalizeImage) : [];
+  const landType = row.land_type as Land["land_type"];
+  const propertyType =
+    row.property_type === "factory" || row.property_type === "warehouse" || row.property_type === "land"
+      ? (row.property_type as Land["property_type"])
+      : landType === "factory"
+        ? "factory"
+        : landType === "warehouse"
+          ? "warehouse"
+          : "land";
 
   return {
     id: String(row.id ?? ""),
@@ -60,25 +74,40 @@ function normalizeLand(value: unknown): Land {
     slug: String(row.slug ?? ""),
     province_id: String(row.province_id ?? ""),
     district: stringOrNull(row.district),
-    land_type: row.land_type as Land["land_type"],
-    size_rai: numberOrNull(row.size_rai) ?? 0,
+    subdistrict: stringOrNull(row.subdistrict),
+    address: stringOrNull(row.address),
+    land_type: landType,
+    property_type: propertyType,
+    transaction_type: row.transaction_type === "rent" ? "rent" : "sale",
+    size_rai: numberOrNull(row.size_rai),
+    area_rai: numberOrNull(row.area_rai),
+    area_ngan: numberOrNull(row.area_ngan),
+    area_sqwa: numberOrNull(row.area_sqwa),
     zoning: row.zoning == null ? null : (row.zoning as Land["zoning"]),
     frontage_m: numberOrNull(row.frontage_m),
-    price_per_rai: numberOrNull(row.price_per_rai) ?? 0,
+    depth_min_m: numberOrNull(row.depth_min_m),
+    depth_max_m: numberOrNull(row.depth_max_m),
+    road_name: stringOrNull(row.road_name),
+    road_width_m: numberOrNull(row.road_width_m),
+    price_per_rai: numberOrNull(row.price_per_rai),
     total_price: numberOrNull(row.total_price),
+    rent_price_monthly: numberOrNull(row.rent_price_monthly),
     referral_reward_max: numberOrNull(row.referral_reward_max),
     is_eec: Boolean(row.is_eec),
-    nearby_landmarks: Array.isArray(row.nearby_landmarks)
-      ? row.nearby_landmarks.map(String)
-      : null,
+    nearby_landmarks: Array.isArray(row.nearby_landmarks) ? row.nearby_landmarks.map(String) : null,
     description: stringOrNull(row.description),
     lat: numberOrNull(row.lat),
     lng: numberOrNull(row.lng),
-    location_precision: row.location_precision as Land["location_precision"],
+    location_precision: row.location_precision === "exact" ? "exact" : "approx",
     status: row.status as Land["status"],
+    verification_status:
+      row.verification_status === "pending" || row.verification_status === "rejected"
+        ? row.verification_status
+        : "verified",
     is_featured: Boolean(row.is_featured),
     seo_title: stringOrNull(row.seo_title),
     seo_description: stringOrNull(row.seo_description),
+    published_at: stringOrNull(row.published_at),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
     deleted_at: stringOrNull(row.deleted_at),
@@ -187,29 +216,43 @@ export async function getPublicListings(opts?: {
   const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 100);
   const offset = Math.max(opts?.offset ?? 0, 0);
 
-  return getCachedPublicListings(
+  const dbListings = await getCachedPublicListings(
     opts?.province_slug ?? null,
     opts?.land_type ?? null,
     limit,
     offset,
   );
+
+  if (offset > 0) return dbListings;
+
+  return sortSeedListings(
+    mergeWithSeedListings(dbListings, {
+      province_slug: opts?.province_slug,
+      land_type: opts?.land_type as Land["land_type"] | undefined,
+    }),
+  ).slice(0, limit);
 }
 
 export async function getFeaturedListings(limit = 6): Promise<Land[]> {
   const sql = getSqlIfConfigured();
-  if (!sql) return [];
-
   const safeLimit = Math.min(Math.max(limit, 1), 50);
-  const rows = await sql.query(
-    `${LAND_SELECT}
-     where l.status in ('active', 'sold') and l.deleted_at is null and l.is_featured = true
-     group by l.id, p.id
-     order by case when l.status = 'active' then 0 else 1 end, l.created_at desc
-     limit $1`,
-    [safeLimit],
-  );
+  let dbListings: Land[] = [];
 
-  return rows.map(normalizeLand);
+  if (sql) {
+    const rows = await sql.query(
+      `${LAND_SELECT}
+       where l.status in ('active', 'sold') and l.deleted_at is null and l.is_featured = true
+       group by l.id, p.id
+       order by case when l.status = 'active' then 0 else 1 end, l.created_at desc
+       limit $1`,
+      [safeLimit],
+    );
+    dbListings = rows.map(normalizeLand);
+  }
+
+  return sortSeedListings(mergeWithSeedListings(dbListings))
+    .filter((land) => land.is_featured)
+    .slice(0, safeLimit);
 }
 
 export async function getListingByRef(publicRef: number): Promise<Land | null> {
@@ -246,13 +289,19 @@ export async function getRelatedListings(land: Land, limit = 4): Promise<Land[]>
 }
 
 export async function getAllProvinces(): Promise<Province[]> {
+  const seedProvinces = SEED_PUBLIC_LISTINGS
+    .map((property) => property.province)
+    .filter((province): province is Province => Boolean(province))
+    .filter((province, index, provinces) => provinces.findIndex((item) => item.slug === province.slug) === index);
   const sql = getSqlIfConfigured();
-  if (!sql) return [];
+  if (!sql) return seedProvinces;
 
   const rows = await sql`select * from provinces order by name_th`;
-  return rows
+  const dbProvinces = rows
     .map((row) => normalizeProvince(row))
     .filter((row): row is Province => Boolean(row));
+  const dbSlugs = new Set(dbProvinces.map((province) => province.slug));
+  return [...dbProvinces, ...seedProvinces.filter((province) => !dbSlugs.has(province.slug))];
 }
 
 const getCachedProvinceBySlug = unstable_cache(
@@ -402,6 +451,189 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   );
 
   return rows[0] ? normalizePost(rows[0]) : null;
+}
+
+export interface PropertySearchFilters {
+  q?: string;
+  transaction_type?: "sale" | "rent";
+  property_type?: "land" | "factory" | "warehouse";
+  province_slug?: string;
+  district?: string;
+  min_price?: number;
+  max_price?: number;
+  min_price_per_rai?: number;
+  max_price_per_rai?: number;
+  min_size_rai?: number;
+  max_size_rai?: number;
+  zoning?: string;
+  eec?: boolean;
+  west?: number;
+  south?: number;
+  east?: number;
+  north?: number;
+  limit?: number;
+  offset?: number;
+}
+
+function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFilters): boolean {
+  if (property.status !== "active" && property.status !== "sold") return false;
+
+  const q = filters.q?.trim().toLocaleLowerCase("th-TH");
+  if (q) {
+    const haystack = [
+      property.title_th,
+      property.district,
+      property.subdistrict,
+      property.province?.name_th,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("th-TH");
+    if (!haystack.includes(q)) return false;
+  }
+  if (filters.transaction_type && property.transaction_type !== filters.transaction_type) return false;
+  if (filters.property_type && property.property_type !== filters.property_type) return false;
+  if (filters.province_slug && property.province?.slug !== filters.province_slug) return false;
+  if (filters.district?.trim() && !property.district?.toLocaleLowerCase("th-TH").includes(filters.district.trim().toLocaleLowerCase("th-TH"))) return false;
+
+  const price = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
+  if (filters.min_price != null && (price == null || price < filters.min_price)) return false;
+  if (filters.max_price != null && (price == null || price > filters.max_price)) return false;
+  if (filters.min_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai < filters.min_price_per_rai)) return false;
+  if (filters.max_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai > filters.max_price_per_rai)) return false;
+  if (filters.min_size_rai != null && (property.size_rai == null || property.size_rai < filters.min_size_rai)) return false;
+  if (filters.max_size_rai != null && (property.size_rai == null || property.size_rai > filters.max_size_rai)) return false;
+  if (filters.zoning && property.zoning !== filters.zoning) return false;
+  if (filters.eec != null && property.is_eec !== filters.eec) return false;
+
+  const hasBounds = [filters.west, filters.south, filters.east, filters.north].every(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  );
+  if (hasBounds) {
+    if (property.lat == null || property.lng == null) return false;
+    if (property.lng < filters.west! || property.lng > filters.east!) return false;
+    if (property.lat < filters.south! || property.lat > filters.north!) return false;
+  }
+
+  return true;
+}
+
+function enrichKnownListingCoordinates(property: Land): Land {
+  const seed = SEED_PUBLIC_LISTINGS.find((item) => item.slug === property.slug);
+  if (!seed) return property;
+  return {
+    ...property,
+    lat: property.lat ?? seed.lat,
+    lng: property.lng ?? seed.lng,
+    location_precision: property.lat != null && property.lng != null
+      ? property.location_precision
+      : seed.location_precision,
+  };
+}
+
+export async function searchProperties(filters: PropertySearchFilters = {}): Promise<Land[]> {
+  const sql = getSqlIfConfigured();
+
+  const clauses = ["l.status in ('active', 'sold')", "l.deleted_at is null"];
+  const params: unknown[] = [];
+  const add = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  if (filters.q?.trim()) {
+    const p = add(`%${filters.q.trim()}%`);
+    clauses.push(`(l.title_th ilike ${p} or coalesce(l.district, '') ilike ${p} or coalesce(l.subdistrict, '') ilike ${p} or p.name_th ilike ${p})`);
+  }
+  if (filters.transaction_type) clauses.push(`l.transaction_type = ${add(filters.transaction_type)}`);
+  if (filters.property_type) clauses.push(`l.property_type = ${add(filters.property_type)}`);
+  if (filters.province_slug) clauses.push(`p.slug = ${add(filters.province_slug)}`);
+  if (filters.district?.trim()) clauses.push(`l.district ilike ${add(`%${filters.district.trim()}%`)}`);
+  if (filters.min_price != null) {
+    clauses.push(`(case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) >= ${add(filters.min_price)}`);
+  }
+  if (filters.max_price != null) {
+    clauses.push(`(case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) <= ${add(filters.max_price)}`);
+  }
+  if (filters.min_price_per_rai != null) clauses.push(`l.price_per_rai >= ${add(filters.min_price_per_rai)}`);
+  if (filters.max_price_per_rai != null) clauses.push(`l.price_per_rai <= ${add(filters.max_price_per_rai)}`);
+  if (filters.min_size_rai != null) clauses.push(`l.size_rai >= ${add(filters.min_size_rai)}`);
+  if (filters.max_size_rai != null) clauses.push(`l.size_rai <= ${add(filters.max_size_rai)}`);
+  if (filters.zoning) clauses.push(`l.zoning = ${add(filters.zoning)}`);
+  if (filters.eec != null) clauses.push(`l.is_eec = ${add(filters.eec)}`);
+
+  const hasBounds = [filters.west, filters.south, filters.east, filters.north].every(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  );
+  if (hasBounds) {
+    clauses.push(`l.lng between ${add(filters.west)} and ${add(filters.east)}`);
+    clauses.push(`l.lat between ${add(filters.south)} and ${add(filters.north)}`);
+  }
+
+  const limit = Math.min(Math.max(filters.limit ?? 24, 1), 100);
+  const offset = Math.max(filters.offset ?? 0, 0);
+  const limitParam = add(limit);
+  const offsetParam = add(offset);
+
+  let rows: Record<string, unknown>[] = [];
+  if (sql) {
+    try {
+      rows = (await sql.query(
+        `${LAND_SELECT}
+         where ${clauses.join(" and ")}
+         group by l.id, p.id
+         order by case when l.status = 'active' then 0 else 1 end,
+                  l.is_featured desc,
+                  l.created_at desc
+         limit ${limitParam} offset ${offsetParam}`,
+        params,
+      )) as Record<string, unknown>[];
+    } catch (error) {
+      console.error("[searchProperties] database search failed; using canonical seed listings", error);
+    }
+  }
+
+  const dbListings = rows.map(normalizeLand).map(enrichKnownListingCoordinates);
+  if (offset > 0) return dbListings;
+
+  const dbSlugs = new Set(dbListings.map((property) => property.slug));
+  const matchingSeeds = SEED_PUBLIC_LISTINGS
+    .filter((property) => !dbSlugs.has(property.slug))
+    .filter((property) => propertyMatchesSearchFilters(property, filters));
+
+  return [...dbListings, ...matchingSeeds].slice(0, limit);
+}
+
+export async function getListingBySlug(slug: string): Promise<Land | null> {
+  const seed = SEED_PUBLIC_LISTINGS.find((property) => property.slug === slug) ?? null;
+  const sql = getSqlIfConfigured();
+  if (!sql) return seed;
+
+  try {
+    const rows = await sql.query(
+      `${LAND_SELECT}
+       where l.slug = $1 and l.status in ('active', 'sold') and l.deleted_at is null
+       group by l.id, p.id
+       limit 1`,
+      [slug],
+    );
+    if (!rows[0]) return seed;
+
+    const property = enrichKnownListingCoordinates(normalizeLand(rows[0]));
+    if (!seed) return property;
+    return {
+      ...property,
+      images: property.images?.length ? property.images : seed.images,
+      province: property.province ?? seed.province,
+    };
+  } catch (error) {
+    console.error("[getListingBySlug] database lookup failed; using canonical seed listing", error);
+    return seed;
+  }
+}
+
+export async function getLatestListings(limit = 6): Promise<Land[]> {
+  return searchProperties({ limit: Math.min(Math.max(limit, 1), 24) });
 }
 
 export async function getSiteStats(): Promise<SiteStats> {

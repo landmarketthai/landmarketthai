@@ -2,10 +2,6 @@ import Link from "next/link";
 import ListingCard from "./ListingCard";
 import LineButton from "@/components/ui/LineButton";
 import { getPublicListings } from "@/lib/neon/queries";
-import {
-  mergeWithSeedListings,
-  resolveListingPresentation,
-} from "@/lib/seed-listings";
 import { slugToLandType } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -39,14 +35,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
     offset,
   }).catch(() => []);
 
-  // Seed fallback listings only join page 1 — appending them per-page would duplicate them
-  const listings =
-    page === 1
-      ? mergeWithSeedListings(dbListings, {
-          province_slug: provinceSlug,
-          land_type: type ?? undefined,
-        })
-      : dbListings;
+  const listings = dbListings;
 
   if (listings.length === 0) {
     return (
@@ -71,17 +60,14 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
     <div>
       <div className="mb-4 text-sm text-slate-500">แสดง {listings.length} แปลง</div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {listings.map((land) => {
-          const presentation = resolveListingPresentation(land);
-          return (
-            <ListingCard
-              key={land.id}
-              land={land}
-              ctaLabel="ดูรายละเอียดแปลง"
-              {...presentation}
-            />
-          );
-        })}
+        {listings.map((land) => (
+          <ListingCard
+            key={land.id}
+            land={land}
+            hrefOverride={`/properties/${land.slug}`}
+            ctaLabel="ดูรายละเอียดทรัพย์"
+          />
+        ))}
       </div>
 
       {(listings.length === PAGE_SIZE || page > 1) && (

@@ -15,17 +15,19 @@ export interface AuthUser {
 
 interface AuthContextValue {
   user: AuthUser | null;
+  sessionToken: string | null;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue>({ user: null, loading: true });
+const AuthContext = createContext<AuthContextValue>({ user: null, sessionToken: null, loading: true });
 
 function ConfiguredAuthProvider({ children }: { children: React.ReactNode }) {
   const { data, isPending } = authClient.useSession();
   const user = (data?.user as AuthUser | undefined) ?? null;
+  const sessionToken = (data?.session as { token?: string } | undefined)?.token ?? null;
 
   return (
-    <AuthContext.Provider value={{ user, loading: isPending }}>
+    <AuthContext.Provider value={{ user, sessionToken, loading: isPending }}>
       {children}
     </AuthContext.Provider>
   );
@@ -34,7 +36,7 @@ function ConfiguredAuthProvider({ children }: { children: React.ReactNode }) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (!authConfigured) {
     return (
-      <AuthContext.Provider value={{ user: null, loading: false }}>
+      <AuthContext.Provider value={{ user: null, sessionToken: null, loading: false }}>
         {children}
       </AuthContext.Provider>
     );
