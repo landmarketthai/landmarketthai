@@ -18,7 +18,7 @@ export function PropertyIntelligence({ land, inventory }: { land: Land; inventor
     <h3 className="font-semibold">จุดอ้างอิงใกล้เคียง</h3>
     {anchors.length === 0 ? <p className="text-sm text-slate-500">ยังไม่มีพิกัดแปลงเพียงพอสำหรับคำนวณระยะทาง</p> : <ul className="space-y-1 text-sm">{anchors.map(({ anchor, distanceKm }) => <li key={anchor.id}>{anchor.label} · {distanceKm.toFixed(1)} กม. เส้นตรงโดยประมาณ ไม่ใช่ระยะขับรถ</li>)}</ul>}
     <h3 className="font-semibold">ประกาศเปรียบเทียบ</h3>
-    <p className="text-xs text-slate-500">เฉพาะประกาศที่เปิดขายของ LandmarketThai ในจังหวัดและประเภทเดียวกัน · ราคาตั้งขาย ไม่ใช่ราคาประเมินตลาด · {comparables.listingCount} ตัวอย่าง</p>
+    <p className="text-xs text-slate-500">เฉพาะประกาศที่เปิดขายของ LandmarketThai ในจังหวัดและประเภทเดียวกัน · ราคาตั้งขาย ไม่ใช่ราคาซื้อขายจริงหรือราคาประเมินตลาด · {comparables.listingCount} ตัวอย่าง</p>
     {comparables.comparables.length === 0 ? <p className="text-sm text-slate-500">ยังไม่มีประกาศเปรียบเทียบเพียงพอ</p> : <ul className="space-y-2">{comparables.comparables.map(({ land: comparable }) => <li key={comparable.id}>
       <Link className="text-sm font-medium text-brand-600 hover:underline" href={resolveListingPresentation(comparable).hrefOverride ?? listingHref(comparable.public_ref, comparable.slug)}>{comparable.title_th}</Link>
       <p className="text-xs text-slate-500">{formatMoneyFull(comparable.price_per_rai)} ต่อไร่</p>
