@@ -139,6 +139,11 @@ export default function SellWizard({ provinces }: Props) {
     if (form.area_rai == null && form.area_ngan == null && form.area_sqwa == null) return null;
     return (form.area_rai ?? 0) + (form.area_ngan ?? 0) / 4 + (form.area_sqwa ?? 0) / 400;
   }, [form.area_rai, form.area_ngan, form.area_sqwa]);
+  const derivedPricePerRai = useMemo(() => (
+    form.transaction_type === "sale" && totalRai != null && totalRai > 0 && form.sale_price != null && form.sale_price > 0
+      ? Math.round((form.sale_price / totalRai) * 100) / 100
+      : null
+  ), [form.sale_price, form.transaction_type, totalRai]);
 
   async function saveDraft(): Promise<boolean> {
     if (!draftId || !token) return false;
@@ -147,7 +152,7 @@ export default function SellWizard({ provinces }: Props) {
       const response = await fetch(`/api/property-submissions/${draftId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, ...form }),
+        body: JSON.stringify({ token, ...form, price_per_rai: derivedPricePerRai }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "บันทึกแบบร่างไม่สำเร็จ");
@@ -165,8 +170,8 @@ export default function SellWizard({ provinces }: Props) {
     if (step === 2) {
       if (!form.title.trim()) return "กรุณาระบุชื่อทรัพย์";
       if (totalRai == null || totalRai <= 0) return "กรุณาระบุขนาดพื้นที่";
-      if (form.transaction_type === "sale" && form.sale_price == null) return "กรุณาระบุราคาขาย";
-      if (form.transaction_type === "rent" && form.rent_price_monthly == null) return "กรุณาระบุค่าเช่า";
+      if (form.transaction_type === "sale" && (form.sale_price == null || form.sale_price <= 0)) return "กรุณาระบุราคาขายที่มากกว่า 0";
+      if (form.transaction_type === "rent" && (form.rent_price_monthly == null || form.rent_price_monthly <= 0)) return "กรุณาระบุค่าเช่าที่มากกว่า 0";
     }
     if (step === 4 && (!form.contact_name.trim() || !form.contact_phone.trim())) return "กรุณาระบุชื่อและเบอร์โทรศัพท์";
     return null;
@@ -284,7 +289,7 @@ export default function SellWizard({ provinces }: Props) {
               <label><span className="label">ไร่ *</span><input type="number" min="0" className="input" value={numberValue(form.area_rai)} onChange={(e) => setNumber('area_rai', e.target.value)} /></label>
               <div className="grid grid-cols-2 gap-3"><label><span className="label">งาน</span><input type="number" min="0" max="3" className="input" value={numberValue(form.area_ngan)} onChange={(e) => setNumber('area_ngan', e.target.value)} /></label><label><span className="label">ตร.ว.</span><input type="number" min="0" max="99.99" step="0.1" className="input" value={numberValue(form.area_sqwa)} onChange={(e) => setNumber('area_sqwa', e.target.value)} /></label></div>
               {form.transaction_type === 'rent' ? <label><span className="label">ค่าเช่า / เดือน *</span><input type="number" min="0" className="input" value={numberValue(form.rent_price_monthly)} onChange={(e) => setNumber('rent_price_monthly', e.target.value)} /></label> : <label><span className="label">ราคาขายรวม *</span><input type="number" min="0" className="input" value={numberValue(form.sale_price)} onChange={(e) => setNumber('sale_price', e.target.value)} /></label>}
-              <label><span className="label">ราคา / ไร่</span><input type="number" min="0" className="input" value={numberValue(form.price_per_rai)} onChange={(e) => setNumber('price_per_rai', e.target.value)} /></label>
+              <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณจากราคาขายและขนาด" /></label>
               <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ''} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
               <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber('frontage_m', e.target.value)} /></label>
               <label><span className="label">ความลึกต่ำสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_min_m)} onChange={(e) => setNumber('depth_min_m', e.target.value)} /></label>

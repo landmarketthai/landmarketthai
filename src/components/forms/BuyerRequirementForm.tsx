@@ -18,6 +18,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
     container_access: "", high_voltage: "", water_requirement: "", name: "", phone: "", line_id: "", consent_pdpa: false,
   });
   const [matches, setMatches] = useState<{ full: Land[]; near: Land[] } | null>(null);
+  const [requirementId, setRequirementId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (key: keyof typeof form, value: string | boolean) => setForm((current) => ({ ...current, [key]: value }));
@@ -25,7 +26,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
   const bool = (value: string) => value === "" ? null : value === "true";
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError(""); setMatches(null);
+    event.preventDefault(); setBusy(true); setError(""); setMatches(null); setRequirementId("");
     const response = await fetch("/api/buyer-requirements", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -40,6 +41,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
     });
     const body = await response.json().catch(() => ({})); setBusy(false);
     if (!response.ok) { setError(body.error ?? "บันทึกความต้องการไม่สำเร็จ"); return; }
+    setRequirementId(typeof body.id === "string" ? body.id : "");
     setMatches(body.matches ?? { full: [], near: [] });
   }
 
@@ -69,9 +71,13 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
       <button disabled={busy} className="btn-green mt-5 w-full sm:w-auto">{busy ? "กำลังค้นหา..." : "บันทึกและค้นหาทรัพย์"}</button>
     </form>
     {matches && <section className="mt-10">
+      <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <div className="font-bold">บันทึกความต้องการเรียบร้อยแล้ว</div>
+        <div className="mt-1 text-emerald-800">ทีมงานสามารถใช้ข้อมูลนี้ติดตามและจับคู่กับทรัพย์ที่เผยแพร่จริง{requirementId ? ` · Ref ${requirementId.slice(0, 8)}` : ""}</div>
+      </div>
       <h2 className="text-2xl font-black text-slate-950">ผลการจับคู่</h2>
       {matches.full.length ? <div className="mt-5 grid gap-5 md:grid-cols-2">{matches.full.map((land) => <ListingCard key={land.id} land={land} />)}</div> : <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-8 text-center"><h3 className="font-bold text-slate-900">ยังไม่มีทรัพย์ที่ตรงทุกเงื่อนไข</h3><p className="mt-2 text-sm text-slate-500">บันทึกความต้องการแล้ว ทีมงานจะติดต่อเมื่อมีทรัพย์จริงที่ตรงเงื่อนไข</p></div>}
-      {matches.near.length > 0 && <><h3 className="mt-9 text-lg font-bold text-slate-900">ทรัพย์ใกล้เคียง</h3><div className="mt-4 grid gap-5 md:grid-cols-2">{matches.near.map((land) => <ListingCard key={land.id} land={land} />)}</div></>}
+      {matches.near.length > 0 && <><h3 className="mt-9 text-lg font-bold text-slate-900">ทำเลตรง แต่บางเงื่อนไขยังไม่ตรง</h3><p className="mt-1 text-sm text-slate-500">แสดงเฉพาะทรัพย์ในทำเลที่ขอ โดยอาจต่างจากช่วงขนาด งบประมาณ ราคา/ไร่ หรือผังเมือง</p><div className="mt-4 grid gap-5 md:grid-cols-2">{matches.near.map((land) => <ListingCard key={land.id} land={land} />)}</div></>}
     </section>}
   </>;
 }

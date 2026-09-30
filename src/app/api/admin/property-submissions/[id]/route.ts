@@ -6,6 +6,10 @@ import { getReviewSubmission, publishSubmission, reviewSubmission, setPublishedP
 const actionSchema = z.object({
   action: z.enum(["approve", "reject", "publish", "sold", "expired"]),
   note: z.string().trim().max(2000).optional(),
+}).superRefine((value, context) => {
+  if (value.action === "reject" && !value.note) {
+    context.addIssue({ code: "custom", path: ["note"], message: "กรุณาระบุเหตุผลที่ปฏิเสธ" });
+  }
 });
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

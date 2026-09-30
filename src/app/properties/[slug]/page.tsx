@@ -100,6 +100,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
       : null,
     property.price_per_rai != null ? ["ราคา / ไร่", formatMoneyFull(property.price_per_rai)] : null,
     property.zoning ? ["ผังเมือง", ZONING_LABELS[property.zoning]] : null,
+    property.is_eec ? ["เขตเศรษฐกิจ", "พื้นที่ EEC"] : null,
     property.frontage_m != null ? ["หน้ากว้าง", `${property.frontage_m.toLocaleString("th-TH")} เมตร`] : null,
     property.depth_min_m != null && property.depth_max_m != null
       ? ["ความลึก", `${property.depth_min_m.toLocaleString("th-TH")}–${property.depth_max_m.toLocaleString("th-TH")} เมตร`]

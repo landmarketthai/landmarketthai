@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submissionUploadSchema } from "@/lib/marketplace/schemas";
 import { insertSubmissionMedia, propertyDraftExists } from "@/lib/neon/marketplace";
-import { headStorageObject, storagePublicUrl } from "@/lib/storage/provider";
+import { getStorageObjectMetadata, storagePublicUrl } from "@/lib/storage/provider";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,7 +15,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     if (!(await propertyDraftExists(id, parsed.data.token))) return NextResponse.json({ error: "ไม่พบแบบร่าง" }, { status: 404 });
-    if (!(await headStorageObject(storageKey))) return NextResponse.json({ error: "ยังไม่พบไฟล์ที่อัปโหลด" }, { status: 409 });
+    const stored = await getStorageObjectMetadata(storageKey);
+    if (!stored) return NextResponse.json({ error: "ยังไม่พบไฟล์ที่อัปโหลด" }, { status: 409 });
+    if (stored.sizeBytes !== parsed.data.size_bytes || stored.contentType !== parsed.data.mime_type) {
+      return NextResponse.json({ error: "ข้อมูลไฟล์ที่อัปโหลดไม่ตรงกับที่ยืนยัน" }, { status: 409 });
+    }
     await insertSubmissionMedia({
       submissionId: id,
       mediaKind: parsed.data.media_kind,

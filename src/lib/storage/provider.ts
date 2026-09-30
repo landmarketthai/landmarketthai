@@ -94,19 +94,26 @@ export async function deleteStorageObject(storageKey: string): Promise<void> {
   );
 }
 
-export async function headStorageObject(storageKey: string): Promise<boolean> {
+export async function getStorageObjectMetadata(storageKey: string): Promise<{ sizeBytes: number; contentType: string | null } | null> {
   const client = getS3Client();
   try {
-    await client.send(
+    const result = await client.send(
       new HeadObjectCommand({
         Bucket: process.env.DO_SPACES_BUCKET!,
         Key: storageKey,
       })
     );
-    return true;
+    return {
+      sizeBytes: Number(result.ContentLength ?? 0),
+      contentType: result.ContentType ?? null,
+    };
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function headStorageObject(storageKey: string): Promise<boolean> {
+  return (await getStorageObjectMetadata(storageKey)) !== null;
 }
 
 export function storagePublicUrl(storageKey: string): string | null {

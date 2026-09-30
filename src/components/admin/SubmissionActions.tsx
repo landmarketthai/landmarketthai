@@ -17,6 +17,10 @@ export default function SubmissionActions({ id, status }: { id: string; status: 
         : [];
 
   async function act(action: typeof actions[number]) {
+    if (action === "reject" && !note.trim()) {
+      setError("กรุณาระบุเหตุผลก่อนปฏิเสธรายการ");
+      return;
+    }
     if (!confirm(`ยืนยัน: ${labels[action]}`)) return;
     setBusy(true); setError("");
     const response = await fetch(`/api/admin/property-submissions/${id}`, {

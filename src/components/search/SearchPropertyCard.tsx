@@ -69,6 +69,22 @@ export default function SearchPropertyCard({ property, selected, onSelect, cardR
                 <div className="flex items-center gap-1.5"><Tag size={13} />{ZONING_LABELS[property.zoning]}</div>
               )}
             </div>
+            {(property.frontage_m != null || property.road_width_m != null || property.is_eec || (property.location_precision === "exact" && property.lat != null && property.lng != null)) && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {property.frontage_m != null && (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">หน้ากว้าง {property.frontage_m.toLocaleString("th-TH")} ม.</span>
+                )}
+                {property.road_width_m != null && (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">ถนน {property.road_width_m.toLocaleString("th-TH")} ม.</span>
+                )}
+                {property.is_eec && (
+                  <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">EEC</span>
+                )}
+                {property.location_precision === "exact" && property.lat != null && property.lng != null && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">พิกัดยืนยัน</span>
+                )}
+              </div>
+            )}
             {(price != null || (property.transaction_type === "sale" && property.price_per_rai != null)) && (
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {price != null && (

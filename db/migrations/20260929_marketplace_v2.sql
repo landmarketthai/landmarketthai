@@ -2,8 +2,15 @@
 -- Incremental, backward-compatible schema expansion.
 -- Existing public inventory in lands remains the source of truth.
 
-alter type land_type_enum add value if not exists 'land';
-alter type listing_status_enum add value if not exists 'expired';
+do $$
+begin
+  if exists (select 1 from pg_type where typname = 'land_type_enum') then
+    alter type land_type_enum add value if not exists 'land';
+  end if;
+  if exists (select 1 from pg_type where typname = 'listing_status_enum') then
+    alter type listing_status_enum add value if not exists 'expired';
+  end if;
+end $$;
 
 do $$
 begin

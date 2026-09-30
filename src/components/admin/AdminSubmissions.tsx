@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { PropertySubmission } from "@/lib/types/database";
+import { SUBMISSION_STATUS_LABELS } from "@/lib/marketplace/presentation";
 
 export default function AdminSubmissions() {
   const { user, sessionToken, loading } = useAuth();
@@ -30,7 +31,7 @@ export default function AdminSubmissions() {
     {items?.length ? items.map((item) => <Link key={item.id} href={`/admin/properties/${item.id}`} className="grid gap-2 border-b border-slate-100 p-4 last:border-0 hover:bg-slate-50 sm:grid-cols-[1fr_180px_150px]">
       <div><div className="font-bold text-slate-900">{item.title ?? "ยังไม่มีชื่อทรัพย์"}</div><div className="mt-1 text-xs text-slate-500">{item.province?.name_th ?? "ไม่ระบุจังหวัด"} · {item.contact_name ?? "ไม่ระบุผู้ติดต่อ"}</div></div>
       <div className="text-sm text-slate-600">{item.total_rai != null ? `${item.total_rai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่` : "ไม่ระบุขนาด"}</div>
-      <div><span className="badge bg-slate-100 text-slate-700">{item.status}</span></div>
+      <div><span className="badge bg-slate-100 text-slate-700">{SUBMISSION_STATUS_LABELS[item.status]}</span></div>
     </Link>) : <div className="p-10 text-center text-sm text-slate-500">ยังไม่มีรายการรอตรวจสอบ</div>}
   </div>;
 }

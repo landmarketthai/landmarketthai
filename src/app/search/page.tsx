@@ -24,11 +24,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const raw = await searchParams;
   const transaction = one(raw.transaction_type);
   const property = one(raw.property_type);
+  const status = one(raw.status);
+  const sort = one(raw.sort);
+  const locationPrecision = one(raw.location_precision);
+  const validSorts: Array<NonNullable<SearchValues["sort"]>> = ["newest", "price_asc", "price_desc", "price_per_rai_asc", "size_desc"];
   const initialMode = one(raw.view) === "map" ? "map" : "list";
   const values: SearchValues = {
     q: one(raw.q),
     transaction_type: transaction === "sale" || transaction === "rent" ? transaction : undefined,
     property_type: property === "land" || property === "factory" || property === "warehouse" ? property : undefined,
+    status: status === "active" || status === "sold" ? status : undefined,
     province: one(raw.province),
     district: one(raw.district),
     min_price: one(raw.min_price),
@@ -37,8 +42,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     max_price_per_rai: one(raw.max_price_per_rai),
     min_size_rai: one(raw.min_size_rai),
     max_size_rai: one(raw.max_size_rai),
+    min_frontage_m: one(raw.min_frontage_m),
+    min_road_width_m: one(raw.min_road_width_m),
     zoning: one(raw.zoning),
     eec: one(raw.eec) === "1" ? true : undefined,
+    location_precision: locationPrecision === "exact" ? "exact" : undefined,
+    sort: validSorts.includes(sort as NonNullable<SearchValues["sort"]>) ? sort as NonNullable<SearchValues["sort"]> : undefined,
   };
 
   const [initialProperties, provinces] = await Promise.all([
@@ -54,8 +63,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       max_price_per_rai: num(values.max_price_per_rai),
       min_size_rai: num(values.min_size_rai),
       max_size_rai: num(values.max_size_rai),
+      min_frontage_m: num(values.min_frontage_m),
+      min_road_width_m: num(values.min_road_width_m),
       zoning: values.zoning,
       eec: values.eec,
+      status: values.status,
+      location_precision: values.location_precision,
+      sort: values.sort,
       limit: 24,
     }).catch(() => []),
     getAllProvinces().catch(() => []),

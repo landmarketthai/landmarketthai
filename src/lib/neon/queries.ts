@@ -13,6 +13,8 @@ import {
   mergeWithSeedListings,
   sortSeedListings,
 } from "@/lib/seed-listings";
+import { sortPropertyResults, type PropertySort } from "@/lib/marketplace/search-sort";
+export type { PropertySort } from "@/lib/marketplace/search-sort";
 
 function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -457,6 +459,7 @@ export interface PropertySearchFilters {
   q?: string;
   transaction_type?: "sale" | "rent";
   property_type?: "land" | "factory" | "warehouse";
+  status?: "active" | "sold";
   province_slug?: string;
   district?: string;
   min_price?: number;
@@ -465,8 +468,12 @@ export interface PropertySearchFilters {
   max_price_per_rai?: number;
   min_size_rai?: number;
   max_size_rai?: number;
+  min_frontage_m?: number;
+  min_road_width_m?: number;
   zoning?: string;
   eec?: boolean;
+  location_precision?: "exact";
+  sort?: PropertySort;
   west?: number;
   south?: number;
   east?: number;
@@ -493,6 +500,7 @@ function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFil
   }
   if (filters.transaction_type && property.transaction_type !== filters.transaction_type) return false;
   if (filters.property_type && property.property_type !== filters.property_type) return false;
+  if (filters.status && property.status !== filters.status) return false;
   if (filters.province_slug && property.province?.slug !== filters.province_slug) return false;
   if (filters.district?.trim() && !property.district?.toLocaleLowerCase("th-TH").includes(filters.district.trim().toLocaleLowerCase("th-TH"))) return false;
 
@@ -503,8 +511,11 @@ function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFil
   if (filters.max_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai > filters.max_price_per_rai)) return false;
   if (filters.min_size_rai != null && (property.size_rai == null || property.size_rai < filters.min_size_rai)) return false;
   if (filters.max_size_rai != null && (property.size_rai == null || property.size_rai > filters.max_size_rai)) return false;
+  if (filters.min_frontage_m != null && (property.frontage_m == null || property.frontage_m < filters.min_frontage_m)) return false;
+  if (filters.min_road_width_m != null && (property.road_width_m == null || property.road_width_m < filters.min_road_width_m)) return false;
   if (filters.zoning && property.zoning !== filters.zoning) return false;
   if (filters.eec != null && property.is_eec !== filters.eec) return false;
+  if (filters.location_precision === "exact" && (property.location_precision !== "exact" || property.lat == null || property.lng == null)) return false;
 
   const hasBounds = [filters.west, filters.south, filters.east, filters.north].every(
     (value) => typeof value === "number" && Number.isFinite(value),
@@ -541,24 +552,16 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
     return `$${params.length}`;
   };
 
-  if (filters.q?.trim()) {
-    const p = add(`%${filters.q.trim()}%`);
-    clauses.push(`(l.title_th ilike ${p} or coalesce(l.district, '') ilike ${p} or coalesce(l.subdistrict, '') ilike ${p} or p.name_th ilike ${p})`);
-  }
-  if (filters.transaction_type) clauses.push(`l.transaction_type = ${add(filters.transaction_type)}`);
-  if (filters.property_type) clauses.push(`l.property_type = ${add(filters.property_type)}`);
+  // Keep SQL predicates compatible with the legacy production schema. Marketplace V2-only
+  // fields are normalized and filtered in memory below until the additive migration is applied.
+  if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
   if (filters.province_slug) clauses.push(`p.slug = ${add(filters.province_slug)}`);
   if (filters.district?.trim()) clauses.push(`l.district ilike ${add(`%${filters.district.trim()}%`)}`);
-  if (filters.min_price != null) {
-    clauses.push(`(case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) >= ${add(filters.min_price)}`);
-  }
-  if (filters.max_price != null) {
-    clauses.push(`(case when l.transaction_type = 'rent' then l.rent_price_monthly else l.total_price end) <= ${add(filters.max_price)}`);
-  }
   if (filters.min_price_per_rai != null) clauses.push(`l.price_per_rai >= ${add(filters.min_price_per_rai)}`);
   if (filters.max_price_per_rai != null) clauses.push(`l.price_per_rai <= ${add(filters.max_price_per_rai)}`);
   if (filters.min_size_rai != null) clauses.push(`l.size_rai >= ${add(filters.min_size_rai)}`);
   if (filters.max_size_rai != null) clauses.push(`l.size_rai <= ${add(filters.max_size_rai)}`);
+  if (filters.min_frontage_m != null) clauses.push(`l.frontage_m >= ${add(filters.min_frontage_m)}`);
   if (filters.zoning) clauses.push(`l.zoning = ${add(filters.zoning)}`);
   if (filters.eec != null) clauses.push(`l.is_eec = ${add(filters.eec)}`);
 
@@ -572,8 +575,10 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
 
   const limit = Math.min(Math.max(filters.limit ?? 24, 1), 100);
   const offset = Math.max(filters.offset ?? 0, 0);
-  const limitParam = add(limit);
-  const offsetParam = add(offset);
+  // Fetch a bounded compatibility window, then apply V2-only predicates in memory.
+  // This keeps the feature usable before the additive Marketplace V2 migration is deployed.
+  const fetchLimitParam = add(100);
+  const fetchOffsetParam = add(0);
 
   let rows: Record<string, unknown>[] = [];
   if (sql) {
@@ -584,8 +589,9 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
          group by l.id, p.id
          order by case when l.status = 'active' then 0 else 1 end,
                   l.is_featured desc,
+                  l.updated_at desc,
                   l.created_at desc
-         limit ${limitParam} offset ${offsetParam}`,
+         limit ${fetchLimitParam} offset ${fetchOffsetParam}`,
         params,
       )) as Record<string, unknown>[];
     } catch (error) {
@@ -593,15 +599,14 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
     }
   }
 
-  const dbListings = rows.map(normalizeLand).map(enrichKnownListingCoordinates);
-  if (offset > 0) return dbListings;
-
-  const dbSlugs = new Set(dbListings.map((property) => property.slug));
+  const normalizedDbListings = rows.map(normalizeLand).map(enrichKnownListingCoordinates);
+  const dbSlugs = new Set(normalizedDbListings.map((property) => property.slug));
+  const matchingDbListings = normalizedDbListings.filter((property) => propertyMatchesSearchFilters(property, filters));
   const matchingSeeds = SEED_PUBLIC_LISTINGS
     .filter((property) => !dbSlugs.has(property.slug))
     .filter((property) => propertyMatchesSearchFilters(property, filters));
 
-  return [...dbListings, ...matchingSeeds].slice(0, limit);
+  return sortPropertyResults([...matchingDbListings, ...matchingSeeds], filters.sort).slice(offset, offset + limit);
 }
 
 export async function getListingBySlug(slug: string): Promise<Land | null> {

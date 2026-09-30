@@ -1,5 +1,6 @@
 import { getSql } from "@/lib/neon/server";
 import { searchProperties } from "@/lib/neon/queries";
+import { classifyBuyerMatch, type BuyerMatchCriteria } from "@/lib/marketplace/matching";
 import type {
   DocType,
   Land,
@@ -160,6 +161,9 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
   const totalRai = input.area_rai == null && input.area_ngan == null && input.area_sqwa == null
     ? null
     : (input.area_rai ?? 0) + (input.area_ngan ?? 0) / 4 + (input.area_sqwa ?? 0) / 400;
+  const pricePerRai = input.transaction_type === "sale" && totalRai != null && totalRai > 0 && input.sale_price != null && input.sale_price > 0
+    ? Math.round((input.sale_price / totalRai) * 100) / 100
+    : null;
   const rows = await sql.query(
     `update property_submissions set
        property_type = $3, transaction_type = $4, title = $5, province_id = $6,
@@ -177,7 +181,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
       input.lat ?? null, input.lng ?? null, input.area_rai ?? null, input.area_ngan ?? null,
       input.area_sqwa ?? null, totalRai, input.frontage_m ?? null, input.depth_min_m ?? null,
       input.depth_max_m ?? null, input.road_name ?? null, input.road_width_m ?? null, input.zoning ?? null,
-      input.sale_price ?? null, input.price_per_rai ?? null, input.rent_price_monthly ?? null,
+      input.sale_price ?? null, pricePerRai, input.rent_price_monthly ?? null,
       input.description ?? null, input.contact_name ?? null, input.contact_phone ?? null, input.contact_line ?? null,
     ],
   );
@@ -197,8 +201,12 @@ export async function submitPropertyDraft(input: {
        where id = $1 and draft_token = $2 and status = 'draft'
          and property_type is not null and transaction_type is not null
          and title is not null and province_id is not null
-         and contact_name is not null and contact_phone is not null
-         and total_rai is not null
+         and nullif(trim(contact_name), '') is not null and nullif(trim(contact_phone), '') is not null
+         and total_rai is not null and total_rai > 0
+         and (
+           (transaction_type = 'sale' and sale_price is not null and sale_price > 0)
+           or (transaction_type = 'rent' and rent_price_monthly is not null and rent_price_monthly > 0)
+         )
          and (($3::boolean = true))
      ), new_lead as (
        insert into leads (lead_type, name, phone, line_id, source, details, consent_pdpa, consent_at, status)
@@ -379,16 +387,7 @@ export async function setPublishedPropertyStatus(submissionId: string, status: "
   return rows.length > 0;
 }
 
-export interface BuyerRequirementInput {
-  property_type?: PropertyType | null;
-  transaction_type: TransactionType;
-  preferred_locations: string[];
-  province_ids: string[];
-  min_size_rai?: number | null;
-  max_size_rai?: number | null;
-  max_price?: number | null;
-  max_price_per_rai?: number | null;
-  zoning?: ZoningColor | null;
+export interface BuyerRequirementInput extends BuyerMatchCriteria {
   purpose?: string | null;
   container_access?: boolean | null;
   high_voltage?: boolean | null;
@@ -432,19 +431,9 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
   const full: Land[] = [];
   const near: Land[] = [];
   for (const property of candidates) {
-    if (property.status !== "active") continue;
-    const locationText = [property.title_th, property.address, property.subdistrict, property.district, property.province?.name_th]
-      .filter(Boolean).join(" ").toLocaleLowerCase("th");
-    const locationOk = (input.province_ids.length === 0 || input.province_ids.includes(property.province_id))
-      && (input.preferred_locations.length === 0 || input.preferred_locations.some((location) => locationText.includes(location.toLocaleLowerCase("th"))));
-    const sizeOk = (input.min_size_rai == null || (property.size_rai != null && property.size_rai >= input.min_size_rai))
-      && (input.max_size_rai == null || (property.size_rai != null && property.size_rai <= input.max_size_rai));
-    const propertyPrice = property.transaction_type === "rent" ? property.rent_price_monthly : property.total_price;
-    const budgetOk = input.max_price == null || (propertyPrice != null && propertyPrice <= input.max_price);
-    const perRaiOk = input.max_price_per_rai == null || (property.price_per_rai != null && property.price_per_rai <= input.max_price_per_rai);
-    const zoningOk = input.zoning == null || property.zoning === input.zoning;
-    if (locationOk && sizeOk && budgetOk && perRaiOk && zoningOk) full.push(property);
-    else near.push(property);
+    const match = classifyBuyerMatch(property, input);
+    if (match === "full") full.push(property);
+    if (match === "near") near.push(property);
   }
 
   return { id, matches: { full: full.slice(0, 12), near: near.slice(0, 12) } };
