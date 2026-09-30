@@ -8,22 +8,22 @@ import type { PropertySubmission } from "@/lib/types/database";
 import { SUBMISSION_STATUS_LABELS } from "@/lib/marketplace/presentation";
 
 export default function AdminSubmissions() {
-  const { user, sessionToken, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<PropertySubmission[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (loading) return;
-    if (!user || !sessionToken) { router.replace("/login?next=/admin/properties"); return; }
-    fetch("/api/admin/property-submissions", { headers: { authorization: `Bearer ${sessionToken}` } })
+    if (!user) { router.replace("/login?next=/admin/properties"); return; }
+    fetch("/api/admin/property-submissions")
       .then(async (response) => {
         if (response.status === 403) throw new Error("บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ");
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "โหลดรายการไม่สำเร็จ");
         setItems(body.submissions ?? []);
       }).catch((reason) => setError(reason instanceof Error ? reason.message : "โหลดรายการไม่สำเร็จ"));
-  }, [loading, router, sessionToken, user]);
+  }, [loading, router, user]);
 
   if (loading || (!error && items === null)) return <div className="p-12 text-center text-sm text-slate-500">กำลังโหลด...</div>;
   if (error) return <div className="rounded-2xl bg-red-50 p-6 text-sm text-red-700">{error}</div>;

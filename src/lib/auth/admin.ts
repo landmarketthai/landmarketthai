@@ -1,7 +1,4 @@
-import { getSqlIfConfigured } from "@/lib/neon/server";
-
-const DEFAULT_NEON_AUTH_URL =
-  "https://ep-raspy-credit-aztfc03r.neonauth.c-3.ap-southeast-1.aws.neon.tech/landmarketthai/auth";
+import { auth } from "@/lib/auth/server";
 
 export interface AdminUser {
   id: string;
@@ -10,43 +7,25 @@ export interface AdminUser {
   role?: string;
 }
 
-export async function getAdminUser(headers: Headers): Promise<AdminUser | null> {
-  const cookie = headers.get("cookie");
-  const authorization = headers.get("authorization");
-  if (!cookie && !authorization) return null;
-
-  const baseUrl = process.env.NEXT_PUBLIC_NEON_AUTH_URL?.trim() || DEFAULT_NEON_AUTH_URL;
-  const response = await fetch(`${baseUrl}/get-session`, {
-    headers: {
-      ...(cookie ? { cookie } : {}),
-      ...(authorization ? { authorization } : {}),
-    },
-    cache: "no-store",
-  }).catch(() => null);
-  const data = response?.ok ? await response.json() as { user?: AdminUser | null } : null;
-  let user = data?.user ?? null;
-  if (!user && authorization?.startsWith("Bearer ")) {
-    const sql = getSqlIfConfigured();
-    const token = authorization.slice(7).trim();
-    if (sql && token) {
-      const rows = await sql.query(
-        `select u.id, u.name, u.email, u.role
-         from neon_auth.session s
-         join neon_auth.user u on u.id=s."userId"
-         where s.token=$1 and s."expiresAt" > now()
-         limit 1`,
-        [token],
-      ).catch(() => []);
-      if (rows[0]) user = rows[0] as unknown as AdminUser;
-    }
-  }
-  if (!user?.email) return null;
-
+export function isAdminUserAllowed(
+  user: AdminUser | null,
+  adminEmails = process.env.ADMIN_EMAILS ?? "",
+): boolean {
+  if (!user?.email) return false;
   const allowed = new Set(
-    (process.env.ADMIN_EMAILS ?? "")
+    adminEmails
       .split(",")
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
-  return user.role === "admin" || allowed.has(user.email.toLowerCase()) ? user : null;
+  return user.role === "admin" || allowed.has(user.email.toLowerCase());
+}
+
+export async function getAdminUser(_headers?: Headers): Promise<AdminUser | null> {
+  const result = await auth.getSession().catch(() => null);
+  const sessionResult = result as
+    | { data?: { user?: AdminUser | null } | null; user?: AdminUser | null }
+    | null;
+  const sessionUser = sessionResult?.data?.user ?? sessionResult?.user ?? null;
+  return isAdminUserAllowed(sessionUser) ? sessionUser : null;
 }

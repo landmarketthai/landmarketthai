@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/components/auth/AuthProvider";
 import type { SubmissionStatus } from "@/lib/types/database";
 
 const labels = { approve: "อนุมัติ", reject: "ปฏิเสธ", publish: "เผยแพร่", sold: "ขายแล้ว", expired: "หมดอายุ" } as const;
 
 export default function SubmissionActions({ id, status }: { id: string; status: SubmissionStatus }) {
-  const { sessionToken } = useAuth();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +23,7 @@ export default function SubmissionActions({ id, status }: { id: string; status: 
     setBusy(true); setError("");
     const response = await fetch(`/api/admin/property-submissions/${id}`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}) },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ action, note: note || undefined }),
     });
     const body = await response.json().catch(() => ({}));

@@ -342,7 +342,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
        returning id
      ), inserted_documents as (
        insert into land_documents (land_id, file_name, storage_key, mime_type, size_bytes, doc_type, is_sensitive)
-       select l.id, m.file_name, m.storage_key, m.mime_type, m.size_bytes, coalesce(m.doc_type,'other')::doc_type_enum, true
+       select l.id, m.file_name, m.storage_key, m.mime_type, m.size_bytes, coalesce(m.doc_type,'other'), true
        from property_submission_media m cross join inserted_land l
        where m.submission_id=$1 and m.media_kind='document'
        returning id

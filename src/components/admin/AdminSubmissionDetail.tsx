@@ -9,21 +9,21 @@ import { PROPERTY_TYPE_LABELS, SUBMISSION_STATUS_LABELS, TRANSACTION_TYPE_LABELS
 import SubmissionActions from "./SubmissionActions";
 
 export default function AdminSubmissionDetail({ id }: { id: string }) {
-  const { user, sessionToken, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [item, setItem] = useState<PropertySubmission | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     if (loading) return;
-    if (!user || !sessionToken) { router.replace(`/login?next=/admin/properties/${id}`); return; }
-    fetch(`/api/admin/property-submissions/${id}`, { headers: { authorization: `Bearer ${sessionToken}` } })
+    if (!user) { router.replace(`/login?next=/admin/properties/${id}`); return; }
+    fetch(`/api/admin/property-submissions/${id}`)
       .then(async (response) => {
         if (response.status === 403) throw new Error("บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ");
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "โหลดข้อมูลไม่สำเร็จ");
         setItem(body.submission);
       }).catch((reason) => setError(reason instanceof Error ? reason.message : "โหลดข้อมูลไม่สำเร็จ"));
-  }, [id, loading, router, sessionToken, user]);
+  }, [id, loading, router, user]);
   if (loading || (!error && !item)) return <div className="p-12 text-center text-sm text-slate-500">กำลังโหลด...</div>;
   if (error || !item) return <div className="rounded-2xl bg-red-50 p-6 text-sm text-red-700">{error}</div>;
   const facts = [
