@@ -22,6 +22,9 @@ test("configured inventory is authoritative even when empty, sold, or unavailabl
     assert.equal(url.searchParams.get("status"), "in.(active,reserved,sold)");
     assert.equal(url.searchParams.get("deleted_at"), "is.null");
     assert.ok(!url.searchParams.get("select")?.includes("owner_lead_id"));
+    for (const field of ["lat", "lng", "location_precision", "verified_at", "verified_by", "agent:agents(*)"]) {
+      assert.ok(url.searchParams.get("select")?.includes(field), `Public inventory must include ${field}`);
+    }
     return new Response(JSON.stringify(response), { status, headers: { "Content-Type": "application/json" } });
   });
   const { getPublicInventory } = await import("./public-inventory.ts");

@@ -1,77 +1,50 @@
-"use client";
+import Link from "next/link";
+import { LAND_TYPE_LABELS, ZONING_LABELS } from "@/lib/utils";
+import { landSearchParams, type LandFilters } from "@/lib/land-search";
+import type { Province } from "@/lib/types/database";
 
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
-import type { LandType } from "@/lib/types/database";
-
-const PROVINCES = [
-  { slug: "rayong", name: "ระยอง" },
-  { slug: "chonburi", name: "ชลบุรี" },
-  { slug: "chachoengsao", name: "ฉะเชิงเทรา" },
-  { slug: "samut-prakan", name: "สมุทรปราการ" },
-  { slug: "ayutthaya", name: "อยุธยา" },
-  { slug: "bangkok", name: "กรุงเทพฯ" },
-];
-
-interface Props {
-  province?: string;
-  type?: string;
-}
-
-export default function FilterBar({ province, type }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
-  function update(key: string, value: string) {
-    const params = new URLSearchParams(window.location.search);
-    if (value) params.set(key, value);
-    else params.delete(key);
-    params.delete("page");
-    startTransition(() => {
-      router.push(`/land?${params.toString()}`);
-    });
-  }
-
+export default function FilterBar({ filters, provinces }: { filters: LandFilters; provinces: Pick<Province, "slug" | "name_th">[] }) {
+  const values = landSearchParams(filters);
   return (
-    <div
-      className={`mb-8 flex flex-wrap gap-3 border-b border-slate-100 pb-6 transition-opacity ${
-        isPending ? "pointer-events-none opacity-60" : ""
-      }`}
-      aria-busy={isPending}
-    >
-      <select
-        value={province ?? ""}
-        onChange={(e) => update("province", e.target.value)}
-        className="input w-auto min-w-36"
-        aria-label="จังหวัด"
-      >
-        <option value="">ทุกจังหวัด</option>
-        {PROVINCES.map((p) => (
-          <option key={p.slug} value={p.slug}>{p.name}</option>
-        ))}
-      </select>
-
-      <select
-        value={type ?? ""}
-        onChange={(e) => update("type", e.target.value)}
-        className="input w-auto min-w-44"
-        aria-label="ประเภทที่ดิน"
-      >
-        <option value="">ทุกประเภท</option>
-        {(Object.entries(LAND_TYPE_LABELS) as [LandType, string][]).map(([slug, label]) => (
-          <option key={slug} value={slug}>{label}</option>
-        ))}
-      </select>
-
-      {(province || type) && (
-        <button
-          onClick={() => router.push("/land")}
-          className="text-sm text-slate-500 hover:text-brand-600 underline"
-        >
-          ล้างตัวกรอง
-        </button>
-      )}
-    </div>
+    <form action="/land" method="get" className="mb-6 grid gap-3 border-b border-slate-100 pb-6 sm:grid-cols-2 lg:grid-cols-4">
+      <label className="text-sm">ค้นหาคำ / อำเภอ
+        <input name="q" type="search" maxLength={200} defaultValue={filters.q} className="input mt-1" placeholder="ชื่อแปลง ทำเล หรือรายละเอียด" />
+      </label>
+      <label className="text-sm">จังหวัด
+        <select name="province" defaultValue={filters.province_slug ?? ""} className="input mt-1">
+          <option value="">ทุกจังหวัด</option>
+          {provinces.map(p => <option key={p.slug} value={p.slug}>{p.name_th}</option>)}
+        </select>
+      </label>
+      <label className="text-sm">ประเภทที่ดิน
+        <select name="type" defaultValue={filters.land_type ?? ""} className="input mt-1">
+          <option value="">ทุกประเภท</option>
+          {Object.entries(LAND_TYPE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>
+      <label className="text-sm">ผังเมือง
+        <select name="zoning" defaultValue={filters.zoning ?? ""} className="input mt-1">
+          <option value="">ทุกสีผังเมือง</option>
+          {Object.entries(ZONING_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>
+      {[
+        ["min_size", "ขนาดต่ำสุด (ไร่)"], ["max_size", "ขนาดสูงสุด (ไร่)"],
+        ["min_price", "ราคาต่ำสุด (บาท/ไร่)"], ["max_price", "ราคาสูงสุด (บาท/ไร่)"],
+      ].map(([name, label]) => (
+        <label key={name} className="text-sm">{label}
+          <input name={name} type="number" min="0" max="1000000000000" step="any" defaultValue={values.get(name) ?? ""} className="input mt-1" />
+        </label>
+      ))}
+      <label className="text-sm">พื้นที่ EEC
+        <select name="eec" defaultValue={values.get("eec") ?? ""} className="input mt-1">
+          <option value="">ทั้งหมด</option><option value="true">เฉพาะ EEC</option><option value="false">นอก EEC</option>
+        </select>
+      </label>
+      <div className="flex items-end gap-3">
+        <button type="submit" className="btn-primary">ค้นหาที่ดิน</button>
+        <Link href="/land" className="text-sm underline">ล้างตัวกรอง</Link>
+      </div>
+    </form>
   );
 }

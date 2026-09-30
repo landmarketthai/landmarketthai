@@ -3,6 +3,7 @@ import Image from "next/image";
 import { MapPin, Ruler, Tag } from "lucide-react";
 import type { Land } from "@/lib/types/database";
 import ListingTrust from "./ListingTrust";
+import VerificationBadges from "./VerificationBadges";
 import {
   LAND_TYPE_LABELS,
   ZONING_LABELS,
@@ -110,6 +111,7 @@ export default function ListingCard({
 
       <div className="flex flex-1 flex-col p-4 pb-5">
         <ListingTrust land={land} className="mb-3" />
+        <VerificationBadges land={land} />
         <Link href={href} className="flex-1">
           <h3 className="mb-3 line-clamp-2 text-base font-semibold leading-snug text-slate-800">
             {land.title_th}
