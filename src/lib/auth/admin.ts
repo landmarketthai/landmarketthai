@@ -30,7 +30,7 @@ export async function getAdminUser(headers: Headers): Promise<AdminUser | null> 
     const token = authorization.slice(7).trim();
     if (sql && token) {
       const rows = await sql.query(
-        `select u.id, u.name, u.email
+        `select u.id, u.name, u.email, u.role
          from neon_auth.session s
          join neon_auth.user u on u.id=s."userId"
          where s.token=$1 and s."expiresAt" > now()
