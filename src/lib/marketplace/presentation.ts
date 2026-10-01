@@ -7,7 +7,7 @@ export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   published: "เผยแพร่แล้ว",
   rejected: "ปฏิเสธ",
   sold: "ขายแล้ว",
-  expired: "หมดอายุ",
+  expired: "เก็บถาวร",
 };
 
 export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {

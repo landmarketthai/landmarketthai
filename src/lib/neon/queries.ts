@@ -13,8 +13,19 @@ import {
   mergeWithSeedListings,
   sortSeedListings,
 } from "@/lib/seed-listings";
-import { sortPropertyResults, type PropertySort } from "@/lib/marketplace/search-sort";
+import { propertySqlOrder, sortPropertyResults } from "@/lib/marketplace/search-sort";
+import { normalizeVerificationStatus } from "@/lib/marketplace/verification";
+import {
+  MAX_SEARCH_OFFSET,
+  buildLocationOptions,
+  collectOrderedMatches,
+  propertyMatchesSearchFilters,
+  propertySearchSqlClauses,
+  type LocationOption,
+  type PropertySearchFilters,
+} from "@/lib/marketplace/search-filters";
 export type { PropertySort } from "@/lib/marketplace/search-sort";
+export type { LocationOption, PropertySearchFilters } from "@/lib/marketplace/search-filters";
 
 function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -23,7 +34,9 @@ function numberOrNull(value: unknown): number | null {
 }
 
 function stringOrNull(value: unknown): string | null {
-  return value === null || value === undefined ? null : String(value);
+  if (value === null || value === undefined) return null;
+  // Neon returns timestamptz as Date; String(date) is locale-formatted and not reliably parseable in browsers.
+  return value instanceof Date ? value.toISOString() : String(value);
 }
 
 function normalizeProvince(value: unknown): Province | undefined {
@@ -52,7 +65,7 @@ function normalizeImage(value: unknown): LandImage {
     alt_th: stringOrNull(row.alt_th),
     sort_order: numberOrNull(row.sort_order) ?? 0,
     is_cover: Boolean(row.is_cover),
-    created_at: String(row.created_at ?? ""),
+    created_at: stringOrNull(row.created_at) ?? "",
   };
 }
 
@@ -101,17 +114,15 @@ function normalizeLand(value: unknown): Land {
     lng: numberOrNull(row.lng),
     location_precision: row.location_precision === "exact" ? "exact" : "approx",
     status: row.status as Land["status"],
-    verification_status:
-      row.verification_status === "pending" || row.verification_status === "rejected"
-        ? row.verification_status
-        : "verified",
+    verification_status: normalizeVerificationStatus(row.verification_status),
     is_featured: Boolean(row.is_featured),
     seo_title: stringOrNull(row.seo_title),
     seo_description: stringOrNull(row.seo_description),
     published_at: stringOrNull(row.published_at),
-    created_at: String(row.created_at ?? ""),
-    updated_at: String(row.updated_at ?? ""),
+    created_at: stringOrNull(row.created_at) ?? "",
+    updated_at: stringOrNull(row.updated_at) ?? "",
     deleted_at: stringOrNull(row.deleted_at),
+    title_deed_on_file: row.title_deed_on_file === true,
     province: normalizeProvince(row.province),
     images,
   };
@@ -121,6 +132,9 @@ const LAND_SELECT = `
   select
     l.*,
     to_jsonb(p.*) as province,
+    exists (
+      select 1 from land_documents d where d.land_id = l.id and d.doc_type = 'title_deed'
+    ) as title_deed_on_file,
     coalesce(
       jsonb_agg(to_jsonb(i.*) order by i.sort_order, i.created_at)
         filter (where i.id is not null),
@@ -336,7 +350,7 @@ function normalizeDemand(value: unknown): BuyerDemand {
     is_public: Boolean(row.is_public),
     seo_title: stringOrNull(row.seo_title),
     seo_description: stringOrNull(row.seo_description),
-    created_at: String(row.created_at ?? ""),
+    created_at: stringOrNull(row.created_at) ?? "",
     province: normalizeProvince(row.province),
   };
 }
@@ -350,7 +364,7 @@ export async function getActiveDemands(limit = 20): Promise<BuyerDemand[]> {
     `select d.*, case when p.id is null then null else to_jsonb(p.*) end as province
      from buyer_demand d
      left join provinces p on p.id = d.province_id
-     where d.status = 'active' and d.is_public = true
+     where d.status = 'active' and d.is_public = true and nullif(trim(d.slug), '') is not null
      order by d.created_at desc
      limit $1`,
     [safeLimit],
@@ -393,8 +407,8 @@ function normalizePost(value: unknown): BlogPost {
     published_at: stringOrNull(row.published_at),
     seo_title: stringOrNull(row.seo_title),
     seo_description: stringOrNull(row.seo_description),
-    created_at: String(row.created_at ?? ""),
-    updated_at: String(row.updated_at ?? ""),
+    created_at: stringOrNull(row.created_at) ?? "",
+    updated_at: stringOrNull(row.updated_at) ?? "",
     category: category
       ? {
           id: String(category.id ?? ""),
@@ -454,78 +468,6 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   return rows[0] ? normalizePost(rows[0]) : null;
 }
 
-export interface PropertySearchFilters {
-  q?: string;
-  property_type?: "land" | "factory" | "warehouse";
-  status?: "active" | "sold";
-  province_slug?: string;
-  district?: string;
-  min_price?: number;
-  max_price?: number;
-  min_price_per_rai?: number;
-  max_price_per_rai?: number;
-  min_size_rai?: number;
-  max_size_rai?: number;
-  min_frontage_m?: number;
-  min_road_width_m?: number;
-  zoning?: string;
-  eec?: boolean;
-  location_precision?: "exact";
-  sort?: PropertySort;
-  west?: number;
-  south?: number;
-  east?: number;
-  north?: number;
-  limit?: number;
-  offset?: number;
-}
-
-function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFilters): boolean {
-  if (property.status !== "active" && property.status !== "sold") return false;
-
-  const q = filters.q?.trim().toLocaleLowerCase("th-TH");
-  if (q) {
-    const haystack = [
-      property.title_th,
-      property.district,
-      property.subdistrict,
-      property.province?.name_th,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLocaleLowerCase("th-TH");
-    if (!haystack.includes(q)) return false;
-  }
-  if (filters.property_type && property.property_type !== filters.property_type) return false;
-  if (filters.status && property.status !== filters.status) return false;
-  if (filters.province_slug && property.province?.slug !== filters.province_slug) return false;
-  if (filters.district?.trim() && !property.district?.toLocaleLowerCase("th-TH").includes(filters.district.trim().toLocaleLowerCase("th-TH"))) return false;
-
-  const price = property.total_price;
-  if (filters.min_price != null && (price == null || price < filters.min_price)) return false;
-  if (filters.max_price != null && (price == null || price > filters.max_price)) return false;
-  if (filters.min_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai < filters.min_price_per_rai)) return false;
-  if (filters.max_price_per_rai != null && (property.price_per_rai == null || property.price_per_rai > filters.max_price_per_rai)) return false;
-  if (filters.min_size_rai != null && (property.size_rai == null || property.size_rai < filters.min_size_rai)) return false;
-  if (filters.max_size_rai != null && (property.size_rai == null || property.size_rai > filters.max_size_rai)) return false;
-  if (filters.min_frontage_m != null && (property.frontage_m == null || property.frontage_m < filters.min_frontage_m)) return false;
-  if (filters.min_road_width_m != null && (property.road_width_m == null || property.road_width_m < filters.min_road_width_m)) return false;
-  if (filters.zoning && property.zoning !== filters.zoning) return false;
-  if (filters.eec != null && property.is_eec !== filters.eec) return false;
-  if (filters.location_precision === "exact" && (property.location_precision !== "exact" || property.lat == null || property.lng == null)) return false;
-
-  const hasBounds = [filters.west, filters.south, filters.east, filters.north].every(
-    (value) => typeof value === "number" && Number.isFinite(value),
-  );
-  if (hasBounds) {
-    if (property.lat == null || property.lng == null) return false;
-    if (property.lng < filters.west! || property.lng > filters.east!) return false;
-    if (property.lat < filters.south! || property.lat > filters.north!) return false;
-  }
-
-  return true;
-}
-
 function enrichKnownListingCoordinates(property: Land): Land {
   const seed = SEED_PUBLIC_LISTINGS.find((item) => item.slug === property.slug);
   if (!seed) return property;
@@ -541,69 +483,98 @@ function enrichKnownListingCoordinates(property: Land): Land {
 
 export async function searchProperties(filters: PropertySearchFilters = {}): Promise<Land[]> {
   const sql = getSqlIfConfigured();
-
-  const clauses = ["l.status in ('active', 'sold')", "l.deleted_at is null", "l.transaction_type = 'sale'"];
-  const params: unknown[] = [];
-  const add = (value: unknown) => {
-    params.push(value);
-    return `$${params.length}`;
-  };
-
-  // Keep SQL predicates compatible with the legacy production schema. Marketplace V2-only
-  // fields are normalized and filtered in memory below until the additive migration is applied.
-  if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
-  if (filters.province_slug) clauses.push(`p.slug = ${add(filters.province_slug)}`);
-  if (filters.district?.trim()) clauses.push(`l.district ilike ${add(`%${filters.district.trim()}%`)}`);
-  if (filters.min_price_per_rai != null) clauses.push(`l.price_per_rai >= ${add(filters.min_price_per_rai)}`);
-  if (filters.max_price_per_rai != null) clauses.push(`l.price_per_rai <= ${add(filters.max_price_per_rai)}`);
-  if (filters.min_size_rai != null) clauses.push(`l.size_rai >= ${add(filters.min_size_rai)}`);
-  if (filters.max_size_rai != null) clauses.push(`l.size_rai <= ${add(filters.max_size_rai)}`);
-  if (filters.min_frontage_m != null) clauses.push(`l.frontage_m >= ${add(filters.min_frontage_m)}`);
-  if (filters.zoning) clauses.push(`l.zoning = ${add(filters.zoning)}`);
-  if (filters.eec != null) clauses.push(`l.is_eec = ${add(filters.eec)}`);
-
-  const hasBounds = [filters.west, filters.south, filters.east, filters.north].every(
-    (value) => typeof value === "number" && Number.isFinite(value),
-  );
-  if (hasBounds) {
-    clauses.push(`l.lng between ${add(filters.west)} and ${add(filters.east)}`);
-    clauses.push(`l.lat between ${add(filters.south)} and ${add(filters.north)}`);
-  }
-
   const limit = Math.min(Math.max(filters.limit ?? 24, 1), 100);
-  const offset = Math.max(filters.offset ?? 0, 0);
-  // Fetch a bounded compatibility window, then apply V2-only predicates in memory.
-  // This keeps the feature usable before the additive Marketplace V2 migration is deployed.
-  const fetchLimitParam = add(100);
-  const fetchOffsetParam = add(0);
+  const offset = Math.min(Math.max(filters.offset ?? 0, 0), MAX_SEARCH_OFFSET);
+  const needed = offset + limit;
+  const seedSlugs = SEED_PUBLIC_LISTINGS.map((property) => property.slug);
 
-  let rows: Record<string, unknown>[] = [];
+  let dbMatches: Land[] = [];
+  const dbSlugs = new Set<string>();
   if (sql) {
     try {
-      rows = (await sql.query(
-        `${LAND_SELECT}
-         where ${clauses.join(" and ")}
-         group by l.id, p.id
-         order by case when l.status = 'active' then 0 else 1 end,
-                  l.is_featured desc,
-                  l.updated_at desc,
-                  l.created_at desc
-         limit ${fetchLimitParam} offset ${fetchOffsetParam}`,
-        params,
-      )) as Record<string, unknown>[];
+      const params: unknown[] = [];
+      const add = (value: unknown) => {
+        params.push(value);
+        return `$${params.length}`;
+      };
+      // All predicates run in SQL (V2 columns via to_jsonb), ordered exactly like sortPropertyResults,
+      // so paging candidates can never hide a match behind a fixed window.
+      const where = propertySearchSqlClauses(filters, add, seedSlugs).join(" and ");
+      const order = propertySqlOrder(filters.sort);
+      const fetchPage = async (pageLimit: number, pageOffset: number) => {
+        const rows = (await sql.query(
+          `with page as (
+             select l.id, row_number() over (order by ${order}) as rn
+             from lands l join provinces p on p.id = l.province_id
+             where ${where}
+             order by ${order}
+             limit ${pageLimit} offset ${pageOffset}
+           )
+           ${LAND_SELECT}
+           join page on page.id = l.id
+           group by l.id, p.id, page.rn
+           order by page.rn`,
+          params,
+        )) as Record<string, unknown>[];
+        return rows.map(normalizeLand).map(enrichKnownListingCoordinates);
+      };
+      const [matches, seedRows] = await Promise.all([
+        // Page size covers the request plus every seed-backed row the in-memory re-check may drop.
+        collectOrderedMatches(fetchPage, (property) => propertyMatchesSearchFilters(property, filters), needed, needed + seedSlugs.length),
+        sql.query(
+          `select slug from lands where slug = any($1::text[]) and status in ('active', 'sold') and deleted_at is null`,
+          [seedSlugs],
+        ) as Promise<Record<string, unknown>[]>,
+      ]);
+      dbMatches = matches;
+      for (const row of seedRows) dbSlugs.add(String(row.slug));
     } catch (error) {
       console.error("[searchProperties] database search failed; using canonical seed listings", error);
+      dbMatches = [];
+      dbSlugs.clear();
     }
   }
 
-  const normalizedDbListings = rows.map(normalizeLand).map(enrichKnownListingCoordinates);
-  const dbSlugs = new Set(normalizedDbListings.map((property) => property.slug));
-  const matchingDbListings = normalizedDbListings.filter((property) => propertyMatchesSearchFilters(property, filters));
+  // A public DB row always replaces its canonical seed, even when the DB row does not match.
   const matchingSeeds = SEED_PUBLIC_LISTINGS
     .filter((property) => !dbSlugs.has(property.slug))
     .filter((property) => propertyMatchesSearchFilters(property, filters));
 
-  return sortPropertyResults([...matchingDbListings, ...matchingSeeds], filters.sort).slice(offset, offset + limit);
+  return sortPropertyResults([...dbMatches, ...matchingSeeds], filters.sort).slice(offset, offset + limit);
+}
+
+/** Province -> district -> subdistrict options taken only from public listing data. */
+export async function getLocationOptions(): Promise<LocationOption[]> {
+  const sql = getSqlIfConfigured();
+  let rows: Record<string, unknown>[] = [];
+  if (sql) {
+    try {
+      // to_jsonb keeps this query valid on schemas that predate the subdistrict column.
+      rows = (await sql.query(
+        `select distinct p.slug as province_slug, p.name_th as province_name,
+           to_jsonb(l) ->> 'district' as district, to_jsonb(l) ->> 'subdistrict' as subdistrict
+         from lands l join provinces p on p.id = l.province_id
+         where l.status in ('active', 'sold') and l.deleted_at is null`,
+        [],
+      )) as Record<string, unknown>[];
+    } catch (error) {
+      console.error("[getLocationOptions] database lookup failed; using seed locations", error);
+    }
+  }
+  return buildLocationOptions([
+    ...rows.map((row) => ({
+      province_slug: stringOrNull(row.province_slug),
+      province_name: stringOrNull(row.province_name),
+      district: stringOrNull(row.district),
+      subdistrict: stringOrNull(row.subdistrict),
+    })),
+    ...SEED_PUBLIC_LISTINGS.map((property) => ({
+      province_slug: property.province?.slug,
+      province_name: property.province?.name_th,
+      district: property.district,
+      subdistrict: property.subdistrict,
+    })),
+  ]);
 }
 
 export async function getListingBySlug(slug: string): Promise<Land | null> {

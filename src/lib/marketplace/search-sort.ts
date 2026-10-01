@@ -34,15 +34,16 @@ export function sortPropertyResults(properties: Land[], sort: PropertySort = "ne
   });
 }
 
+/** SQL mirror of sortPropertyResults, so paging DB candidates in this order never skips a true match. */
 export function propertySqlOrder(sort: PropertySort = "newest"): string {
   const activeFirst = "case when l.status = 'active' then 0 else 1 end";
-  if (sort === "price_asc") {
-    return `${activeFirst}, l.total_price asc nulls last, l.created_at desc`;
-  }
-  if (sort === "price_desc") {
-    return `${activeFirst}, l.total_price desc nulls last, l.created_at desc`;
-  }
-  if (sort === "price_per_rai_asc") return `${activeFirst}, l.price_per_rai asc nulls last, l.created_at desc`;
-  if (sort === "size_desc") return `${activeFirst}, l.size_rai desc nulls last, l.created_at desc`;
-  return `${activeFirst}, l.is_featured desc, coalesce(l.published_at, l.created_at) desc`;
+  // Same fallback chain and millisecond precision as the Date.parse comparison above.
+  const updated = "date_trunc('milliseconds', coalesce(l.updated_at, (to_jsonb(l) ->> 'published_at')::timestamptz, l.created_at)) desc nulls last";
+  const key: Partial<Record<PropertySort, string>> = {
+    price_asc: "l.total_price asc nulls last",
+    price_desc: "l.total_price desc nulls last",
+    price_per_rai_asc: "l.price_per_rai asc nulls last",
+    size_desc: "l.size_rai desc nulls last",
+  };
+  return [activeFirst, key[sort], updated, "l.public_ref asc", "l.id asc"].filter(Boolean).join(", ");
 }

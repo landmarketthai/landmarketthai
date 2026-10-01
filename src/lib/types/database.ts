@@ -89,6 +89,8 @@ export interface Land {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Derived: a title-deed document exists in land_documents (file itself stays private). */
+  title_deed_on_file?: boolean;
   province?: Province;
   images?: LandImage[];
 }

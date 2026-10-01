@@ -14,7 +14,8 @@ import ListingCard from "@/components/listings/ListingCard";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getFeaturedListings, searchProperties } from "@/lib/neon/queries";
+import { getActiveDemands, getFeaturedListings, searchProperties } from "@/lib/neon/queries";
+import BuyerDemandList from "@/components/demand/BuyerDemandList";
 import HomePropertyMap from "@/components/search/HomePropertyMap";
 import {
   resolveListingPresentation,
@@ -81,14 +82,15 @@ const trustItems: { Icon: LucideIcon; label: string }[] = [
   { Icon: Shield,       label: "ปลอดภัย\nเชื่อถือได้" },
   { Icon: Search,       label: "ตรวจสอบข้อมูล\nก่อนเผยแพร่" },
   { Icon: Users,        label: "มีทีมงานมืออาชีพ\nช่วยปิดดีล" },
-  { Icon: Calendar,     label: "ข้อมูลอัปเดต\nทุกวัน" },
-  { Icon: Clock,        label: "ปิดดีลไว\nตรวจสอบ 100%" },
+  { Icon: Calendar,     label: "แสดงวันที่อัปเดต\nทุกประกาศ" },
+  { Icon: Clock,        label: "บอกชัดว่า\nตรวจสอบอะไรแล้ว" },
 ];
 
 export default async function HomePage() {
-  const [featuredListings, mapProperties] = await Promise.all([
+  const [featuredListings, mapProperties, buyerDemands] = await Promise.all([
     getFeaturedListings(6).catch(() => []),
     searchProperties({ limit: 100 }).catch(() => []),
+    getActiveDemands(3).catch(() => []),
   ]);
 
   const sortedListings = sortSeedListings(featuredListings);
@@ -267,50 +269,10 @@ export default async function HomePage() {
       {/* ── 2. TRUST STRIP ───────────────────────────────────────────────── */}
       <TrustStrip />
 
-      {/* ── V2 ADD-ON: PROPERTY SEARCH ──────────────────────────────────── */}
-      <section className="bg-[#eef2f9] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {/* ── 3. MAP-FIRST PROPERTY SEARCH ───────────────────────────────── */}
+      <section id="property-map" className="bg-[#eef2f9] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <div className="container-xl">
-          <div className="rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_8px_28px_rgba(13,30,70,0.08)] sm:p-6 lg:p-7">
-            <div className="mb-5 flex flex-col gap-2 text-center sm:text-left lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-bold tracking-[0.14em] text-[#2f9e44]">ค้นหาทรัพย์</p>
-                <h2 className="mt-1 text-xl font-bold text-[#0a2a63] sm:text-2xl">ค้นหาที่ดิน โรงงาน และโกดัง</h2>
-                <p className="mt-1 text-sm text-slate-500">ค้นจากข้อมูลจริงในระบบ และเปิดดูตำแหน่งบนแผนที่ได้</p>
-              </div>
-              <Link href="/search?view=map" className="text-sm font-semibold text-blue-700 hover:underline">
-                เปิดค้นหาแบบแผนที่ ›
-              </Link>
-            </div>
-
-            <form action="/search" method="get" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(260px,1.5fr)_160px_auto]">
-              <label className="relative sm:col-span-2 lg:col-span-1">
-                <span className="sr-only">ค้นหาทำเล</span>
-                <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input name="q" className="input pl-10" placeholder="จังหวัด / อำเภอ / ตำบล / นิคม / ทำเล" />
-              </label>
-              <select name="property_type" className="input" defaultValue="" aria-label="ประเภททรัพย์">
-                <option value="">ทุกประเภท</option>
-                <option value="land">ที่ดิน</option>
-                <option value="factory">โรงงาน</option>
-                <option value="warehouse">โกดัง</option>
-              </select>
-              <button type="submit" className="btn-green w-full justify-center sm:col-span-2 lg:col-span-1 lg:w-auto">
-                <Search size={16} /> ค้นหาทรัพย์
-              </button>
-            </form>
-
-            <div className="mt-4 grid gap-2 min-[390px]:grid-cols-2 lg:grid-cols-3">
-              <Link href="/sell" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
-                ฝากขายทรัพย์
-              </Link>
-              <Link href="/buy-request" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
-                ฝากความต้องการซื้อ
-              </Link>
-              <Link href="/land" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 min-[390px]:col-span-2 lg:col-span-1">
-                ดูรายการที่ดินเดิม
-              </Link>
-            </div>
-          </div>
+          <HomePropertyMap properties={mapProperties} />
         </div>
       </section>
 
@@ -319,7 +281,7 @@ export default async function HomePage() {
         <div className="container-xl">
           <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
             <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
-              ที่ดินแนะนำ <b className="text-[#2f9e44]">อัปเดตทุกวัน</b>
+              ที่ดิน<b className="text-[#2f9e44]">แนะนำ</b>
             </h2>
             <Link
               href="/land"
@@ -342,6 +304,24 @@ export default async function HomePage() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* ── BUYER DEMAND (same buyer_demand source as /buyer-demand) ─────── */}
+      <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
+        <div className="container-xl">
+          <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
+            <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
+              ผู้ซื้อ<b className="text-[#2f9e44]">กำลังมองหา</b>
+            </h2>
+            <Link href="/buyer-demand" className="text-sm font-semibold text-blue-700 hover:underline sm:absolute sm:right-0 sm:bottom-1">
+              ดูทั้งหมด ›
+            </Link>
+          </div>
+          <BuyerDemandList
+            demands={buyerDemands}
+            emptyAction={<Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>}
+          />
         </div>
       </section>
 
@@ -423,39 +403,6 @@ export default async function HomePage() {
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5. PROPERTY MAP ──────────────────────────────────────────────── */}
-      <section id="property-map" className="bg-white px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <div className="container-xl">
-          <div className="mb-5 flex flex-col items-center gap-2 text-center sm:relative sm:mb-7 sm:block">
-            <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
-              แผนที่ทรัพย์<b className="text-[#2f9e44]">ทั้งหมด</b>
-            </h2>
-            <Link
-              href="/search?view=map"
-              className="text-sm font-semibold text-blue-700 hover:underline sm:absolute sm:right-0 sm:bottom-1"
-            >
-              เปิดแผนที่เต็ม ›
-            </Link>
-          </div>
-
-          <p className="mx-auto mb-6 max-w-2xl text-center text-sm leading-relaxed text-slate-600 sm:text-base">
-            ดูทำเลทรัพย์ที่เผยแพร่ทั้งหมด {mapProperties.length} รายการ
-            แตะหมุดบนแผนที่หรือรายการเพื่อดูรายละเอียด แสดงเฉพาะทรัพย์ที่มีพิกัดจริง
-          </p>
-
-          <HomePropertyMap properties={mapProperties} />
-
-          <div className="mt-8 flex flex-col items-center gap-2 text-center">
-            <Link href="/search" className="btn-green px-8 text-sm">
-              ค้นหาทรัพย์ทั้งหมด
-            </Link>
-            <Link href="/submit-land" className="text-xs font-semibold text-slate-500 hover:underline">
-              มีที่ดิน? ส่งให้ทีมประเมิน ›
-            </Link>
           </div>
         </div>
       </section>

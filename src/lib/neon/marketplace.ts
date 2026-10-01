@@ -1,6 +1,12 @@
 import { getSql } from "@/lib/neon/server";
 import { searchProperties } from "@/lib/neon/queries";
 import { classifyBuyerMatch, type BuyerMatchCriteria } from "@/lib/marketplace/matching";
+import { normalizeVerificationStatus } from "@/lib/marketplace/verification";
+import {
+  ADMIN_ACTIONS,
+  LAND_STATUS_FOR_SUBMISSION,
+  publishReadinessIssues,
+} from "@/lib/marketplace/listing-workflow";
 import type {
   DocType,
   Land,
@@ -18,7 +24,8 @@ function num(value: unknown): number | null {
 }
 
 function str(value: unknown): string | null {
-  return value === null || value === undefined || value === "" ? null : String(value);
+  if (value === null || value === undefined || value === "") return null;
+  return value instanceof Date ? value.toISOString() : String(value);
 }
 
 function normalizeSubmission(value: unknown): PropertySubmission {
@@ -62,10 +69,10 @@ function normalizeSubmission(value: unknown): PropertySubmission {
     contact_phone: str(row.contact_phone),
     contact_line: str(row.contact_line),
     status: row.status as PropertySubmission["status"],
-    verification_status: row.verification_status as PropertySubmission["verification_status"],
+    verification_status: normalizeVerificationStatus(row.verification_status),
     review_note: str(row.review_note),
-    created_at: String(row.created_at ?? ""),
-    updated_at: String(row.updated_at ?? ""),
+    created_at: str(row.created_at) ?? "",
+    updated_at: str(row.updated_at) ?? "",
     submitted_at: str(row.submitted_at),
     reviewed_at: str(row.reviewed_at),
     published_at: str(row.published_at),
@@ -98,7 +105,7 @@ function normalizeSubmissionMedia(value: unknown): PropertySubmissionMedia {
     doc_type: (row.doc_type as DocType | null) ?? null,
     sort_order: num(row.sort_order) ?? 0,
     is_cover: Boolean(row.is_cover),
-    created_at: String(row.created_at ?? ""),
+    created_at: str(row.created_at) ?? "",
   };
 }
 
@@ -284,14 +291,14 @@ export async function getReviewSubmission(id: string): Promise<PropertySubmissio
 
 export async function reviewSubmission(id: string, action: "approve" | "reject", note?: string | null): Promise<boolean> {
   const sql = getSql();
-  const next = action === "approve" ? "approved" : "rejected";
+  const { from, to } = ADMIN_ACTIONS[action];
   const verification = action === "approve" ? "verified" : "rejected";
   const rows = await sql.query(
     `update property_submissions
-     set status=$2, verification_status=$3, review_note=$4, reviewed_at=now(), updated_at=now()
-     where id=$1 and status='pending_review'
+     set status=$2, verification_status=$3, review_note=coalesce($4, review_note), reviewed_at=now(), updated_at=now()
+     where id=$1 and status = any($5::text[])
      returning id`,
-    [id, next, verification, note ?? null],
+    [id, to, verification, note ?? null, [...from]],
   );
   return rows.length > 0;
 }
@@ -310,7 +317,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
   const sql = getSql();
   const submissionRows = await sql.query(`select * from property_submissions where id=$1 and status='approved' limit 1`, [id]);
   const source = submissionRows[0] as Record<string, unknown> | undefined;
-  if (!source?.id || !source.title || !source.province_id || !source.property_type || source.transaction_type !== "sale") return null;
+  if (!source?.id || publishReadinessIssues(normalizeSubmission(source)).length) return null;
 
   const propertyType = String(source.property_type) as PropertyType;
   const transactionType: TransactionType = "sale";
@@ -361,20 +368,25 @@ export async function publishSubmission(id: string): Promise<string | null> {
   return landId;
 }
 
-export async function setPublishedPropertyStatus(submissionId: string, status: "sold" | "expired"): Promise<boolean> {
+/**
+ * Post-publish lifecycle (sold / archive / relist). Updates the linked land row in place —
+ * never deletes — so sold listings stay searchable and updated_at records when it changed.
+ */
+export async function setPublishedPropertyStatus(submissionId: string, action: "sold" | "archive" | "relist"): Promise<boolean> {
   const sql = getSql();
-  const landStatus = status === "sold" ? "sold" : "expired";
+  const { from, to } = ADMIN_ACTIONS[action];
+  const landStatus = LAND_STATUS_FOR_SUBMISSION[to];
   const rows = await sql.query(
     `with updated_land as (
-       update lands l set status=$2, updated_at=now()
+       update lands l set status=$3, updated_at=now()
        from property_submissions s
-       where s.id=$1 and s.linked_land_id=l.id and s.status in ('published','sold','expired')
+       where s.id=$1 and s.linked_land_id=l.id and s.status = any($4::text[]) and l.deleted_at is null
        returning l.id
      )
      update property_submissions set status=$2, updated_at=now()
-     where id=$1 and exists (select 1 from updated_land)
+     where id=$1 and status = any($4::text[]) and exists (select 1 from updated_land)
      returning id`,
-    [submissionId, landStatus],
+    [submissionId, to, landStatus, [...from]],
   );
   if (rows.length) {
     await sql.query(`update site_stats set total_listings=(select count(*) from lands where status in ('active','sold') and deleted_at is null) where id=1`, []);

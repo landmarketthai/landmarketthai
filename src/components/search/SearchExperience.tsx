@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import type { Land, Province } from "@/lib/types/database";
+import { formatMoneyFull, formatRai, listingStatusLabel } from "@/lib/utils";
+import { verificationBadges } from "@/lib/marketplace/verification";
+import { locationChoices, type LocationOption } from "@/lib/marketplace/search-filters";
 import PropertyMap, { type MapBounds } from "./PropertyMap";
 import SearchPropertyCard from "./SearchPropertyCard";
 
@@ -14,6 +17,7 @@ export interface SearchValues {
   status?: "active" | "sold";
   province?: string;
   district?: string;
+  subdistrict?: string;
   min_price?: string;
   max_price?: string;
   min_price_per_rai?: string;
@@ -21,6 +25,7 @@ export interface SearchValues {
   min_size_rai?: string;
   max_size_rai?: string;
   min_frontage_m?: string;
+  min_depth_m?: string;
   min_road_width_m?: string;
   zoning?: string;
   eec?: boolean;
@@ -31,6 +36,7 @@ export interface SearchValues {
 interface Props {
   initialProperties: Land[];
   provinces: Province[];
+  locationOptions: LocationOption[];
   initialValues: SearchValues;
   initialMode?: "list" | "map";
 }
@@ -70,11 +76,17 @@ function paramsFromValues(values: SearchValues) {
   return params;
 }
 
-export default function SearchExperience({ initialProperties, provinces, initialValues, initialMode = "list" }: Props) {
+export default function SearchExperience({ initialProperties, provinces, locationOptions, initialValues, initialMode = "list" }: Props) {
   const router = useRouter();
   const [values, setValues] = useState<SearchValues>(initialValues);
   const [properties, setProperties] = useState(initialProperties);
+  const [fitKey, setFitKey] = useState(0);
+  const { districts: districtOptions, subdistricts: subdistrictOptions } = useMemo(
+    () => locationChoices(locationOptions, values),
+    [locationOptions, values],
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mobileMode, setMobileMode] = useState<"list" | "map">(initialMode);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [searchOnMove, setSearchOnMove] = useState(true);
@@ -85,6 +97,10 @@ export default function SearchExperience({ initialProperties, provinces, initial
   const visibleMapProperties = useMemo(
     () => properties.filter((property) => property.lat != null && property.lng != null),
     [properties],
+  );
+  const selectedMapProperty = useMemo(
+    () => properties.find((property) => property.id === selectedId) ?? null,
+    [properties, selectedId],
   );
 
   const activeFilters = useMemo(() => {
@@ -102,6 +118,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
     if (values.status) items.push({ key: "status", label: values.status === "active" ? "พร้อมขาย" : "ขายแล้ว" });
     if (values.province) items.push({ key: "province", label: province?.name_th ?? values.province });
     if (values.district) items.push({ key: "district", label: `อำเภอ: ${values.district}` });
+    if (values.subdistrict) items.push({ key: "subdistrict", label: `ตำบล: ${values.subdistrict}` });
     if (values.min_price) items.push({ key: "min_price", label: `ราคา ≥ ${numberLabel(values.min_price)}` });
     if (values.max_price) items.push({ key: "max_price", label: `ราคา ≤ ${numberLabel(values.max_price)}` });
     if (values.min_price_per_rai) items.push({ key: "min_price_per_rai", label: `บาท/ไร่ ≥ ${numberLabel(values.min_price_per_rai)}` });
@@ -109,10 +126,11 @@ export default function SearchExperience({ initialProperties, provinces, initial
     if (values.min_size_rai) items.push({ key: "min_size_rai", label: `ขนาด ≥ ${numberLabel(values.min_size_rai)} ไร่` });
     if (values.max_size_rai) items.push({ key: "max_size_rai", label: `ขนาด ≤ ${numberLabel(values.max_size_rai)} ไร่` });
     if (values.min_frontage_m) items.push({ key: "min_frontage_m", label: `หน้ากว้าง ≥ ${numberLabel(values.min_frontage_m)} ม.` });
+    if (values.min_depth_m) items.push({ key: "min_depth_m", label: `ความลึก ≥ ${numberLabel(values.min_depth_m)} ม.` });
     if (values.min_road_width_m) items.push({ key: "min_road_width_m", label: `ถนน ≥ ${numberLabel(values.min_road_width_m)} ม.` });
     if (values.zoning) items.push({ key: "zoning", label: zoning ?? values.zoning });
     if (values.eec) items.push({ key: "eec", label: "EEC" });
-    if (values.location_precision === "exact") items.push({ key: "location_precision", label: "พิกัดยืนยัน" });
+    if (values.location_precision === "exact") items.push({ key: "location_precision", label: "พิกัดแบบ Exact" });
     return items;
   }, [provinces, values]);
 
@@ -132,7 +150,9 @@ export default function SearchExperience({ initialProperties, provinces, initial
       if (!response.ok) return;
       const body = (await response.json()) as { properties?: Land[] };
       setProperties(body.properties ?? []);
+      if (!bounds) setFitKey((key) => key + 1);
       setSelectedId(null);
+      setHoveredId(null);
     } finally {
       setLoading(false);
     }
@@ -155,6 +175,9 @@ export default function SearchExperience({ initialProperties, provinces, initial
 
   function removeFilter(key: keyof SearchValues) {
     const nextValues = { ...values, [key]: undefined };
+    // Location filters are hierarchical: dropping a parent drops its children.
+    if (key === "province") nextValues.district = undefined;
+    if (key === "province" || key === "district") nextValues.subdistrict = undefined;
     applyValues(nextValues);
   }
 
@@ -164,16 +187,12 @@ export default function SearchExperience({ initialProperties, provinces, initial
 
   function selectProperty(id: string, fromMap = false) {
     setSelectedId(id);
-    if (fromMap) {
-      if (window.matchMedia("(max-width: 1023px)").matches) setMobileMode("list");
-      setTimeout(() => {
-        const card = cardRefs.current.get(id);
-        if (!card) return;
-        card.scrollIntoView({ block: "center" });
-        const section = card.closest('section[aria-label="รายการทรัพย์"]');
-        if (section) window.scrollTo({ top: Math.max(0, section.getBoundingClientRect().top + window.scrollY - 72) });
-      }, 0);
-    }
+    if (!fromMap || !window.matchMedia("(min-width: 1024px)").matches) return;
+    setTimeout(() => {
+      const card = cardRefs.current.get(id);
+      if (!card) return;
+      card.scrollIntoView({ block: "center" });
+    }, 0);
   }
 
   function handleBoundsChange(bounds: MapBounds) {
@@ -223,7 +242,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
             <select
               className="input col-span-2 min-[420px]:col-span-1 lg:col-span-1"
               value={values.province ?? ""}
-              onChange={(event) => setValues((current) => ({ ...current, province: event.target.value || undefined }))}
+              onChange={(event) => setValues((current) => ({ ...current, province: event.target.value || undefined, district: undefined, subdistrict: undefined }))}
             >
               <option value="">ทุกจังหวัด</option>
               {provinces.map((province) => <option key={province.id} value={province.slug}>{province.name_th}</option>)}
@@ -244,7 +263,14 @@ export default function SearchExperience({ initialProperties, provinces, initial
                 <div className="mt-0.5 text-xs text-slate-500">ระบบจะแสดงเฉพาะเงื่อนไขที่มีข้อมูลจริงในประกาศ</div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                <input className="input" placeholder="อำเภอ" value={values.district ?? ""} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined }))} />
+                <select className="input" aria-label="อำเภอ" value={values.district ?? ""} disabled={!districtOptions.length} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined, subdistrict: undefined }))}>
+                  <option value="">{!values.province ? "เลือกจังหวัดก่อน" : districtOptions.length ? "ทุกอำเภอ" : "ยังไม่มีข้อมูลอำเภอ"}</option>
+                  {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
+                </select>
+                <select className="input" aria-label="ตำบล" value={values.subdistrict ?? ""} disabled={!subdistrictOptions.length} onChange={(e) => setValues((v) => ({ ...v, subdistrict: e.target.value || undefined }))}>
+                  <option value="">{!values.district ? "เลือกอำเภอก่อน" : subdistrictOptions.length ? "ทุกตำบล" : "ยังไม่มีข้อมูลตำบล"}</option>
+                  {subdistrictOptions.map((subdistrict) => <option key={subdistrict} value={subdistrict}>{subdistrict}</option>)}
+                </select>
                 <select className="input" value={values.status ?? ""} onChange={(e) => setValues((v) => ({ ...v, status: (e.target.value || undefined) as SearchValues["status"] }))}>
                   <option value="">ทุกสถานะ</option>
                   <option value="active">พร้อมขาย</option>
@@ -257,6 +283,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
                 <input className="input" inputMode="decimal" placeholder="ขนาดต่ำสุด (ไร่)" value={values.min_size_rai ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_size_rai: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ขนาดสูงสุด (ไร่)" value={values.max_size_rai ?? ""} onChange={(e) => setValues((v) => ({ ...v, max_size_rai: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="หน้ากว้างอย่างน้อย (ม.)" value={values.min_frontage_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_frontage_m: e.target.value || undefined }))} />
+                <input className="input" inputMode="decimal" placeholder="ความลึกอย่างน้อย (ม.)" value={values.min_depth_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_depth_m: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ถนนกว้างอย่างน้อย (ม.)" value={values.min_road_width_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_road_width_m: e.target.value || undefined }))} />
                 <select className="input" value={values.zoning ?? ""} onChange={(e) => setValues((v) => ({ ...v, zoning: e.target.value || undefined }))}>
                   {zoningOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -267,7 +294,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
                 </label>
                 <label className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
                   <input type="checkbox" checked={values.location_precision === "exact"} onChange={(e) => setValues((v) => ({ ...v, location_precision: e.target.checked ? "exact" : undefined }))} />
-                  พิกัดยืนยันเท่านั้น
+                  เฉพาะพิกัดแบบ Exact
                 </label>
               </div>
               <div className="mt-4 flex justify-end">
@@ -337,6 +364,7 @@ export default function SearchExperience({ initialProperties, provinces, initial
                   property={property}
                   selected={selectedId === property.id}
                   onSelect={() => selectProperty(property.id)}
+                  onHover={(hovered) => setHoveredId(hovered ? property.id : null)}
                   cardRef={(node) => node ? cardRefs.current.set(property.id, node) : cardRefs.current.delete(property.id)}
                 />
               ))}
@@ -359,14 +387,60 @@ export default function SearchExperience({ initialProperties, provinces, initial
           <PropertyMap
             properties={properties}
             selectedId={selectedId}
+            hoveredId={hoveredId}
             onSelect={(id) => selectProperty(id, true)}
+            onHover={setHoveredId}
             onBoundsChange={handleBoundsChange}
+            fitKey={fitKey}
             className="h-[calc(100dvh-13rem)] min-h-[360px] sm:min-h-[440px] lg:h-full lg:min-h-0"
           />
           <label className="absolute right-3 top-3 z-[600] flex min-h-10 items-center gap-2 rounded-lg bg-white/95 px-3 text-xs font-semibold text-slate-700 shadow-md backdrop-blur">
             <input type="checkbox" checked={searchOnMove} onChange={(event) => setSearchOnMove(event.target.checked)} />
             ค้นหาเมื่อเลื่อนแผนที่
           </label>
+
+          {mobileMode === "map" && selectedMapProperty && (
+            <div className="absolute inset-x-3 bottom-3 z-[650] rounded-2xl border border-slate-200 bg-white/97 p-4 shadow-[0_14px_40px_rgba(2,24,55,0.28)] backdrop-blur lg:hidden">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${selectedMapProperty.status === "sold" ? "bg-slate-500" : "bg-emerald-600"}`}>
+                      {listingStatusLabel(selectedMapProperty)}
+                    </span>
+                    {verificationBadges(selectedMapProperty).map((badge) => (
+                      <span key={badge} className="text-[10px] font-bold text-emerald-700">✓ {badge}</span>
+                    ))}
+                    <span className={`text-[10px] font-bold ${selectedMapProperty.location_precision === "exact" ? "text-blue-700" : "text-amber-700"}`}>
+                      {selectedMapProperty.location_precision === "exact" ? "พิกัดแบบ Exact" : "≈ ตำแหน่งโดยประมาณ"}
+                    </span>
+                  </div>
+                  <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#082f63]">{selectedMapProperty.title_th}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  className="-m-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg text-slate-400 hover:bg-slate-100"
+                  aria-label="ปิดตัวอย่างทรัพย์"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {selectedMapProperty.total_price != null && (
+                  <span className="text-base font-black text-[#082f63]">{formatMoneyFull(selectedMapProperty.total_price)}</span>
+                )}
+                {selectedMapProperty.size_rai != null && (
+                  <span className="text-sm font-bold text-slate-600">{formatRai(selectedMapProperty.size_rai)}</span>
+                )}
+                {selectedMapProperty.price_per_rai != null && (
+                  <span className="text-xs text-slate-500">{formatMoneyFull(selectedMapProperty.price_per_rai)} / ไร่</span>
+                )}
+              </div>
+              <Link href={`/properties/${selectedMapProperty.slug}`} className="btn-green mt-3 w-full justify-center text-sm">
+                ดูรายละเอียดทรัพย์
+              </Link>
+            </div>
+          )}
         </section>
       </div>
     </div>

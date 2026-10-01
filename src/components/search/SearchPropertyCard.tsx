@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Building2, MapPin, Ruler, Tag } from "lucide-react";
 import type { Land } from "@/lib/types/database";
 import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
+import { verificationBadges } from "@/lib/marketplace/verification";
 
 const propertyTypeLabel = {
   land: "ที่ดิน",
@@ -16,14 +17,16 @@ interface Props {
   property: Land;
   selected?: boolean;
   onSelect?: () => void;
+  onHover?: (hovered: boolean) => void;
   cardRef?: (node: HTMLElement | null) => void;
 }
 
-export default function SearchPropertyCard({ property, selected, onSelect, cardRef }: Props) {
+export default function SearchPropertyCard({ property, selected, onSelect, onHover, cardRef }: Props) {
   const cover = property.images?.find((image) => image.is_cover) ?? property.images?.[0];
   const price = property.total_price;
   const priceLabel = "ราคารวม";
   const updatedLabel = formatUpdatedDate(property.updated_at);
+  const badges = verificationBadges(property);
 
   return (
     <article
@@ -31,7 +34,8 @@ export default function SearchPropertyCard({ property, selected, onSelect, cardR
       className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
         selected ? "border-[#00A859] ring-2 ring-[#00A859]/20" : "border-slate-200 hover:border-slate-300 hover:shadow-md"
       }`}
-      onMouseEnter={onSelect}
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
     >
       <button type="button" onClick={onSelect} className="w-full text-left">
         <div className="grid grid-cols-[104px_minmax(0,1fr)] min-[380px]:grid-cols-[132px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)]">
@@ -69,7 +73,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, cardR
                 <div className="flex items-center gap-1.5"><Tag size={13} />{ZONING_LABELS[property.zoning]}</div>
               )}
             </div>
-            {(property.frontage_m != null || property.road_width_m != null || property.is_eec || (property.location_precision === "exact" && property.lat != null && property.lng != null)) && (
+            {(property.frontage_m != null || property.road_width_m != null || property.is_eec || badges.length > 0 || (property.lat != null && property.lng != null)) && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {property.frontage_m != null && (
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">หน้ากว้าง {property.frontage_m.toLocaleString("th-TH")} ม.</span>
@@ -80,8 +84,13 @@ export default function SearchPropertyCard({ property, selected, onSelect, cardR
                 {property.is_eec && (
                   <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">EEC</span>
                 )}
-                {property.location_precision === "exact" && property.lat != null && property.lng != null && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">พิกัดยืนยัน</span>
+                {badges.map((badge) => (
+                  <span key={badge} className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">✓ {badge}</span>
+                ))}
+                {property.lat != null && property.lng != null && (
+                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${property.location_precision === "exact" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>
+                    {property.location_precision === "exact" ? "พิกัดแบบ Exact" : "≈ ตำแหน่งโดยประมาณ"}
+                  </span>
                 )}
               </div>
             )}

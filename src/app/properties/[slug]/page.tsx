@@ -21,6 +21,8 @@ import LineButton from "@/components/ui/LineButton";
 import { getListingBySlug } from "@/lib/neon/queries";
 import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
 import type { Land } from "@/lib/types/database";
+import { landVerification } from "@/lib/marketplace/verification";
+import VerificationChecklist from "@/components/listings/VerificationChecklist";
 
 export const revalidate = 60;
 const getProperty = cache(getListingBySlug);
@@ -105,7 +107,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
     property.road_name ? ["ถนน", property.road_name] : null,
     property.road_width_m != null ? ["ความกว้างถนน", `${property.road_width_m.toLocaleString("th-TH")} เมตร`] : null,
     property.lat != null && property.lng != null
-      ? ["พิกัด", property.location_precision === "exact" ? "พิกัดยืนยัน" : "ตำแหน่งโดยประมาณ"]
+      ? ["พิกัด", property.location_precision === "exact" ? "พิกัดแบบ Exact" : "ตำแหน่งโดยประมาณ"]
       : null,
     updatedLabel ? ["อัปเดตล่าสุด", updatedLabel] : null,
   ].filter(Boolean) as [string, string][];
@@ -243,6 +245,15 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
                 </div>
               </section>
             )}
+
+            <section className="card p-4 sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <CheckCircle size={20} className="text-brand-600" />
+                <h2 className="text-xl font-bold text-slate-900">สถานะการตรวจสอบข้อมูล</h2>
+              </div>
+              <VerificationChecklist dimensions={landVerification(property)} />
+              <p className="mt-3 text-xs text-slate-500">แสดงเฉพาะสิ่งที่มีข้อมูลรองรับในระบบ หัวข้อที่ยังไม่ยืนยันควรตรวจสอบเพิ่มเติมก่อนตัดสินใจ</p>
+            </section>
 
             {property.description && (
               <section className="card p-4 sm:p-6">

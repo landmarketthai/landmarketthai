@@ -7,7 +7,7 @@ import FilterBar from "@/components/listings/FilterBar";
 export const metadata: Metadata = {
   title: "ที่ดินอุตสาหกรรม EEC ทั่วไทย – ตลาดที่ดิน",
   description:
-    "ค้นหาที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC Rayong Chonburi ราคาต่อไร่ ตรวจสอบแล้วทุกแปลง",
+    "ค้นหาที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC Rayong Chonburi ราคาต่อไร่ ทีมงานตรวจสอบประกาศก่อนเผยแพร่",
 };
 
 interface SearchParams {
