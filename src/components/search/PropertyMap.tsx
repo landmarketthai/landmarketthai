@@ -78,10 +78,14 @@ export default function PropertyMap({
   const onHoverRef = useRef(onHover);
   const onBoundsRef = useRef(onBoundsChange);
   const suppressBoundsRef = useRef(false);
+  const userMapInteractionRef = useRef(false);
+  const userInputRef = useRef(false);
+  const inputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedIdRef = useRef(selectedId);
   const hoveredIdRef = useRef(hoveredId);
   const lastFitKeyRef = useRef<number | null>(null);
-  const [ready, setReady] = useState(false);
+  const fitKeyRef = useRef(fitKey);
+  const [ready, setReady] = useState(0);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -89,11 +93,33 @@ export default function PropertyMap({
     onBoundsRef.current = onBoundsChange;
     selectedIdRef.current = selectedId;
     hoveredIdRef.current = hoveredId;
-  }, [onSelect, onHover, onBoundsChange, selectedId, hoveredId]);
+    fitKeyRef.current = fitKey;
+  }, [onSelect, onHover, onBoundsChange, selectedId, hoveredId, fitKey]);
 
   useEffect(() => {
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
+    let interactionNode: HTMLDivElement | null = null;
+    let resizeFrame: number | null = null;
+    let boxZooming = false;
+    const inputEvents = ["click", "dblclick", "wheel", "keydown", "touchmove"];
+    const markUserMapInteraction = (event: Event) => {
+      if (!event.isTrusted) return;
+      // Arm motion start, not moveend: an idle click must not authorize a later resize.
+      userInputRef.current = true;
+      if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
+      inputTimerRef.current = setTimeout(() => {
+        userInputRef.current = false;
+      }, event.type === "wheel" ? 100 : 0);
+    };
+    const finishBoxZoom = (event: Event) => {
+      if (event.type === "keydown") {
+        if ((event as KeyboardEvent).key === "Escape") boxZooming = false;
+      } else if (boxZooming) {
+        boxZooming = false;
+        markUserMapInteraction(event);
+      }
+    };
 
     async function mount() {
       if (!containerRef.current || mapRef.current) return;
@@ -110,6 +136,9 @@ export default function PropertyMap({
         dragging: interactive,
         touchZoom: interactive,
         doubleClickZoom: interactive,
+        keyboard: interactive,
+        boxZoom: interactive,
+        trackResize: false,
       });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -132,13 +161,34 @@ export default function PropertyMap({
       cluster.addTo(map);
       mapRef.current = map;
       clusterRef.current = cluster;
-      setReady(true);
+      setReady((generation) => generation + 1);
 
+      interactionNode = containerRef.current;
+      if (interactive) {
+        for (const event of inputEvents) interactionNode.addEventListener(event, markUserMapInteraction, true);
+        document.addEventListener("mouseup", finishBoxZoom, true);
+        document.addEventListener("keydown", finishBoxZoom, true);
+      }
+
+      const resize = () => {
+        if (cancelled) return;
+        // invalidateSize emits moveend. Preserve any real drag in progress.
+        suppressBoundsRef.current = true;
+        try {
+          map.invalidateSize({ animate: false });
+        } finally {
+          suppressBoundsRef.current = false;
+        }
+        // A mobile map first mounted while hidden still needs its initial fit when revealed.
+        if (map.getSize().x && map.getSize().y && lastFitKeyRef.current !== fitKeyRef.current) {
+          setReady((generation) => generation + 1);
+        }
+      };
       if (typeof ResizeObserver !== "undefined") {
-        resizeObserver = new ResizeObserver(() => map.invalidateSize({ animate: false }));
+        resizeObserver = new ResizeObserver(resize);
         resizeObserver.observe(containerRef.current);
       }
-      requestAnimationFrame(() => map.invalidateSize({ animate: false }));
+      resizeFrame = requestAnimationFrame(resize);
 
       const applySemanticZoom = () => {
         const compact = map.getZoom() < 10;
@@ -149,11 +199,17 @@ export default function PropertyMap({
       map.on("zoomend", applySemanticZoom);
 
       if (interactive) {
+        map.on("boxzoomstart", () => { boxZooming = true; });
+        map.on("dragstart", () => {
+          userMapInteractionRef.current = true;
+        });
+        map.on("movestart zoomstart", () => {
+          if (userInputRef.current) userMapInteractionRef.current = true;
+          userInputRef.current = false;
+        });
         map.on("moveend", () => {
-          if (suppressBoundsRef.current) {
-            suppressBoundsRef.current = false;
-            return;
-          }
+          if (suppressBoundsRef.current || !userMapInteractionRef.current) return;
+          userMapInteractionRef.current = false;
           const bounds = map.getBounds();
           onBoundsRef.current?.({
             west: bounds.getWest(),
@@ -170,6 +226,15 @@ export default function PropertyMap({
     return () => {
       cancelled = true;
       resizeObserver?.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      for (const event of inputEvents) interactionNode?.removeEventListener(event, markUserMapInteraction, true);
+      document.removeEventListener("mouseup", finishBoxZoom, true);
+      document.removeEventListener("keydown", finishBoxZoom, true);
+      userMapInteractionRef.current = false;
+      userInputRef.current = false;
+      if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
+      suppressBoundsRef.current = false;
+      lastFitKeyRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       clusterRef.current = null;
@@ -185,7 +250,7 @@ export default function PropertyMap({
       if (!map || !cluster) return;
       const leaflet = await import("leaflet");
       const L = (leaflet.default ?? leaflet) as typeof import("leaflet");
-      if (cancelled) return;
+      if (cancelled || mapRef.current !== map || clusterRef.current !== cluster) return;
 
       cluster.clearLayers();
       markerRefs.current.clear();
@@ -217,10 +282,12 @@ export default function PropertyMap({
         points.push([property.lat, property.lng]);
       }
 
-      if (points.length && lastFitKeyRef.current !== fitKey) {
+      if (points.length && map.getSize().x && map.getSize().y && lastFitKeyRef.current !== fitKey) {
         lastFitKeyRef.current = fitKey;
         const bounds = L.latLngBounds(points);
-        suppressBoundsRef.current = true;
+        userMapInteractionRef.current = false;
+        userInputRef.current = false;
+        map.stop();
         map.fitBounds(bounds.pad(0.25), { maxZoom: 13, animate: false });
       }
     }
@@ -242,7 +309,9 @@ export default function PropertyMap({
   useEffect(() => {
     const selected = properties.find((item) => item.id === selectedId && item.lat != null && item.lng != null);
     if (selected && mapRef.current) {
-      suppressBoundsRef.current = true;
+      userMapInteractionRef.current = false;
+      userInputRef.current = false;
+      mapRef.current.stop();
       mapRef.current.flyTo([selected.lat!, selected.lng!], Math.max(mapRef.current.getZoom(), 13), { duration: 0.4 });
     }
   }, [selectedId, properties, ready]);

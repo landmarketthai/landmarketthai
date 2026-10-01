@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import type { Land, Province } from "@/lib/types/database";
 import { formatMoneyFull, formatRai, listingStatusLabel } from "@/lib/utils";
@@ -93,6 +93,23 @@ export default function SearchExperience({ initialProperties, provinces, locatio
   const [loading, setLoading] = useState(false);
   const cardRefs = useRef(new Map<string, HTMLElement>());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const boundsRequestRef = useRef(false);
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    requestRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!searchOnMove) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (boundsRequestRef.current) {
+        requestRef.current?.abort();
+        setLoading(false);
+      }
+    }
+  }, [searchOnMove]);
 
   const visibleMapProperties = useMemo(
     () => properties.filter((property) => property.lat != null && property.lng != null),
@@ -135,6 +152,11 @@ export default function SearchExperience({ initialProperties, provinces, locatio
   }, [provinces, values]);
 
   const fetchResults = useCallback(async (nextValues: SearchValues, bounds?: MapBounds) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    boundsRequestRef.current = !!bounds;
     const params = paramsFromValues(nextValues);
     params.set("limit", bounds ? "100" : "24");
     if (bounds) {
@@ -146,15 +168,18 @@ export default function SearchExperience({ initialProperties, provinces, locatio
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/properties/search?${params.toString()}`);
+      const response = await fetch(`/api/properties/search?${params.toString()}`, { signal: controller.signal });
       if (!response.ok) return;
       const body = (await response.json()) as { properties?: Land[] };
+      if (controller.signal.aborted) return;
       setProperties(body.properties ?? []);
       if (!bounds) setFitKey((key) => key + 1);
       setSelectedId(null);
       setHoveredId(null);
+    } catch (error) {
+      if (!controller.signal.aborted) console.error("Property search failed:", error);
     } finally {
-      setLoading(false);
+      if (requestRef.current === controller && !controller.signal.aborted) setLoading(false);
     }
   }, []);
 
@@ -197,7 +222,12 @@ export default function SearchExperience({ initialProperties, provinces, locatio
 
   function handleBoundsChange(bounds: MapBounds) {
     if (!searchOnMove) return;
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (!isDesktop && mobileMode !== "map") return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // A queued user search already supersedes the previous response.
+    requestRef.current?.abort();
+    boundsRequestRef.current = true;
     debounceRef.current = setTimeout(() => void fetchResults(values, bounds), 350);
   }
 
