@@ -63,17 +63,14 @@ export default async function ListingGrid({ provinceSlug, landType, filters, pag
     <div>
       <div className="mb-4 text-sm text-slate-500">แสดง {listings.length} แปลง</div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {listings.map((land) => {
-          const presentation = resolveListingPresentation(land);
-          return (
-            <ListingCard
-              key={land.id}
-              land={land}
-              ctaLabel="ดูรายละเอียดแปลง"
-              {...presentation}
-            />
-          );
-        })}
+        {listings.map((land) => (
+          <ListingCard
+            key={land.id}
+            land={land}
+            {...resolveListingPresentation(land)}
+            ctaLabel="ดูรายละเอียดทรัพย์"
+          />
+        ))}
       </div>
 
       {(hasNext || page > 1) && (

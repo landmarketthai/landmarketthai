@@ -7,6 +7,22 @@ export const SEED_101_KABIN_SLUG = "101-rai-kabin-buri";
 
 const SEED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
+const LEGACY_MARKETPLACE_FIELDS = {
+  subdistrict: null,
+  address: null,
+  property_type: "land",
+  transaction_type: "sale",
+  area_rai: null,
+  area_ngan: null,
+  area_sqwa: null,
+  depth_min_m: null,
+  depth_max_m: null,
+  road_name: null,
+  road_width_m: null,
+  verification_status: "verified",
+  published_at: SEED_TIMESTAMP,
+} as const;
+
 export const SEED_RAYONG_PROVINCE: Province = {
   id: "seed-province-rayong",
   name_th: "ระยอง",
@@ -42,6 +58,7 @@ const SEED_37_RAI_IMAGE = {
 
 /** Canonical active 37-rai listing shared by homepage and /land. */
 export const SEED_37_RAI_LAND: Land = {
+  ...LEGACY_MARKETPLACE_FIELDS,
   id: "seed-land-37-rai-eec-rayong",
   public_ref: 0,
   title_th: "ที่ดินอุตสาหกรรม EEC ระยอง",
@@ -87,6 +104,7 @@ const SEED_109_RAI_IMAGE = {
 
 /** Sold 109-rai Rayong listing kept public as a completed deal portfolio item. */
 export const SEED_109_RAI_LAND: Land = {
+  ...LEGACY_MARKETPLACE_FIELDS,
   id: "seed-land-109-rai-eec-rayong",
   public_ref: 0,
   title_th: "ที่ดินอุตสาหกรรม EEC ระยอง 109 ไร่ ใกล้ WHA และ BYD",
@@ -132,6 +150,7 @@ const SEED_101_KABIN_IMAGE = {
 
 /** Active 101-rai Kabin Buri listing. */
 export const SEED_101_KABIN_LAND: Land = {
+  ...LEGACY_MARKETPLACE_FIELDS,
   id: "seed-land-101-kabin-buri",
   public_ref: 0,
   title_th: "ที่ดินอุตสาหกรรม 101 ไร่ กบินทร์บุรี ตรงข้ามสวนอุตสาหกรรมกวางตุ้ง",
@@ -280,11 +299,25 @@ export function mergeWithSeedListings(
   dbListings: Land[],
   opts?: { province_slug?: string; land_type?: LandType },
 ): Land[] {
-  const dbSlugs = new Set(dbListings.map((land) => land.slug));
+  const seedBySlug = new Map(SEED_PUBLIC_LISTINGS.map((land) => [land.slug, land]));
+  const enrichedDbListings = dbListings.map((land) => {
+    const seed = seedBySlug.get(land.slug);
+    if (!seed) return land;
+    return {
+      ...land,
+      lat: land.lat ?? seed.lat,
+      lng: land.lng ?? seed.lng,
+      location_precision:
+        land.lat != null && land.lng != null ? land.location_precision : seed.location_precision,
+      images: land.images?.length ? land.images : seed.images,
+      province: land.province ?? seed.province,
+    };
+  });
+  const dbSlugs = new Set(enrichedDbListings.map((land) => land.slug));
   const seedListings = filterSeedPublicListings(opts).filter(
     (land) => !dbSlugs.has(land.slug),
   );
-  return [...dbListings, ...seedListings].filter(
+  return [...enrichedDbListings, ...seedListings].filter(
     (land) => (land.status === "active" || land.status === "sold") && !land.deleted_at && matchesSeedListingFilters(land, opts),
   );
 }

@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   if (!province) return {};
   return {
     title: `ที่ดินอุตสาหกรรม${province.name_th} – ที่ดิน EEC ${province.name_en}`,
-    description: `ที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC ใน${province.name_th} ตรวจสอบแล้ว ราคาต่อไร่ สอบถาม LINE`,
+    description: `ที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC ใน${province.name_th} ทีมงานตรวจสอบประกาศก่อนเผยแพร่ ราคาต่อไร่ สอบถาม LINE`,
     alternates: { canonical: `/land/${slug}` },
   };
 }
@@ -97,7 +97,7 @@ export default async function ProvincePage({
             <strong>{province.name_th}</strong>เป็นหนึ่งในจังหวัดสำคัญของ EEC (Eastern Economic Corridor)
             ที่ดึงดูดการลงทุนจากญี่ปุ่น จีน และยุโรปอย่างต่อเนื่อง
             ที่ดินอุตสาหกรรมใน{province.name_th}ประกอบด้วยโซนม่วง (อุตสาหกรรม) และพื้นที่ใกล้นิคมชั้นนำ
-            LandmarketThai คัดสรรที่ดินที่ผ่านการตรวจสอบเอกสารสิทธิ์แล้วทุกแปลง
+            LandmarketThai คัดสรรประกาศโดยทีมงานตรวจสอบก่อนเผยแพร่ ควรตรวจสอบเอกสารสิทธิ์และผังเมืองกับหน่วยงานก่อนตัดสินใจ
           </p>
         </div>
 

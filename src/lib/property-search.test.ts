@@ -47,5 +47,6 @@ test("map accepts zero coordinates but rejects incomplete, out-of-range and non-
 test("trust dates use Bangkok time and preserve distinct public statuses", () => {
   assert.equal(listingUpdatedLabel("2026-09-29T18:00:00Z"), listingUpdatedLabel("2026-09-30T01:00:00+07:00"));
   assert.equal(listingUpdatedLabel("bad-date"), "ไม่ระบุวันที่");
+  assert.equal(LISTING_STATUS_LABELS.expired, "หมดอายุ");
   assert.equal(new Set([LISTING_STATUS_LABELS.active, LISTING_STATUS_LABELS.reserved, LISTING_STATUS_LABELS.sold]).size, 3);
 });

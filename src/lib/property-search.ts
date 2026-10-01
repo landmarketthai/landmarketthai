@@ -38,21 +38,21 @@ export function searchProperties(listings: Land[], filters: PropertySearchFilter
     if (type && land.land_type !== type && !(type === "eec" && land.is_eec)) return false;
     if (filters.property_type === "land" && ["factory", "warehouse"].includes(land.land_type)) return false;
     if (filters.property_type && filters.property_type !== "land" && land.land_type !== filters.property_type) return false;
-    if (minPrice !== null && land.price_per_rai < minPrice || maxPrice !== null && land.price_per_rai > maxPrice) return false;
-    if (minSize !== null && land.size_rai < minSize || maxSize !== null && land.size_rai > maxSize) return false;
+    if (minPrice !== null && (land.price_per_rai == null || land.price_per_rai < minPrice) || maxPrice !== null && (land.price_per_rai == null || land.price_per_rai > maxPrice)) return false;
+    if (minSize !== null && (land.size_rai == null || land.size_rai < minSize) || maxSize !== null && (land.size_rai == null || land.size_rai > maxSize)) return false;
     const searchable = [land.title_th, land.slug, land.district, land.province?.name_th,
       land.province?.name_en, land.province?.slug, ...(land.nearby_landmarks ?? [])].join(" ").toLocaleLowerCase("th-TH");
     return terms.every((term) => searchable.includes(term));
   });
   return results.sort((a, b) => {
-    if (filters.sort === "price_asc") return a.price_per_rai - b.price_per_rai || a.id.localeCompare(b.id);
-    if (filters.sort === "size_desc") return b.size_rai - a.size_rai || a.id.localeCompare(b.id);
+    if (filters.sort === "price_asc") return (a.price_per_rai ?? Infinity) - (b.price_per_rai ?? Infinity) || a.id.localeCompare(b.id);
+    if (filters.sort === "size_desc") return (b.size_rai ?? -Infinity) - (a.size_rai ?? -Infinity) || a.id.localeCompare(b.id);
     return b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id);
   });
 }
 
 export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
-  active: "เปิดขาย", reserved: "จองแล้ว", sold: "ปิดดีลแล้ว", draft: "ฉบับร่าง", archived: "เก็บถาวร",
+  active: "เปิดขาย", reserved: "จองแล้ว", sold: "ปิดดีลแล้ว", draft: "ฉบับร่าง", archived: "เก็บถาวร", expired: "หมดอายุ",
 };
 
 export function listingUpdatedLabel(updatedAt: string) {

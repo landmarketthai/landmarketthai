@@ -168,4 +168,215 @@
   .label {
     @apply block text-sm font-medium text-slate-700 mb-1;
   }
+
+  .property-price-marker-wrap {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+  }
+
+  .property-price-marker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: max-content;
+    min-width: 92px;
+    max-width: 150px;
+    border: 2px solid #00a85a;
+    border-radius: 12px;
+    background: #fff;
+    padding: 6px 10px 7px;
+    color: #082f63;
+    line-height: 1.12;
+    box-shadow: 0 3px 10px rgba(2, 24, 55, .2);
+    transition: transform .12s ease, background-color .12s ease, color .12s ease, box-shadow .12s ease;
+    transform-origin: 50% 100%;
+  }
+
+  .property-price-marker::after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    left: calc(50% - 5px);
+    width: 10px;
+    height: 10px;
+    rotate: 45deg;
+    background: inherit;
+    border-right: 2px solid #00a85a;
+    border-bottom: 2px solid #00a85a;
+  }
+
+  .property-marker-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .property-price-marker strong {
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .property-price-marker small {
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 650;
+    color: #475569;
+    white-space: nowrap;
+  }
+
+  .property-price-marker.is-compact:not(.is-selected) {
+    min-width: 0;
+    padding-inline: 9px;
+  }
+
+  .property-price-marker.is-compact:not(.is-selected) small {
+    display: none;
+  }
+
+  .property-marker-verified {
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
+    border-radius: 999px;
+    background: #00a85a;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .property-price-marker.is-approximate {
+    border-style: dashed;
+  }
+
+  .property-price-marker.is-approximate::before {
+    content: "≈";
+    position: absolute;
+    left: -8px;
+    top: -8px;
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    border: 2px solid white;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: white;
+    font-size: 11px;
+    font-weight: 900;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, .2);
+  }
+
+  .property-price-marker.is-approximate::after {
+    bottom: -8px;
+    left: calc(50% - 6px);
+    width: 12px;
+    height: 12px;
+    rotate: 0deg;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #f59e0b;
+  }
+
+  .property-price-marker.is-sold {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #64748b;
+    opacity: .82;
+  }
+
+  .property-price-marker.is-sold::after {
+    border-color: #cbd5e1;
+  }
+
+  .property-price-marker.is-sold strong::before {
+    content: "ขายแล้ว · ";
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .property-price-marker.is-hovered,
+  .property-price-marker:hover {
+    z-index: 2;
+    background: #082f63;
+    color: #fff;
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 8px 20px rgba(2, 24, 55, .28);
+  }
+
+  .property-price-marker.is-hovered small,
+  .property-price-marker:hover small,
+  .property-price-marker.is-selected small {
+    color: rgba(255, 255, 255, .86);
+  }
+
+  .property-price-marker.is-selected {
+    z-index: 3;
+    border-color: #00a85a;
+    background: #082f63;
+    color: #fff;
+    transform: scale(1.08);
+    box-shadow: 0 0 0 4px rgba(0, 168, 90, .22), 0 9px 24px rgba(2, 24, 55, .32);
+  }
+
+  .property-price-marker.is-sold.is-hovered,
+  .property-price-marker.is-sold:hover,
+  .property-price-marker.is-sold.is-selected {
+    border-color: #94a3b8;
+    background: #475569;
+    color: #fff;
+    opacity: 1;
+  }
+
+  .property-price-marker.is-sold.is-selected {
+    box-shadow: 0 0 0 4px rgba(100, 116, 139, .22), 0 9px 24px rgba(2, 24, 55, .28);
+  }
+
+  .property-cluster-wrap {
+    background: transparent;
+    border: 0;
+  }
+
+  .property-cluster {
+    display: grid;
+    width: 50px;
+    height: 50px;
+    place-content: center;
+    border: 3px solid #fff;
+    border-radius: 999px;
+    background: #082f63;
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 168, 90, .28), 0 5px 14px rgba(2, 24, 55, .24);
+    text-align: center;
+  }
+
+  .property-cluster strong {
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .property-cluster small {
+    margin-top: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .property-price-marker {
+      transition: none;
+    }
+  }
+
+  .leaflet-container {
+    font-family: var(--font-sans);
+  }
 }

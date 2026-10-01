@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Users, ArrowRight } from "lucide-react";
 import { getDemandBySlug, getActiveDemands } from "@/lib/neon/queries";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
+import { LAND_TYPE_LABELS, formatUpdatedDate } from "@/lib/utils";
 import LineButton from "@/components/ui/LineButton";
 import JsonLd from "@/components/seo/JsonLd";
 
@@ -55,7 +55,14 @@ export default async function BuyerDemandDetailPage({ params }: { params: Promis
 
       <div className="max-w-2xl">
         <div className="flex items-center gap-2 mb-4">
-          <span className="badge bg-green-100 text-green-700 px-3 py-1">🔍 กำลังมองหา</span>
+          {demand.status === "active" ? (
+            <span className="badge bg-green-100 text-green-700 px-3 py-1">🔍 กำลังมองหา</span>
+          ) : (
+            <span className="badge bg-slate-200 text-slate-700 px-3 py-1">{demand.status === "matched" ? "จับคู่แล้ว" : "ปิดความต้องการแล้ว"}</span>
+          )}
+          {formatUpdatedDate(demand.created_at) && (
+            <span className="text-xs text-slate-400">ลงประกาศ {formatUpdatedDate(demand.created_at)}</span>
+          )}
           {demand.land_type && (
             <span className="badge bg-slate-100 text-slate-700 px-3 py-1">
               {LAND_TYPE_LABELS[demand.land_type]}

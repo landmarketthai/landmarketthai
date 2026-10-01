@@ -1,7 +1,7 @@
 import type { Land } from "@/lib/types/database";
 
-function proximity(a: number, b: number): number {
-  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0
+function proximity(a: number | null, b: number | null): number {
+  return a != null && b != null && Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0
     ? Math.min(a, b) / Math.max(a, b)
     : 0;
 }

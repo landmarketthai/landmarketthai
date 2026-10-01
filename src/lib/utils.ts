@@ -1,6 +1,7 @@
-import type { LandType, ZoningColor } from "./types/database";
+import type { Land, LandType, ZoningColor } from "./types/database";
 
 export const LAND_TYPE_LABELS: Record<LandType, string> = {
+  land: "ที่ดิน",
   industrial: "ที่ดินอุตสาหกรรม",
   eec: "EEC",
   factory: "โรงงาน",
@@ -45,6 +46,23 @@ export function formatMoney(n: number): string {
 
 export function formatMoneyFull(n: number): string {
   return `${n.toLocaleString("th-TH")} บาท`;
+}
+
+export function listingStatusLabel(land: Pick<Land, "status" | "transaction_type">): string {
+  if (land.status === "sold") return "ขายแล้ว";
+  if (land.status === "reserved") return "จองแล้ว";
+  if (land.status === "active") return "พร้อมขาย";
+  return land.status;
+}
+
+export function formatUpdatedDate(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 export function listingHref(publicRef: number, slug: string): string {

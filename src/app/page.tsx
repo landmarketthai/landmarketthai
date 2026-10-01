@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowRight, MapPin,
+  ArrowRight,
   BadgeDollarSign, BarChart3, Smartphone, Wallet, Target, Users,
   Shield, Search, Calendar, Clock,
   Wrench, Briefcase, Building2, Network,
@@ -15,12 +15,13 @@ import PropertyMapPreview from "@/components/listings/PropertyMapPreview";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getActiveDemands } from "@/lib/neon/queries";
+import { getActiveDemands, searchProperties } from "@/lib/neon/queries";
+import BuyerDemandList from "@/components/demand/BuyerDemandList";
+import HomePropertyMap from "@/components/search/HomePropertyMap";
 import {
   resolveListingPresentation,
   sortSeedListings,
 } from "@/lib/seed-listings";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
 import { getPublicInventory } from "@/lib/public-inventory";
 
 export const revalidate = 3600;
@@ -83,21 +84,15 @@ const trustItems: { Icon: LucideIcon; label: string }[] = [
   { Icon: Shield,       label: "ปลอดภัย\nเชื่อถือได้" },
   { Icon: Search,       label: "ตรวจสอบข้อมูล\nก่อนเผยแพร่" },
   { Icon: Users,        label: "มีทีมงานมืออาชีพ\nช่วยปิดดีล" },
-  { Icon: Calendar,     label: "ข้อมูลอัปเดต\nทุกวัน" },
-  { Icon: Clock,        label: "ปิดดีลไว\nตรวจสอบ 100%" },
-];
-
-const fallbackDemands = [
-  { province: "ระยอง",         type: "อุตสาหกรรม",  size: "50–100 ไร่", note: "ใกล้นิคมอุตสาหกรรม สำหรับโรงงานผลิต",         ago: "2 ชม. ที่แล้ว" },
-  { province: "ชลบุรี",        type: "โลจิสติกส์",  size: "20–50 ไร่",  note: "ใกล้ท่าเรือแหลมฉบัง สำหรับคลังสินค้า",         ago: "4 ชม. ที่แล้ว" },
-  { province: "สมุทรปราการ",  type: "ศูนย์ข้อมูล", size: "30–80 ไร่",  note: "บางนา-เทพารักษ์ สำหรับศูนย์ข้อมูล",              ago: "1 วัน ที่แล้ว" },
-  { province: "อยุธยา",        type: "อุตสาหกรรม",  size: "100+ ไร่",   note: "ใกล้นิคมบางปะอิน สำหรับโรงงาน",                 ago: "1 วัน ที่แล้ว" },
+  { Icon: Calendar,     label: "แสดงวันที่อัปเดต\nทุกประกาศ" },
+  { Icon: Clock,        label: "บอกชัดว่า\nตรวจสอบอะไรแล้ว" },
 ];
 
 export default async function HomePage() {
-  const [demands, inventory] = await Promise.all([
+  const [buyerDemands, inventory, mapProperties] = await Promise.all([
     getActiveDemands(4).catch(() => []),
     getPublicInventory().catch(() => []),
+    searchProperties({ limit: 100 }).catch(() => []),
   ]);
 
   const sortedListings = sortSeedListings(inventory.filter(land => land.is_featured || land.status === "sold")).slice(0, 6);
@@ -276,12 +271,19 @@ export default async function HomePage() {
       {/* ── 2. TRUST STRIP ───────────────────────────────────────────────── */}
       <TrustStrip />
 
+      {/* ── 3. MAP-FIRST PROPERTY SEARCH ───────────────────────────────── */}
+      <section id="property-map" className="bg-[#eef2f9] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <div className="container-xl">
+          <HomePropertyMap properties={mapProperties} />
+        </div>
+      </section>
+
       {/* ── 3. FEATURED LISTINGS ─────────────────────────────────────────── */}
       <section id="featured-listings" className="bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl">
           <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
             <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
-              ที่ดินแนะนำ <b className="text-[#2f9e44]">อัปเดตทุกวัน</b>
+              ที่ดิน<b className="text-[#2f9e44]">แนะนำ</b>
             </h2>
             <Link
               href="/land"
@@ -305,6 +307,24 @@ export default async function HomePage() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* ── BUYER DEMAND (same buyer_demand source as /buyer-demand) ─────── */}
+      <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
+        <div className="container-xl">
+          <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
+            <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
+              ผู้ซื้อ<b className="text-[#2f9e44]">กำลังมองหา</b>
+            </h2>
+            <Link href="/buyer-demand" className="text-sm font-semibold text-blue-700 hover:underline sm:absolute sm:right-0 sm:bottom-1">
+              ดูทั้งหมด ›
+            </Link>
+          </div>
+          <BuyerDemandList
+            demands={buyerDemands}
+            emptyAction={<Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>}
+          />
         </div>
       </section>
 
@@ -386,90 +406,6 @@ export default async function HomePage() {
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5. BUYER DEMAND ──────────────────────────────────────────────── */}
-      <section className="bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
-        <div className="container-xl">
-          <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
-            <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
-              ความต้องการที่ดิน <b className="text-[#2f9e44]">(ผู้ซื้อกำลังหา)</b>
-            </h2>
-            <Link
-              href="/buyer-demand"
-              className="text-sm font-semibold text-blue-700 hover:underline sm:absolute sm:right-0 sm:bottom-1"
-            >
-              ดูทั้งหมด ›
-            </Link>
-          </div>
-
-          <p className="mx-auto mb-7 max-w-2xl text-center text-sm leading-relaxed text-slate-600 sm:text-base">
-            ทีมงานกำลังคัดเลือกที่ดินให้ผู้ซื้อและนักลงทุนตามเงื่อนไขด้านล่าง
-            หากมีที่ดินตรงหรือใกล้เคียง ส่งข้อมูลให้ทีมตรวจสอบได้
-          </p>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {demands.length > 0
-              ? demands.slice(0, 4).map((d) => (
-                  <Link
-                    key={d.id}
-                    href={`/buyer-demand/${d.slug}`}
-                    className="min-h-32 rounded-[18px] p-4 pb-5 transition-shadow hover:shadow-md"
-                    style={{ background: "#fdf3e5", border: "1px solid #f1ddbd" }}
-                  >
-                    <div className="flex min-w-0 items-center gap-1.5 text-[17px] font-bold text-[#0a2a63]">
-                      <MapPin size={16} className="text-[#2f9e44]" />
-                      <span className="truncate">{d.province?.name_th ?? "ทั่วไทย"}</span>
-                    </div>
-                    <div className="text-sm font-semibold text-slate-800 mt-2 mb-1.5">
-                      ต้องการที่ดิน{" "}
-                      {d.size_min_rai && d.size_max_rai
-                        ? `${d.size_min_rai}–${d.size_max_rai} ไร่`
-                        : d.size_min_rai
-                        ? `${d.size_min_rai}+ ไร่`
-                        : "ทุกขนาด"}
-                    </div>
-                    {d.budget_note && (
-                      <div className="text-xs text-slate-500 leading-relaxed">{d.budget_note}</div>
-                    )}
-                    {d.land_type && (
-                      <div className="mt-3 text-xs text-[#2a8a3c] font-semibold">
-                        {LAND_TYPE_LABELS[d.land_type]}
-                      </div>
-                    )}
-                  </Link>
-                ))
-              : fallbackDemands.map((d) => (
-                  <div
-                    key={d.province}
-                    className="min-h-32 rounded-[18px] p-4 pb-5"
-                    style={{ background: "#fdf3e5", border: "1px solid #f1ddbd" }}
-                  >
-                    <div className="flex min-w-0 items-center gap-1.5 text-[17px] font-bold text-[#0a2a63]">
-                      <MapPin size={16} className="text-[#2f9e44]" />
-                      <span className="truncate">{d.province}</span>
-                    </div>
-                    <div className="text-sm font-semibold text-slate-800 mt-2 mb-1.5">
-                      ต้องการที่ดิน {d.size}
-                    </div>
-                    <div className="text-xs text-slate-500 leading-relaxed">{d.note}</div>
-                    <div className="mt-3 text-xs text-[#2a8a3c] font-semibold">
-                      อัปเดต {d.ago}
-                    </div>
-                  </div>
-                ))}
-
-          </div>
-
-          <div className="mt-8 flex flex-col items-center gap-2 text-center">
-            <Link href="/submit-land" className="btn-green px-8 text-sm">
-              ส่งที่ดินให้ทีมประเมิน
-            </Link>
-            <p className="text-xs text-slate-500">
-              ใช้เวลาแจ้งข้อมูลเบื้องต้นไม่กี่นาที
-            </p>
           </div>
         </div>
       </section>

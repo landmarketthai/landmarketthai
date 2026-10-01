@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const typeName = LAND_TYPE_LABELS[landType];
   return {
     title: `${typeName}${province.name_th} – ที่ดิน ${province.name_en} ${typeName}`,
-    description: `${typeName}ใน${province.name_th} EEC ราคาต่อไร่ ตรวจสอบเอกสารสิทธิ์แล้ว ติดต่อผ่าน LINE`,
+    description: `${typeName}ใน${province.name_th} EEC ราคาต่อไร่ ทีมงานตรวจสอบประกาศก่อนเผยแพร่ ติดต่อผ่าน LINE`,
     alternates: { canonical: `/land/${slug}/${type}` },
   };
 }
@@ -76,7 +76,7 @@ export default async function ProvinceTypePage({
           </nav>
           <h1 className="text-2xl font-bold">{typeName}{province.name_th}</h1>
           <p className="text-slate-400 text-sm mt-1">
-            {typeName}ใน{province.name_th} ตรวจสอบเอกสารสิทธิ์แล้ว ราคาต่อไร่โปร่งใส
+            {typeName}ใน{province.name_th} ราคาต่อไร่โปร่งใส ทีมงานตรวจสอบประกาศก่อนเผยแพร่
           </p>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default async function ProvinceTypePage({
       <div className="container-xl section">
         <div className="prose prose-slate text-sm max-w-none mb-8 p-5 bg-slate-50 rounded-xl">
           <p>
-            <strong>{typeName}{province.name_th}</strong> – LandmarketThai รวบรวมที่ดินที่ผ่านการตรวจสอบ
+            <strong>{typeName}{province.name_th}</strong> – LandmarketThai รวบรวมประกาศที่ดินที่ทีมงานตรวจสอบก่อนเผยแพร่
             จากเครือข่ายพาร์ทเนอร์กว่า 200 รายทั่วภูมิภาค ทีมผู้เชี่ยวชาญพร้อมให้ข้อมูลและจัดเยี่ยมชม
             พื้นที่โดยไม่มีค่าใช้จ่าย
           </p>

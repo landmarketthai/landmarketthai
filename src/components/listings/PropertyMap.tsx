@@ -57,7 +57,7 @@ export default function PropertyMap({ listings, selectedId, onSelect, className 
         link.className = "font-bold text-blue-800 underline";
         popup.append(link);
         const summary = document.createElement("p");
-        summary.textContent = `${formatMoney(land.price_per_rai)} บาท/ไร่ · ${LISTING_STATUS_LABELS[land.status]} · อัปเดต ${listingUpdatedLabel(land.updated_at)}`;
+        summary.textContent = `${land.price_per_rai == null ? "ยังไม่ระบุราคา" : `${formatMoney(land.price_per_rai)} บาท/ไร่`} · ${LISTING_STATUS_LABELS[land.status]} · อัปเดต ${listingUpdatedLabel(land.updated_at)}`;
         popup.append(summary);
         const precision = document.createElement("p");
         precision.textContent = land.location_precision === "approx" ? "ตำแหน่งโดยประมาณ" : "พิกัดแปลง";

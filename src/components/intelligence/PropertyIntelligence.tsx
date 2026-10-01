@@ -21,7 +21,7 @@ export function PropertyIntelligence({ land, inventory }: { land: Land; inventor
     <p className="text-xs text-slate-500">เฉพาะประกาศที่เปิดขายของ LandmarketThai ในจังหวัดและประเภทเดียวกัน · ราคาตั้งขาย ไม่ใช่ราคาซื้อขายจริงหรือราคาประเมินตลาด · {comparables.listingCount} ตัวอย่าง</p>
     {comparables.comparables.length === 0 ? <p className="text-sm text-slate-500">ยังไม่มีประกาศเปรียบเทียบเพียงพอ</p> : <ul className="space-y-2">{comparables.comparables.map(({ land: comparable }) => <li key={comparable.id}>
       <Link className="text-sm font-medium text-brand-600 hover:underline" href={resolveListingPresentation(comparable).hrefOverride ?? listingHref(comparable.public_ref, comparable.slug)}>{comparable.title_th}</Link>
-      <p className="text-xs text-slate-500">{formatMoneyFull(comparable.price_per_rai)} ต่อไร่</p>
+      <p className="text-xs text-slate-500">{comparable.price_per_rai == null ? "ยังไม่ระบุราคา" : `${formatMoneyFull(comparable.price_per_rai)} ต่อไร่`}</p>
     </li>)}</ul>}
   </section>;
 }

@@ -22,6 +22,8 @@ import PropertyVideos from "@/components/properties/PropertyVideos";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
 import ListingTrust from "@/components/listings/ListingTrust";
+import VerificationChecklist from "@/components/listings/VerificationChecklist";
+import { landVerification } from "@/lib/marketplace/verification";
 import VerificationBadges from "@/components/listings/VerificationBadges";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
 import { getPublicInventory } from "@/lib/public-inventory";
@@ -176,6 +178,7 @@ export default async function PropertyDetailPage({
             {land && <>
               <ListingTrust land={land} />
               <VerificationBadges land={land} />
+              <VerificationChecklist dimensions={landVerification(land)} />
               {inventory ? <PropertyIntelligence land={land} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}
             </>}
 
@@ -294,7 +297,7 @@ export default async function PropertyDetailPage({
                       className="w-full text-sm"
                     />
 
-                    <LeadForm compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
+                    <LeadForm listingId={land?.id} compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
 
                     <div className="grid gap-2 border-t border-slate-100 pt-4">
                       <Link href="/contact" className="btn-outline w-full text-sm">
