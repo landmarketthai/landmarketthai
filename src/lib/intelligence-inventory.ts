@@ -1,6 +1,4 @@
-import { getSupabasePublicConfig } from "@/lib/supabase/env";
-import { getPublicListings } from "@/lib/supabase/queries";
-import { SEED_ACTIVE_LISTINGS } from "@/lib/seed-listings";
+import { getPublicInventory } from "@/lib/public-inventory";
 import type { Land } from "@/lib/types/database";
 
 export interface IntelligenceInventory {
@@ -9,9 +7,8 @@ export interface IntelligenceInventory {
 }
 
 /** DB errors propagate: a failed live load must not become an apparently current seed report. */
-export async function loadIntelligenceInventory(readListings = getPublicListings): Promise<IntelligenceInventory> {
-  if (!getSupabasePublicConfig()) return { lands: [...SEED_ACTIVE_LISTINGS], source: "repository" };
+export async function loadIntelligenceInventory(readListings = getPublicInventory): Promise<IntelligenceInventory> {
   const lands = (await readListings()).filter((land) => land.status === "active" && !land.deleted_at);
   // No seed merge: a configured database owns active/reserved/sold status.
-  return { lands, source: "database" };
+  return { lands, source: process.env.DATABASE_URL?.trim() ? "database" : "repository" };
 }

@@ -1,5 +1,5 @@
 import type { Land, LandType, ZoningColor } from "@/lib/types/database";
-import { LAND_TYPE_LABELS, ZONING_LABELS, slugToLandType } from "@/lib/utils";
+import { ZONING_LABELS, slugToLandType } from "@/lib/utils";
 
 export interface LandFilters {
   province_slug?: string;
@@ -92,30 +92,4 @@ export function matchesLandFilters(land: Land, filters: LandFilters = {}): boole
     && (filters.price_max === undefined || land.price_per_rai <= filters.price_max)
     && (!filters.zoning || land.zoning === filters.zoning)
     && (filters.is_eec === undefined || land.is_eec === filters.is_eec);
-}
-
-// Escape regex syntax and quote PostgREST values for a literal substring match.
-// imatch avoids PostgREST treating a user-entered '*' as a LIKE wildcard.
-export function landTextFilter(text: string): string {
-  const pattern = text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  return ["title_th", "district", "description"].map(field => `${field}.imatch."${pattern}"`).join(",");
-}
-
-export function applyLandFilters<T extends {
-  eq(column: string, value: string | boolean): T;
-  gte(column: string, value: number): T;
-  lte(column: string, value: number): T;
-  or(filter: string): T;
-}>(query: T, filters: LandFilters): T {
-  if (filters.province_slug) query = query.eq("province.slug", filters.province_slug);
-  if (filters.land_type === "eec") query = query.or("land_type.eq.eec,is_eec.eq.true");
-  else if (filters.land_type && Object.hasOwn(LAND_TYPE_LABELS, filters.land_type)) query = query.eq("land_type", filters.land_type);
-  if (filters.q) query = query.or(landTextFilter(filters.q));
-  if (filters.size_min !== undefined) query = query.gte("size_rai", filters.size_min);
-  if (filters.size_max !== undefined) query = query.lte("size_rai", filters.size_max);
-  if (filters.price_min !== undefined) query = query.gte("price_per_rai", filters.price_min);
-  if (filters.price_max !== undefined) query = query.lte("price_per_rai", filters.price_max);
-  if (filters.zoning) query = query.eq("zoning", filters.zoning);
-  if (filters.is_eec !== undefined) query = query.eq("is_eec", filters.is_eec);
-  return query;
 }

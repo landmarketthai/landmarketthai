@@ -168,6 +168,7 @@ export const SEED_PUBLIC_LISTINGS: Land[] = [
   SEED_109_RAI_LAND,
 ];
 
+export const SEED_ACTIVE_LISTINGS = SEED_PUBLIC_LISTINGS.filter((land) => land.status === "active");
 export const SEED_SOLD_SLUGS = new Set<string>([SEED_109_RAI_SLUG]);
 
 export const SEED_LISTING_IMAGES = {

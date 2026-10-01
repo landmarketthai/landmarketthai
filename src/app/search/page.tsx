@@ -28,6 +28,7 @@ export default async function SearchPage({ searchParams }: {
     <div className="container-xl section">
       <h1 className="mb-2 text-2xl font-bold text-brand-900">{filters.history === "1" ? "ประวัติดีลที่ปิดแล้ว" : "ค้นหาทรัพย์พร้อมแผนที่"}</h1>
       <p className="mb-6 text-sm text-slate-600">{filters.history === "1" ? "แสดงเฉพาะทรัพย์ที่ปิดดีลแล้ว" : "แสดงทรัพย์เปิดขาย"} พร้อมสถานะและวันที่อัปเดตล่าสุด</p>
+      <p className="mb-4 text-sm"><Link href="/search?history=1" className="text-blue-700 underline">ดูประวัติแปลงที่ขายแล้ว</Link></p>
       <form action="/search" method="get" className="mb-6 grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm">ทำเล / ชื่อแปลง<input name="q" defaultValue={filters.q} className="input mt-1" placeholder="จังหวัด อำเภอ นิคม" /></label>
         <label className="text-sm">จังหวัด<select name="province" defaultValue={filters.province ?? ""} className="input mt-1">

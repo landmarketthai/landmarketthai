@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyLandFilters, landSearchParams, landTextFilter, matchesLandFilters, parseLandPage, parseLandSearchParams } from "./land-search.ts";
+import { landSearchParams, matchesLandFilters, parseLandPage, parseLandSearchParams } from "./land-search.ts";
 import { SEED_37_RAI_LAND, SEED_101_KABIN_LAND } from "./seed-listings.ts";
 import { searchProperties } from "./property-search.ts";
 
@@ -27,17 +27,17 @@ test("malformed URLs fail rather than broadening results", () => {
 });
 
 test("curated fallback uses every server criterion with inclusive decimal bounds", () => {
-  const matching = parseLandSearchParams({ province: "rayong", type: "industrial", q: "EEC", min_size: "37", max_size: "37", min_price: "2300000", max_price: "2300000", zoning: "purple", eec: "true" });
+  const matching = parseLandSearchParams({ province: "rayong", type: "industrial", q: "EEC", min_size: "36.91825", max_size: "36.91825", min_price: "2300000", max_price: "2300000", zoning: "purple", eec: "true" });
   assert.ok(matchesLandFilters(SEED_37_RAI_LAND, matching));
   assert.equal(matchesLandFilters(SEED_101_KABIN_LAND, matching), false);
-  for (const input of [{ max_size: "36.99" }, { min_price: "2300000.01" }, { eec: "false" }, { zoning: "green" }, { q: "%" }]) {
+  for (const input of [{ max_size: "36.91824" }, { min_price: "2300000.01" }, { eec: "false" }, { zoning: "green" }, { q: "%" }]) {
     assert.equal(matchesLandFilters(SEED_37_RAI_LAND, parseLandSearchParams(input)), false);
   }
   assert.ok(matchesLandFilters(SEED_37_RAI_LAND, { land_type: "eec" }));
 });
 
 test("advanced listing filters preserve active-only inventory before pagination", () => {
-  const filters = parseLandSearchParams({ province: "rayong", type: "eec", q: "EEC", min_size: "37", max_size: "37", min_price: "2300000", max_price: "2300000", zoning: "purple", eec: "true" });
+  const filters = parseLandSearchParams({ province: "rayong", type: "eec", q: "EEC", min_size: "36.91825", max_size: "36.91825", min_price: "2300000", max_price: "2300000", zoning: "purple", eec: "true" });
   const rows = ["reserved", "sold", "draft", "archived", "active"].map(status => ({
     ...SEED_37_RAI_LAND, id: status, status: status as typeof SEED_37_RAI_LAND.status,
   }));
@@ -48,39 +48,7 @@ test("advanced listing filters preserve active-only inventory before pagination"
   assert.equal(results.length, 1);
 });
 
-test("all URL criteria become database filters before pagination", () => {
-  const calls: unknown[][] = [];
-  const query = {
-    eq: (column: string, value: string | boolean) => { calls.push(["eq", column, value]); return query; },
-    gte: (column: string, value: number) => { calls.push(["gte", column, value]); return query; },
-    lte: (column: string, value: number) => { calls.push(["lte", column, value]); return query; },
-    or: (value: string) => { calls.push(["or", value]); return query; },
-  };
-  applyLandFilters(query, parseLandSearchParams({ province: "rayong", type: "eec", q: "factory", min_size: "0", max_size: "37", min_price: "0", max_price: "2300000", zoning: "purple", eec: "false" }));
-  assert.deepEqual(calls, [
-    ["eq", "province.slug", "rayong"], ["or", "land_type.eq.eec,is_eec.eq.true"],
-    ["or", 'title_th.imatch."factory",district.imatch."factory",description.imatch."factory"'],
-    ["gte", "size_rai", 0], ["lte", "size_rai", 37],
-    ["gte", "price_per_rai", 0], ["lte", "price_per_rai", 2300000],
-    ["eq", "zoning", "purple"], ["eq", "is_eec", false],
-  ]);
-});
-
 test("small native numeric inputs survive saved URLs and pagination", () => {
   const filters = parseLandSearchParams({ min_size: "0.0000001" });
   assert.deepEqual(parseLandSearchParams(Object.fromEntries(landSearchParams(filters))), filters);
-});
-
-test("PostgREST text values quote injection syntax and escape regex metacharacters", () => {
-  const text = 'x%_*\\"),status.eq.draft';
-  const filter = landTextFilter(text);
-  const clauses = filter.match(/(?:title_th|district|description)\.imatch\."((?:\\.|[^"\\])*)"/g)!;
-  assert.equal(clauses.length, 3);
-  for (const clause of clauses) {
-    const encoded = clause.slice(clause.indexOf('.imatch."') + 9, -1);
-    const pattern = encoded.replace(/\\([\\"])/g, "$1");
-    const matcher = new RegExp(pattern, "i");
-    assert.ok(matcher.test(`before ${text} after`));
-    assert.equal(matcher.test("anything status=active"), false);
-  }
 });

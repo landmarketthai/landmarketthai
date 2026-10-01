@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { landSearchParams, parseLandSearchParams } from "@/lib/land-search";
 
-export const SAVED_SEARCH_ALERT_NOTICE = "บันทึกความสนใจรับแจ้งเตือนไว้เท่านั้น ขณะนี้ยังไม่มีการส่งอีเมลหรือ LINE อัตโนมัติ เปิดผลการค้นหาเพื่อดูประกาศล่าสุด";
+export const SAVED_SEARCH_ALERT_NOTICE = "บันทึกตัวกรองและความสนใจเฉพาะในเบราว์เซอร์นี้ ไม่ซิงก์ข้ามอุปกรณ์ ขณะนี้ยังไม่มีการส่งอีเมลหรือ LINE อัตโนมัติ เปิดผลการค้นหาเพื่อดูประกาศล่าสุด";
 
 export interface SavedSearch {
   id: string;
@@ -50,4 +50,25 @@ export function parseSavedSearch(input: unknown) {
   const canonical = landSearchParams(filters);
   canonical.delete("page");
   return { ...value, search_params: canonical.toString() };
+}
+
+const STORAGE_KEY = "landmarketthai.saved-searches.v1";
+const storedSearchSchema = saveSchema.extend({ id: z.uuid(), created_at: z.iso.datetime() });
+
+export function readSavedSearches(storage: Pick<Storage, "getItem"> = localStorage): SavedSearch[] {
+  const items = z.array(storedSearchSchema).parse(JSON.parse(storage.getItem(STORAGE_KEY) ?? "[]"));
+  return items.map(({ id, created_at, ...input }) => ({ ...parseSavedSearch(input), id, created_at }));
+}
+
+export function writeSavedSearches(items: SavedSearch[], storage: Pick<Storage, "setItem"> = localStorage): void {
+  const validated = z.array(storedSearchSchema).parse(items);
+  storage.setItem(STORAGE_KEY, JSON.stringify(validated.map(({ id, created_at, ...input }) => ({ ...parseSavedSearch(input), id, created_at }))));
+}
+
+export function saveBrowserSearch(input: unknown, storage: Pick<Storage, "getItem" | "setItem"> = localStorage): void {
+  const value = parseSavedSearch(input);
+  const items = readSavedSearches(storage);
+  const existing = items.find(item => item.search_params === value.search_params);
+  const saved = { ...value, id: existing?.id ?? crypto.randomUUID(), created_at: existing?.created_at ?? new Date().toISOString() };
+  writeSavedSearches([saved, ...items.filter(item => item.id !== saved.id)], storage);
 }

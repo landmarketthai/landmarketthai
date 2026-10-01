@@ -54,7 +54,6 @@ export const propertyDetails: PropertyDetail[] = [
     soldOut: true,
     frontage: "ประมาณ 240 เมตร",
     access: "เข้าออกได้ 2 ทาง",
-    status: "Sold out",
     nearby: ["WHA", "BYD"],
     heroImage: {
       src: "/images/listings/109-rai-home-thumbnail.png",

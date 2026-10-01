@@ -5,7 +5,7 @@ import ListingGrid from "@/components/listings/ListingGrid";
 import ListingGridSkeleton from "@/components/listings/ListingGridSkeleton";
 import FilterBar from "@/components/listings/FilterBar";
 import { parseLandSearchParams, parseLandPage, type LandSearchInput } from "@/lib/land-search";
-import { getAllProvinces } from "@/lib/supabase/queries";
+import { getAllProvinces } from "@/lib/neon/queries";
 import { SEED_ACTIVE_LISTINGS } from "@/lib/seed-listings";
 import SaveSearchForm from "@/components/listings/SaveSearchForm";
 
@@ -53,7 +53,8 @@ async function ListingGridWrapper({
   catch (error) {
     return <div className="container-xl section"><p role="alert">{error instanceof Error ? error.message : "Invalid filters"}</p><Link href="/land" className="underline">ล้างตัวกรอง</Link></div>;
   }
-  const provinces = await getAllProvinces().catch(() => SEED_ACTIVE_LISTINGS.map(land => land.province!));
+  const dbProvinces = await getAllProvinces().catch(() => []);
+  const provinces = dbProvinces.length ? dbProvinces : SEED_ACTIVE_LISTINGS.map(land => land.province!);
   return (
     <div className="container-xl section">
       <FilterBar key={JSON.stringify(filters)} filters={filters} provinces={provinces} />

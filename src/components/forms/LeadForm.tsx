@@ -4,6 +4,8 @@ import { useState } from "react";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
+import { LAND_TYPE_LABELS } from "@/lib/utils";
+import { THAI_PROVINCES } from "@/lib/constants/provinces";
 
 type LeadType = "buyer" | "partner" | "owner";
 type FieldErrors = Record<string, string[]>;
@@ -41,6 +43,12 @@ export default function LeadForm({
     if (data._hp) { setState("success"); return; }
 
     const payload = {
+      ...(defaultType === "buyer" && !compact ? {
+        province: data.province || undefined,
+        land_type: data.land_type || undefined,
+        intended_use: data.intended_use || undefined,
+        ...Object.fromEntries(["size_min_rai", "size_max_rai", "budget_min", "budget_max"].map(key => [key, data[key] ? Number(data[key]) : undefined])),
+      } : {}),
       lead_type: defaultType,
       name: data.name,
       phone: data.phone,
@@ -152,6 +160,21 @@ export default function LeadForm({
         />
         <FieldError id="err-lead-line" errors={fieldErrors.line_id} />
       </div>
+
+      {defaultType === "buyer" && !compact && <>
+        <label className="label">จังหวัด
+          <select name="province" className="input mt-1" disabled={isLoading}><option value="">ทุกจังหวัด</option>{THAI_PROVINCES.map(province => <option key={province} value={province}>{province}</option>)}</select>
+        </label>
+        <label className="label">ประเภทที่ดิน
+          <select name="land_type" className="input mt-1" disabled={isLoading}><option value="">ทุกประเภท</option>{Object.entries(LAND_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        </label>
+        {([["size_min_rai", "ขนาดขั้นต่ำ (ไร่)"], ["size_max_rai", "ขนาดสูงสุด (ไร่)"], ["budget_min", "งบประมาณรวมขั้นต่ำ (บาท)"], ["budget_max", "งบประมาณรวมสูงสุด (บาท)"]] as const).map(([name, label]) => <div key={name}>
+          <label className="label" htmlFor={`lead-${name}`}>{label}</label>
+          <input id={`lead-${name}`} name={name} type="number" min="0" step="any" max="1000000000000" className="input" disabled={isLoading} aria-describedby={fieldErrors[name]?.length ? `err-${name}` : undefined} />
+          <FieldError id={`err-${name}`} errors={fieldErrors[name]} />
+        </div>)}
+        <label className="label">การใช้ประโยชน์ที่ต้องการ<input name="intended_use" maxLength={500} className="input mt-1" disabled={isLoading} /></label>
+      </>}
 
       <div>
         <label className="flex cursor-pointer items-start gap-3 rounded-lg py-1 text-xs leading-relaxed text-slate-600">

@@ -1,4 +1,33 @@
 import { z } from "zod";
+import { LAND_TYPE_LABELS, ZONING_LABELS } from "@/lib/utils";
+import { LOCATION_ANCHORS } from "@/lib/location-intelligence";
+
+export const buyerRequirementsSchema = z.object({
+  province: z.string().trim().min(1).max(80).optional(),
+  land_type: z.enum(Object.keys(LAND_TYPE_LABELS) as [string, ...string[]]).optional(),
+  size_min_rai: z.number().nonnegative().max(1e12).optional(),
+  size_max_rai: z.number().nonnegative().max(1e12).optional(),
+  budget_min: z.number().nonnegative().max(1e12).optional(),
+  budget_max: z.number().nonnegative().max(1e12).optional(),
+  zoning: z.enum(Object.keys(ZONING_LABELS) as [string, ...string[]]).optional(),
+  is_eec: z.boolean().optional(),
+  frontage_min_m: z.number().nonnegative().max(1e12).optional(),
+  anchor_id: z.enum(LOCATION_ANCHORS.map(anchor => anchor.id) as [string, ...string[]]).optional(),
+  distance_max_km: z.number().nonnegative().max(1e12).optional(),
+  intended_use: z.string().trim().max(500).optional(),
+  listing_id: z.string().trim().min(1).max(200).optional(),
+}).superRefine((value, context) => {
+  for (const [min, max] of [["size_min_rai", "size_max_rai"], ["budget_min", "budget_max"]] as const) {
+    if (value[min] !== undefined && value[max] !== undefined && value[min] > value[max]) {
+      context.addIssue({ code: "custom", path: [max], message: "ค่าสูงสุดต้องไม่น้อยกว่าค่าต่ำสุด" });
+    }
+  }
+  if ((value.anchor_id === undefined) !== (value.distance_max_km === undefined)) {
+    context.addIssue({ code: "custom", path: ["distance_max_km"], message: "ระบุจุดอ้างอิงและระยะทางร่วมกัน" });
+  }
+});
+
+export type BuyerRequirements = z.infer<typeof buyerRequirementsSchema>;
 
 const thaiPhone = z
   .string()
@@ -9,16 +38,11 @@ const consentPdpa = z
   .boolean()
   .refine((v) => v === true, "กรุณายอมรับนโยบายความเป็นส่วนตัว");
 
-export const buyerLeadSchema = z.object({
+export const buyerLeadSchema = buyerRequirementsSchema.safeExtend({
   name: z.string().min(2, "กรุณากรอกชื่อ"),
   phone: thaiPhone,
   line_id: z.string().optional(),
-  province: z.string().optional(),
-  land_type: z.string().optional(),
-  budget_min: z.number().optional(),
-  budget_max: z.number().optional(),
   notes: z.string().optional(),
-  listing_id: z.string().optional(),
   referral_code: z.string().optional(),
   consent_pdpa: consentPdpa,
   source: z.string().optional(),

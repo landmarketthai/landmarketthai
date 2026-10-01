@@ -1,9 +1,9 @@
 import Link from "next/link";
 import ListingCard from "./ListingCard";
 import LineButton from "@/components/ui/LineButton";
-import { getPublicListings } from "@/lib/neon/queries";
+import { getPublicInventory } from "@/lib/public-inventory";
+import { matchesLandFilters, landSearchParams, type LandFilters } from "@/lib/land-search";
 import {
-  mergeWithSeedListings,
   resolveListingPresentation,
 } from "@/lib/seed-listings";
 import { slugToLandType } from "@/lib/utils";
@@ -15,14 +15,15 @@ interface Props {
   landType?: string;
   page?: number;
   basePath?: string;
+  filters?: LandFilters;
 }
 
-export default async function ListingGrid({ provinceSlug, landType, page = 1, basePath = "/land" }: Props) {
+export default async function ListingGrid({ provinceSlug, landType, filters, page = 1, basePath = "/land" }: Props) {
   const offset = (page - 1) * PAGE_SIZE;
   const type = landType ? slugToLandType(landType) : undefined;
 
   function pageHref(targetPage: number): string {
-    const params = new URLSearchParams();
+    const params = landSearchParams(filters ?? {});
     if (basePath === "/land") {
       if (provinceSlug) params.set("province", provinceSlug);
       if (landType) params.set("type", landType);
@@ -32,21 +33,12 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
     return qs ? `${basePath}?${qs}` : basePath;
   }
 
-  const dbListings = await getPublicListings({
-    province_slug: provinceSlug,
-    land_type: type ?? undefined,
-    limit: PAGE_SIZE,
-    offset,
-  }).catch(() => []);
-
-  // Seed fallback listings only join page 1 — appending them per-page would duplicate them
-  const listings =
-    page === 1
-      ? mergeWithSeedListings(dbListings, {
-          province_slug: provinceSlug,
-          land_type: type ?? undefined,
-        })
-      : dbListings;
+  const inventory = await getPublicInventory().catch(() => null);
+  if (!inventory) return <p role="alert" className="rounded-xl bg-amber-50 p-6">โหลดรายการไม่ได้ชั่วคราว กรุณาลองใหม่อีกครั้ง</p>;
+  const matches = inventory.filter((land) => land.status === "active" && !land.deleted_at &&
+    matchesLandFilters(land, { ...filters, province_slug: provinceSlug ?? filters?.province_slug, land_type: type ?? filters?.land_type }));
+  const listings = matches.slice(offset, offset + PAGE_SIZE);
+  const hasNext = matches.length > offset + PAGE_SIZE;
 
   if (listings.length === 0) {
     return (
@@ -55,7 +47,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
         <h2 className="mb-2 text-lg font-semibold text-slate-700">ยังไม่มีที่ดินในเงื่อนไขนี้</h2>
         <p className="mx-auto mb-6 max-w-sm text-sm text-slate-500">
           ทีมเราอาจมีที่ดินที่ยังไม่ได้ลงประกาศ ติดต่อผ่าน LINE เพื่อรับข้อมูลก่อนใคร
-          หรือลงทะเบียนเพื่อรับแจ้งเตือนเมื่อมีที่ดินใหม่
+          หรือบันทึกตัวกรองเพื่อกลับมาดูประกาศล่าสุด
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <LineButton label="สอบถามที่ดินผ่าน LINE" />
@@ -84,7 +76,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
         })}
       </div>
 
-      {(listings.length === PAGE_SIZE || page > 1) && (
+      {(hasNext || page > 1) && (
         <div className="mt-10 flex justify-center gap-2">
           {page > 1 && (
             <Link
@@ -94,7 +86,7 @@ export default async function ListingGrid({ provinceSlug, landType, page = 1, ba
               ← ก่อนหน้า
             </Link>
           )}
-          {listings.length === PAGE_SIZE && (
+          {hasNext && (
             <Link
               href={pageHref(page + 1)}
               className="btn-primary px-4 py-2 text-sm"

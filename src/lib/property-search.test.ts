@@ -16,12 +16,12 @@ test("active search excludes reserved, sold, draft, archived and deleted invento
 test("database sold/deleted seed rows are never resurrected as active seeds", () => {
   for (const change of [{ status: "sold" }, { status: "draft" }, { deleted_at: "2026-09-30" }]) {
     const row = { ...SEED_37_RAI_LAND, ...change } as Land;
-    assert.ok(!mergeWithSeedListings([row]).some((land) => land.slug === row.slug));
+    assert.ok(!searchProperties(mergeWithSeedListings([row])).some((land) => land.slug === row.slug));
   }
 });
 
 test("search combines Thai/English location terms, EEC, price and size boundaries", () => {
-  assert.deepEqual(searchProperties(SEED_ACTIVE_LISTINGS, { q: "rayong  EEC", type: "eec", min_price: "2300000", max_price: "2300000", min_size: "37", max_size: "37" }).map((land) => land.slug), [SEED_37_RAI_LAND.slug]);
+  assert.deepEqual(searchProperties(SEED_ACTIVE_LISTINGS, { q: "rayong  EEC", type: "eec", min_price: "2300000", max_price: "2300000", min_size: "36.91825", max_size: "36.91825" }).map((land) => land.slug), [SEED_37_RAI_LAND.slug]);
   assert.deepEqual(searchProperties(SEED_ACTIVE_LISTINGS, { q: "หนองกี่", province: "prachin-buri", property_type: "land" }).map((land) => land.slug), [SEED_101_KABIN_LAND.slug]);
   assert.deepEqual(searchProperties(SEED_ACTIVE_LISTINGS, { province: "rayong", min_size: "100" }), []);
   assert.deepEqual(searchProperties(SEED_ACTIVE_LISTINGS, { property_type: "warehouse" }), []);

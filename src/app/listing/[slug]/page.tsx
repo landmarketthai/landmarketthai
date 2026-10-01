@@ -6,11 +6,16 @@ import { MapPin, Ruler, Tag, Award, ChevronRight } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
 import ListingTrust from "@/components/listings/ListingTrust";
+import VerificationBadges from "@/components/listings/VerificationBadges";
+import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
+import { getPublicInventory } from "@/lib/public-inventory";
+import { rankSimilarProperties } from "@/lib/similar-properties";
+import { resolveListingPresentation } from "@/lib/seed-listings";
 import PropertyMapPreview from "@/components/listings/PropertyMapPreview";
 import ShareButton from "@/components/listings/ShareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import LeadForm from "@/components/forms/LeadForm";
-import { getListingByRef, getRelatedListings } from "@/lib/neon/queries";
+import { getListingByRef } from "@/lib/neon/queries";
 import { LAND_TYPE_LABELS, ZONING_LABELS, formatRai, formatMoney, formatMoneyFull, listingHref } from "@/lib/utils";
 
 export const revalidate = 3600;
@@ -48,7 +53,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
   const land = await getListingByRef(ref).catch(() => null);
   if (!land) notFound();
 
-  const related = await getRelatedListings(land, 3).catch(() => []);
+  const inventory = await getPublicInventory().catch(() => null);
+  const related = rankSimilarProperties(land, inventory ?? [], 3);
 
   const listingSchema = {
     "@context": "https://schema.org",
@@ -161,6 +167,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
           {/* Title */}
           <h1 className="text-2xl font-bold text-slate-900">{land.title_th}</h1>
           <ListingTrust land={land} />
+          <VerificationBadges land={land} />
 
           {/* Key facts grid */}
           {(() => {
@@ -223,6 +230,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
             <h2 className="mb-3 font-semibold text-slate-800">ตำแหน่งบนแผนที่</h2>
             <PropertyMapPreview listings={[land]} />
           </section>
+          {inventory ? <PropertyIntelligence land={land} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}
           {land.description && (
             <div>
               <h2 className="font-semibold text-slate-800 mb-3">รายละเอียด</h2>
@@ -265,7 +273,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
           <h2 className="text-xl font-bold text-slate-900 mb-6">ที่ดินใกล้เคียง</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {related.map((land) => (
-              <ListingCard key={land.id} land={land} />
+              <ListingCard key={land.id} land={land} {...resolveListingPresentation(land)} />
             ))}
           </div>
         </div>

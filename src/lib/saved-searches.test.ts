@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { isSameOriginMutation, parseSavedSearch, savedSearchUpdateSchema } from "@/lib/saved-searches";
+import { isSameOriginMutation, parseSavedSearch, savedSearchUpdateSchema, readSavedSearches, writeSavedSearches, saveBrowserSearch } from "@/lib/saved-searches";
 import { parseLandSearchParams } from "@/lib/land-search";
 
 test("saved searches preserve all filters and canonicalize equivalent URLs", () => {
@@ -39,15 +39,24 @@ test("saved search mutations check browser origin against the public proxy host"
   assert.equal(check({ "sec-fetch-site": "cross-site" }), false);
 });
 
-test("saved search storage enforces private reads, canonical uniqueness, and explicit consent", () => {
-  const sql = readFileSync(new URL("../../supabase/migrations/20260930010000_add_saved_searches.sql", import.meta.url), "utf8");
-  assert.match(sql, /enable row level security/i);
-  assert.match(sql, /revoke all on table public.saved_searches from anon, authenticated/i);
-  assert.match(sql, /for select to authenticated using \(\(select auth.uid\(\)\) = user_id\)/i);
-  assert.match(sql, /unique \(user_id, search_params\)/i);
-  assert.match(sql, /alert_requested = \(alert_requested_at is not null\)/i);
-  const route = readFileSync(new URL("../app/api/saved-searches/route.ts", import.meta.url), "utf8");
-  assert.match(route, /session.auth.getUser\(\)/);
-  assert.match(route, /user_id: user.id/);
-  assert.equal((route.match(/\.eq\("user_id", user.id\)/g) ?? []).length, 2);
+test("browser searches round trip, deduplicate canonical filters and preserve existing data on failure", () => {
+  const data = new Map<string, string>();
+  const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+  const input = { name: "Rayong", search_params: "province=rayong&min_size=36.91825", alert_requested: false };
+  saveBrowserSearch(input, storage);
+  const first = readSavedSearches(storage)[0];
+  saveBrowserSearch({ ...input, name: "Updated", search_params: "min_size=36.91825&province=rayong", alert_requested: true }, storage);
+  const items = readSavedSearches(storage);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].id, first.id);
+  assert.equal(items[0].name, "Updated");
+  assert.equal(items[0].alert_requested, true);
+  const before = [...data];
+  assert.throws(() => saveBrowserSearch({ ...input, search_params: "redirect=https://evil.test" }, storage));
+  assert.deepEqual([...data], before);
+  writeSavedSearches([], storage);
+  assert.deepEqual(readSavedSearches(storage), []);
+  storage.setItem([...data.keys()][0], "corrupt");
+  assert.throws(() => readSavedSearches(storage));
+  assert.throws(() => saveBrowserSearch(input, storage));
 });

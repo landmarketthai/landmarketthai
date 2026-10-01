@@ -11,16 +11,17 @@ import {
 import TrustStrip from "@/components/ui/TrustStrip";
 import MobileStickyCta from "@/components/ui/MobileStickyCta";
 import ListingCard from "@/components/listings/ListingCard";
+import PropertyMapPreview from "@/components/listings/PropertyMapPreview";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getFeaturedListings, getActiveDemands } from "@/lib/neon/queries";
+import { getActiveDemands } from "@/lib/neon/queries";
 import {
-  mergeWithSeedListings,
   resolveListingPresentation,
   sortSeedListings,
 } from "@/lib/seed-listings";
 import { LAND_TYPE_LABELS } from "@/lib/utils";
+import { getPublicInventory } from "@/lib/public-inventory";
 
 export const revalidate = 3600;
 
@@ -94,12 +95,12 @@ const fallbackDemands = [
 ];
 
 export default async function HomePage() {
-  const [featuredListings, demands] = await Promise.all([
-    getFeaturedListings(6).catch(() => []),
+  const [demands, inventory] = await Promise.all([
     getActiveDemands(4).catch(() => []),
+    getPublicInventory().catch(() => []),
   ]);
 
-  const sortedListings = sortSeedListings(mergeWithSeedListings(featuredListings));
+  const sortedListings = sortSeedListings(inventory.filter(land => land.is_featured || land.status === "sold")).slice(0, 6);
 
   const orgSchema = {
     "@context": "https://schema.org",
@@ -290,6 +291,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
+          <PropertyMapPreview listings={inventory.filter(land => land.status === "active")} />
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {sortedListings.map((land) => {
               const presentation = resolveListingPresentation(land);

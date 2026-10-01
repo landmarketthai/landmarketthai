@@ -46,6 +46,13 @@ export interface Province {
   lng: number | null;
 }
 
+export interface Agent {
+  id: string;
+  display_name: string;
+  verified_at?: string | null;
+  verified_by?: string | null;
+}
+
 export interface Land {
   id: string;
   public_ref: number;
@@ -76,6 +83,9 @@ export interface Land {
   // joined
   province?: Province;
   images?: LandImage[];
+  verified_at?: string | null;
+  verified_by?: string | null;
+  agent?: Agent | null;
 }
 
 export interface LandImage {

@@ -20,6 +20,13 @@ import LeadForm from "@/components/forms/LeadForm";
 import PropertyGallery from "@/components/properties/PropertyGallery";
 import PropertyVideos from "@/components/properties/PropertyVideos";
 import LineButton from "@/components/ui/LineButton";
+import ListingCard from "@/components/listings/ListingCard";
+import ListingTrust from "@/components/listings/ListingTrust";
+import VerificationBadges from "@/components/listings/VerificationBadges";
+import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
+import { getPublicInventory } from "@/lib/public-inventory";
+import { SEED_PUBLIC_LISTINGS, resolveListingPresentation } from "@/lib/seed-listings";
+import { rankSimilarProperties } from "@/lib/similar-properties";
 import {
   getPropertyDetail,
   propertyDetails,
@@ -30,6 +37,7 @@ interface Params {
 }
 
 const highlightIcons = [Factory, Truck, ShieldCheck];
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return propertyDetails.map((property) => ({ slug: property.slug }));
@@ -45,7 +53,10 @@ export default async function PropertyDetailPage({
 
   if (!property) notFound();
 
-  const isSoldOut = property.soldOut === true;
+  const inventory = await getPublicInventory().catch(() => null);
+  const land = inventory?.find(item => item.slug === slug) ?? SEED_PUBLIC_LISTINGS.find(item => item.slug === slug);
+  const isSoldOut = property.soldOut === true || land?.status === "sold";
+  const similar = land ? rankSimilarProperties(land, inventory ?? []) : [];
 
   return (
     <main className="bg-white">
@@ -161,6 +172,12 @@ export default async function PropertyDetailPage({
                 })}
               </div>
             </section>
+
+            {land && <>
+              <ListingTrust land={land} />
+              <VerificationBadges land={land} />
+              {inventory ? <PropertyIntelligence land={land} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}
+            </>}
 
             {property.mapEmbed && (
               <section>
@@ -296,6 +313,11 @@ export default async function PropertyDetailPage({
           </aside>
         </div>
       </section>
+
+      {similar.length > 0 && <section className="container-xl section">
+        <h2 className="mb-6 text-xl font-bold">ที่ดินใกล้เคียงที่ยังเปิดขาย</h2>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} />)}</div>
+      </section>}
 
       <section className="px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
         <div className="container-xl">

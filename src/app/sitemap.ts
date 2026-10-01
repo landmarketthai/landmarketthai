@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/land-insights`, changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE}/property/37-rai-eec-rayong`, changeFrequency: "weekly", priority: 0.85 },
     { url: `${SITE}/property/101-rai-kabin-buri`, changeFrequency: "weekly", priority: 0.85 },
+    { url: `${SITE}/property/109-rai-eec-rayong`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE}/become-partner`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE}/how-it-works`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE}/submit-land`, changeFrequency: "monthly", priority: 0.8 },

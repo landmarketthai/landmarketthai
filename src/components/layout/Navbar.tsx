@@ -13,6 +13,8 @@ import { authClient } from "@/lib/auth/client";
 const navLinks = [
   { label: "หน้าแรก", href: "/" },
   { label: "ที่ดินทั้งหมด", href: "/land" },
+  { label: "แผนที่", href: "/search" },
+  { label: "ราคาตั้งขาย", href: "/land-insights" },
   { label: "ส่งที่ดิน", href: "/submit-land" },
   { label: "วิธีรับค่าตอบแทน", href: "/how-it-works" },
   { label: "ข่าวสาร", href: "/blog" },

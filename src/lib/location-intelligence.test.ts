@@ -40,7 +40,7 @@ test("missing, nonfinite, out-of-range and malformed coordinates never yield dis
 
 test("registry pins match existing marketing maps and logistics landmarks retain unknown coordinates", () => {
   assert.equal(new Set(LOCATION_ANCHORS.map((anchor) => anchor.id)).size, LOCATION_ANCHORS.length);
-  for (const property of propertyDetails) {
+  for (const property of propertyDetails.filter(property => !property.soldOut)) {
     const anchor = LOCATION_ANCHORS.find((entry) => entry.id === `listing-${property.slug}`)!;
     const [lat, lng] = new URL(property.mapEmbed!.embedUrl).searchParams.get("q")!.split(",").map(Number);
     assert.deepEqual(anchor.coordinates, { lat, lng });
