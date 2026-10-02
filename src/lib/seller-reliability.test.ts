@@ -81,6 +81,32 @@ test("initialization preserves credentials on failed restore, restores local val
   assert.equal(JSON.parse(stored.get("credentials")!).id, "draft-b");
 });
 
+test("corrupt credentials are removed with only their identifiable local draft before creating fresh", async () => {
+  const stored = new Map([["credentials", '{"id":"draft-broken",'], ["local:draft-broken", "bad draft"], ["other", "keep"]]);
+  let created = 0;
+  const env = {
+    cancelled: false, setLoading: () => {}, setError: () => {}, DRAFT_STORAGE_KEY: "credentials", localFormKey: (id: string) => `local:${id}`,
+    localStorage: { getItem: (key: string) => stored.get(key), setItem: (key: string, value: string) => stored.set(key, value), removeItem: (key: string) => stored.delete(key) },
+    loadSellerDraft: async () => { throw new Error("corrupt credentials must not be used"); },
+    fetch: async () => { created++; return response(200, { id: "fresh", token: "fresh-token" }); },
+    setDraft: () => {}, setSubmitted: () => {}, frozen: { current: false }, fromDraft: () => ({}),
+    storageId: { current: null }, formRef: { current: null }, savedForm: { current: null }, savedPayload: { current: null },
+    setDraftId: () => {}, setToken: () => {}, setFormState: () => {}, setSaveState: () => {}, emptyForm: {},
+  };
+  await handler("init", env)();
+  assert.equal(created, 1);
+  assert.equal(stored.has("credentials"), true);
+  assert.equal(JSON.parse(stored.get("credentials")!).id, "fresh");
+  assert.equal(stored.has("local:draft-broken"), false);
+  assert.equal(stored.get("other"), "keep");
+});
+
+test("ListingCard falls back to usable area instead of showing zero rai", () => {
+  const card = read("../components/listings/ListingCard.tsx");
+  assert.match(card, /exactTotalRai > 0/);
+  assert.match(card, /return propertySizeLabel\(land\)/);
+});
+
 test("form edits persist immediately under their draft ID and are blocked during submit", () => {
   const writes: [string, string][] = [];
   const formRef = { current: { contact_phone: "0812345678", title: "saved" } };

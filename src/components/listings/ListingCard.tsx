@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { MapPin, Ruler, Tag, MoveHorizontal, Building2 } from "lucide-react";
 import type { Land } from "@/lib/types/database";
+import { propertySizeLabel } from "@/lib/marketplace/presentation";
 import ListingTrust from "./ListingTrust";
 import VerificationBadges from "./VerificationBadges";
 import {
@@ -30,38 +31,18 @@ interface Props {
 }
 
 function exactAreaLabel(land: Land): string | null {
-  if (land.area_rai != null || land.area_ngan != null || land.area_sqwa != null) {
+  const exactTotalRai = (land.area_rai ?? 0) + (land.area_ngan ?? 0) / 4 + (land.area_sqwa ?? 0) / 400;
+  if (exactTotalRai > 0) {
     const parts: string[] = [];
-    if (land.area_rai != null) parts.push(`${land.area_rai.toLocaleString("th-TH")} ไร่`);
-    if (land.area_ngan != null) parts.push(`${land.area_ngan.toLocaleString("th-TH")} งาน`);
-    if (land.area_sqwa != null) {
-      parts.push(`${land.area_sqwa.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ว.`);
+    if ((land.area_rai ?? 0) > 0) parts.push(`${land.area_rai!.toLocaleString("th-TH")} ไร่`);
+    if ((land.area_ngan ?? 0) > 0) parts.push(`${land.area_ngan!.toLocaleString("th-TH")} งาน`);
+    if ((land.area_sqwa ?? 0) > 0) {
+      parts.push(`${land.area_sqwa!.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ว.`);
     }
     if (parts.length > 0) return parts.join(" ");
   }
-  if (land.size_rai == null) {
-    return land.usable_area_sqm != null ? `${land.usable_area_sqm.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ม.` : null;
-  }
-
-  const wholeRai = Math.floor(land.size_rai);
-  const remainingSqwa = Math.round((land.size_rai - wholeRai) * 400 * 100) / 100;
-  let ngan = Math.floor(remainingSqwa / 100);
-  let sqwa = Math.round((remainingSqwa - ngan * 100) * 100) / 100;
-
-  if (sqwa >= 100) {
-    ngan += 1;
-    sqwa = 0;
-  }
-  if (ngan >= 4) {
-    return `${wholeRai + 1} ไร่`;
-  }
-
-  const parts = [`${wholeRai.toLocaleString("th-TH")} ไร่`];
-  if (ngan > 0) parts.push(`${ngan} งาน`);
-  if (sqwa > 0) parts.push(`${sqwa.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ว.`);
-  return parts.join(" ");
+  return propertySizeLabel(land);
 }
-
 function propertyTypeLabel(land: Land): string {
   // Land keeps its legacy category label (e.g. ที่ดินอุตสาหกรรม); other assets use the property type label.
   if (land.property_type && land.property_type !== "land") return LAND_TYPE_LABELS[land.property_type] ?? LAND_TYPE_LABELS.other;

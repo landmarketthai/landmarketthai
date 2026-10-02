@@ -268,9 +268,14 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     async function init() {
       setLoading(true); setError(null);
       const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+      let parsed: { id: string; token: string } | null = null;
       if (saved) {
-        const parsed = JSON.parse(saved) as { id: string; token: string };
-        if (!parsed.id || !parsed.token) throw new Error("ข้อมูลแบบร่างในเครื่องไม่ครบ");
+        try {
+          const credentials = JSON.parse(saved) as Partial<{ id: string; token: string }>;
+          if (typeof credentials.id === "string" && credentials.id && typeof credentials.token === "string" && credentials.token) parsed = credentials as { id: string; token: string };
+        } catch { /* Corrupt storage is stale; network errors below must keep valid credentials. */ }
+      }
+      if (saved && parsed) {
         const restored = await loadSellerDraft(parsed.id, parsed.token);
         if (cancelled) return;
         if (restored) {
@@ -292,6 +297,10 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           setSaveState(JSON.stringify(next) === savedForm.current ? "saved" : "unsaved"); setLoading(false);
           return;
         }
+      } else if (saved) {
+        const id = saved.match(/"id"\s*:\s*"([^"]+)"/)?.[1];
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        if (id) localStorage.removeItem(localFormKey(id));
       }
       const response = await fetch("/api/property-submissions", { method: "POST" });
       if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
