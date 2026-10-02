@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Area to show (district center, or an exact pin from a Google Maps link). Only moves the map; never sets lat/lng. */
 export interface MapFocus {
@@ -16,13 +16,17 @@ interface Props {
   lng: number | null;
   onChange: (lat: number, lng: number) => void;
   focus?: MapFocus | null;
+  disabled?: boolean;
 }
 
-export default function LocationPicker({ lat, lng, onChange, focus = null }: Props) {
+export default function LocationPicker({ lat, lng, onChange, focus = null, disabled = false }: Props) {
+  const [mapReady, setMapReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markerRef = useRef<import("leaflet").Marker | null>(null);
   const onChangeRef = useRef(onChange);
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
   const positionRef = useRef(lat != null && lng != null ? [lat, lng] as [number, number] : null);
   const focusRef = useRef(focus);
 
@@ -48,9 +52,11 @@ export default function LocationPicker({ lat, lng, onChange, focus = null }: Pro
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map);
-      map.on("click", (event: import("leaflet").LeafletMouseEvent) => onChangeRef.current(event.latlng.lat, event.latlng.lng));
-      if (position) markerRef.current = L.marker(position).addTo(map);
+      map.on("click", (event: import("leaflet").LeafletMouseEvent) => {
+        if (!disabledRef.current) onChangeRef.current(event.latlng.lat, event.latlng.lng);
+      });
       mapRef.current = map;
+      setMapReady(true);
     }
     void init();
     return () => {
@@ -58,6 +64,7 @@ export default function LocationPicker({ lat, lng, onChange, focus = null }: Pro
       mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
@@ -82,11 +89,11 @@ export default function LocationPicker({ lat, lng, onChange, focus = null }: Pro
     }
     void sync();
     return () => { cancelled = true; };
-  }, [lat, lng]);
+  }, [lat, lng, mapReady]);
 
   useEffect(() => {
     if (focus) mapRef.current?.flyTo([focus.lat, focus.lng], focus.zoom, { duration: 0.8 });
-  }, [focus]);
+  }, [focus, mapReady]);
 
   return <div ref={containerRef} className="h-60 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:h-72" aria-label="ปักหมุดตำแหน่งทรัพย์" />;
 }

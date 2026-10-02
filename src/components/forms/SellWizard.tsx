@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, FileText, ImagePlus, Info, Link2, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
+import { draftPatch, loadSellerDraft, mergeDraft, phoneLooksValid } from "@/lib/seller-draft";
 import LocationPicker, { type MapFocus } from "./LocationPicker";
 
 interface Props { provinces: Province[]; buyerDemandSlug?: string }
@@ -114,9 +115,7 @@ const SERVER_FIELD_LABELS: Record<string, string> = {
 const AUTOSAVE_DELAY_MS = 1500;
 const DRAFT_STORAGE_KEY = "landmarketthai:sell-draft";
 
-function phoneLooksValid(value: string): boolean {
-  return /^0\d{8,9}$/.test(value.replace(/[\s\-().]/g, "").replace(/^\+?66(?=\d{9}$)/, "0"));
-}
+const localFormKey = (id: string) => `${DRAFT_STORAGE_KEY}:${id}:form`;
 
 function fromDraft(draft: PropertySubmission): DraftForm {
   return {
@@ -148,19 +147,29 @@ function fromDraft(draft: PropertySubmission): DraftForm {
   };
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = "unsaved" | "saving" | "saved" | "error";
 type MapsStatus = { state: "idle" | "loading" | "error"; message?: string } | { state: "ok"; lat: number; lng: number };
 
 export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [draft, setDraft] = useState<PropertySubmission | null>(null);
-  const [form, setForm] = useState<DraftForm>(emptyForm);
+  const [form, setFormState] = useState<DraftForm>(emptyForm);
   const [loading, setLoading] = useState(true);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveRetryable, setSaveRetryable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadBatchCount, setUploadBatchCount] = useState(0);
+  const uploading = uploadBatchCount > 0;
+  const uploadBatches = useRef(new Set<Promise<boolean>>());
+  const failedUploads = useRef(new Map<File, "image" | "document">());
+  const frozen = useRef(false);
+  const mapsRequest = useRef(0);
+  const formRef = useRef(form);
+  const savedForm = useRef(JSON.stringify(emptyForm));
+  const storageId = useRef<string | null>(null);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [consent, setConsent] = useState(false);
@@ -173,6 +182,31 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const focusProvinceOnLoad = useRef<string | null>(null);
   const savedPayload = useRef<string | null>(null);
   const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
+
+  function setForm(update: (current: DraftForm) => DraftForm) {
+    if (frozen.current) return;
+    const next = update(formRef.current);
+    formRef.current = next;
+    setFormState(next);
+    setSaveState((current) => current === "saving" ? current : "unsaved");
+    if (storageId.current) {
+      try { localStorage.setItem(localFormKey(storageId.current), JSON.stringify(next)); }
+      catch { setError("เก็บข้อมูลในเครื่องไม่สำเร็จ กรุณาบันทึกแบบร่างก่อนปิดหน้านี้"); }
+    }
+  }
+
+  function cancelMapsLookup() {
+    mapsRequest.current++;
+    setMapsStatus({ state: "idle" });
+  }
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (JSON.stringify(formRef.current) !== savedForm.current || uploadBatches.current.size) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
 
   const provinceName = provinces.find((province) => province.id === form.province_id)?.name_th ?? "";
   const isBangkok = provinceName.replace(/^จังหวัด\s*/, "").startsWith("กรุงเทพ");
@@ -214,44 +248,65 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   // or a pasted Google Maps link only.
   function selectProvince(provinceId: string) {
     setForm((v) => ({ ...v, province_id: provinceId, district: "", subdistrict: "", lat: null, lng: null }));
+    cancelMapsLookup();
     focusProvinceOnLoad.current = provinces.find((province) => province.id === provinceId)?.name_th ?? null;
     clearFieldError("province_id");
   }
   function selectDistrict(name: string) {
     setForm((v) => ({ ...v, district: name, subdistrict: "", lat: null, lng: null }));
+    cancelMapsLookup();
     setMapFocus(focusOn(districtOptions.find((option) => option.name_th === name), 12));
   }
   function selectSubdistrict(name: string) {
     setForm((v) => ({ ...v, subdistrict: name, lat: null, lng: null }));
+    cancelMapsLookup();
     setMapFocus(focusOn(subdistrictOptions.find((option) => option.name_th === name), 13));
   }
 
   useEffect(() => {
     let cancelled = false;
     async function init() {
+      setLoading(true); setError(null);
       const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as { id: string; token: string };
-          const response = await fetch(`/api/property-submissions/${parsed.id}`, { headers: { "x-draft-token": parsed.token } });
-          if (response.ok) {
-            const body = (await response.json()) as { draft: PropertySubmission };
-            if (!cancelled) {
-              setDraftId(parsed.id); setToken(parsed.token); setDraft(body.draft); setForm(fromDraft(body.draft)); setLoading(false);
-            }
+        const parsed = JSON.parse(saved) as { id: string; token: string };
+        if (!parsed.id || !parsed.token) throw new Error("ข้อมูลแบบร่างในเครื่องไม่ครบ");
+        const restored = await loadSellerDraft(parsed.id, parsed.token);
+        if (cancelled) return;
+        if (restored) {
+          setDraft(restored);
+          if (restored.status !== "draft") {
+            setSubmitted(true); setLoading(false); frozen.current = true;
             return;
           }
-        } catch { /* create a fresh draft below */ }
+          const baseline = fromDraft(restored);
+          let local: Partial<DraftForm> = {};
+          try { local = JSON.parse(localStorage.getItem(localFormKey(parsed.id)) ?? "{}") ?? {}; }
+          catch { setError("อ่านข้อมูลที่ยังไม่บันทึกในเครื่องไม่สำเร็จ"); }
+          const next = { ...baseline, ...local };
+          storageId.current = parsed.id;
+          formRef.current = next;
+          savedForm.current = JSON.stringify(baseline);
+          savedPayload.current = null;
+          setDraftId(parsed.id); setToken(parsed.token); setFormState(next);
+          setSaveState(JSON.stringify(next) === savedForm.current ? "saved" : "unsaved"); setLoading(false);
+          return;
+        }
       }
       const response = await fetch("/api/property-submissions", { method: "POST" });
       if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
       const created = (await response.json()) as { id: string; token: string };
+      if (cancelled) return;
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
-      if (!cancelled) { setDraftId(created.id); setToken(created.token); setLoading(false); }
+      storageId.current = created.id;
+      savedForm.current = JSON.stringify(emptyForm);
+      savedPayload.current = null;
+      formRef.current = emptyForm;
+      setFormState(emptyForm); setDraftId(created.id); setToken(created.token); setLoading(false);
     }
     void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setLoading(false); } });
     return () => { cancelled = true; };
-  }, []);
+  }, [restoreAttempt]);
 
   const totalRai = useMemo(() => {
     if (form.area_rai == null && form.area_ngan == null && form.area_sqwa == null) return null;
@@ -266,14 +321,12 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const hasArea = (totalRai != null && totalRai > 0) || (form.usable_area_sqm != null && form.usable_area_sqm > 0);
 
   // A half-typed phone number would fail server validation on every autosave; keep it local until valid.
-  const payload = useMemo(() => JSON.stringify({
-    ...form,
-    contact_phone: form.contact_phone.trim() === "" || phoneLooksValid(form.contact_phone) ? form.contact_phone : null,
-    price_per_rai: derivedPricePerRai,
-  }), [form, derivedPricePerRai]);
+  const payload = useMemo(() => draftPatch(form, derivedPricePerRai), [form, derivedPricePerRai]);
+  const formSnapshot = JSON.stringify(form);
 
-  async function persist(body: string): Promise<boolean> {
+  async function persist(body: string, snapshot: string): Promise<boolean> {
     if (!draftId || !token) return false;
+    let retryable = true;
     setSaveState("saving"); setSaveError(null);
     try {
       const response = await fetch(`/api/property-submissions/${draftId}`, {
@@ -283,59 +336,75 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
+        retryable = response.status >= 500 || response.status === 429;
         const fields = Object.keys(result?.issues?.fieldErrors ?? {}).map((key) => SERVER_FIELD_LABELS[key] ?? key);
         throw new Error(fields.length ? `บันทึกไม่สำเร็จ กรุณาตรวจสอบ: ${[...new Set(fields)].join(", ")}` : result.error || "บันทึกแบบร่างไม่สำเร็จ");
       }
       savedPayload.current = body;
-      setDraft(result.draft as PropertySubmission);
-      setSaveState("saved");
+      if (result.draft) setDraft((current) => mergeDraft(current, result.draft as PropertySubmission));
+      const sent = JSON.parse(snapshot) as DraftForm;
+      if (sent.contact_phone.trim() === "" || phoneLooksValid(sent.contact_phone)) savedForm.current = snapshot;
+      setSaveState(JSON.stringify(formRef.current) === savedForm.current ? "saved" : "unsaved");
       return true;
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "บันทึกแบบร่างไม่สำเร็จ");
+      setSaveRetryable(retryable);
       setSaveState("error");
       return false;
     }
   }
 
   /** Saves the current form; saves run one at a time so an older PATCH never lands after a newer one. */
-  function saveDraft(): Promise<boolean> {
+  function saveDraft(force = false): Promise<boolean> {
+    if (frozen.current && !force) return Promise.resolve(false);
     const body = payload;
-    const run = saveQueue.current.then(() => body === savedPayload.current ? true : persist(body));
+    const snapshot = formSnapshot;
+    const run = saveQueue.current.then(() => !force && body === savedPayload.current ? true : persist(body, snapshot));
     saveQueue.current = run.catch(() => false);
     return run;
   }
   const saveDraftRef = useRef(saveDraft);
   useEffect(() => { saveDraftRef.current = saveDraft; });
 
-  // Debounced autosave after meaningful edits. The first payload after loading is the baseline
-  // (nothing to save), and nothing autosaves while submitting or after submission.
+  // Restored local edits are dirty. Re-check after saves so reverting an in-flight edit is saved too.
   useEffect(() => {
     if (loading || submitting || submitted || !draftId || !token) return;
-    if (savedPayload.current === null) { savedPayload.current = payload; return; }
-    if (payload === savedPayload.current) return;
+    if (savedPayload.current === null && formSnapshot === savedForm.current) { savedPayload.current = payload; return; }
+    if (payload === savedPayload.current || saveState === "error") return;
     const timer = setTimeout(() => void saveDraftRef.current(), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [payload, loading, submitting, submitted, draftId, token]);
+  }, [payload, formSnapshot, loading, submitting, submitted, draftId, token, saveState]);
+
+  useEffect(() => {
+    if (saveState !== "error" || !saveRetryable || submitting || submitted) return;
+    const retry = () => void saveDraftRef.current();
+    const timer = setTimeout(retry, 5000);
+    window.addEventListener("online", retry);
+    return () => { clearTimeout(timer); window.removeEventListener("online", retry); };
+  }, [saveState, saveRetryable, submitting, submitted, payload]);
 
   async function resolveMapsLink() {
+    if (frozen.current) return;
+    const request = ++mapsRequest.current;
     if (!mapsInput.trim()) { setMapsStatus({ state: "error", message: "กรุณาวางลิงก์ Google Maps หรือพิกัด" }); return; }
     setMapsStatus({ state: "loading" });
     try {
       const response = await fetch("/api/maps-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: mapsInput }) });
       const body = await response.json().catch(() => ({}));
+      if (request !== mapsRequest.current || frozen.current) return;
       if (!response.ok || typeof body.lat !== "number" || typeof body.lng !== "number") throw new Error(body.error || "อ่านพิกัดจากลิงก์ไม่สำเร็จ");
       const { lat, lng } = body as { lat: number; lng: number };
       setForm((v) => ({ ...v, lat, lng }));
       setMapFocus((current) => ({ lat, lng, zoom: 17, key: (current?.key ?? 0) + 1 }));
       setMapsStatus({ state: "ok", lat, lng });
     } catch (reason) {
+      if (request !== mapsRequest.current || frozen.current) return;
       setMapsStatus({ state: "error", message: reason instanceof Error ? reason.message : "อ่านพิกัดจากลิงก์ไม่สำเร็จ" });
     }
   }
 
   async function upload(file: File, mediaKind: "image" | "document") {
-    if (!draftId || !token) return;
-    setUploading(true); setError(null);
+    if (!draftId || !token) return false;
     try {
       const metadata = { token, media_kind: mediaKind, file_name: file.name, mime_type: file.type, size_bytes: file.size, doc_type: mediaKind === "document" ? "other" : undefined };
       const presign = await fetch(`/api/property-submissions/${draftId}/uploads/presign`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(metadata) });
@@ -349,10 +418,28 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       });
       const confirmed = await confirm.json();
       if (!confirm.ok) throw new Error(confirmed.error || "ยืนยันไฟล์ไม่สำเร็จ");
-      const refreshed = await fetch(`/api/property-submissions/${draftId}`, { headers: { "x-draft-token": token } });
-      if (refreshed.ok) setDraft(((await refreshed.json()) as { draft: PropertySubmission }).draft);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "อัปโหลดไฟล์ไม่สำเร็จ"); }
-    finally { setUploading(false); }
+      failedUploads.current.delete(file);
+      return true;
+    } catch (reason) { failedUploads.current.set(file, mediaKind); setError(reason instanceof Error ? reason.message : "อัปโหลดไฟล์ไม่สำเร็จ"); return false; }
+  }
+
+  function uploadBatch(files: File[], mediaKind: "image" | "document") {
+    if (frozen.current || !files.length || !draftId || !token) return;
+    setError(null); setUploadBatchCount((count) => count + 1);
+    const batch = (async () => {
+      const results = await Promise.all(files.map((file) => upload(file, mediaKind)));
+      try {
+        const refreshed = await loadSellerDraft(draftId, token);
+        if (!refreshed) throw new Error("เปิดแบบร่างหลังอัปโหลดไม่สำเร็จ");
+        setDraft((current) => ({ ...mergeDraft(current, refreshed), media: [...new Map([...(current?.media ?? []), ...(refreshed.media ?? [])].map((media) => [media.id, media])).values()] }));
+        return results.every(Boolean);
+      } catch {
+        setError("โหลดรายการไฟล์ไม่สำเร็จ ไฟล์ที่ยืนยันแล้วถูกเก็บไว้ในแบบร่าง");
+        return results.every(Boolean);
+      }
+    })();
+    uploadBatches.current.add(batch);
+    void batch.finally(() => { uploadBatches.current.delete(batch); setUploadBatchCount((count) => count - 1); });
   }
 
   function validate(): Partial<Record<FieldKey, string>> {
@@ -369,27 +456,35 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   }
 
   async function submit() {
+    if (frozen.current) return;
     const errors = validate();
     setFieldErrors(errors);
     const first = (Object.keys(errors) as FieldKey[])[0];
     if (first) {
       setError(null);
       document.getElementById(`sell-${FIELD_SECTION[first]}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sell-field="${first}"]`)?.focus());
       return;
     }
     if (!draftId || !token) return;
+    frozen.current = true;
+    cancelMapsLookup();
     setSubmitting(true); setError(null);
     try {
-      if (!(await saveDraft())) throw new Error("บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
+      const uploads = await Promise.all([...uploadBatches.current]);
+      if (failedUploads.current.size > 0 || uploads.some((ok) => !ok)) throw new Error("มีไฟล์อัปโหลดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
+      await saveQueue.current;
+      if (!(await saveDraft(true))) throw new Error("บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
       const response = await fetch(`/api/property-submissions/${draftId}/submit`, {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "ส่งข้อมูลไม่สำเร็จ");
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
       setSubmitted(true);
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); localStorage.removeItem(localFormKey(draftId)); }
+      catch { /* A later restore checks status and keeps this submission closed. */ }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "ส่งข้อมูลไม่สำเร็จ"); }
-    finally { setSubmitting(false); }
+    finally { frozen.current = false; setSubmitting(false); }
   }
 
   function setText(key: "title" | "address" | "road_name" | "description" | "contact_name" | "contact_phone" | "contact_line", value: string) {
@@ -402,7 +497,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     if (key === "sale_price") clearFieldError("sale_price");
     if (key === "area_rai" || key === "area_ngan" || key === "area_sqwa" || key === "usable_area_sqm") clearFieldError("area");
   }
-  const invalid = (key: FieldKey) => fieldErrors[key] ? { "aria-invalid": true as const, "aria-describedby": `sell-error-${key}` } : {};
+  const invalid = (key: FieldKey) => ({ "data-sell-field": key, ...(fieldErrors[key] ? { "aria-invalid": true as const, "aria-describedby": `sell-error-${key}` } : {}) });
   const fieldError = (key: FieldKey) => fieldErrors[key] && <p id={`sell-error-${key}`} className="mt-1 text-xs font-semibold text-red-600">{fieldErrors[key]}</p>;
   const heading = (id: SectionId, hint?: string) => (
     <div className="mb-4">
@@ -412,17 +507,18 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   );
 
   if (loading) return <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">กำลังเปิดแบบร่าง...</div>;
+  if (!draftId && !submitted) return <div role="alert" className="rounded-3xl border border-red-200 bg-white p-8"><p>{error}</p><button type="button" className="btn-green mt-4" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>ลองเปิดแบบร่างอีกครั้ง</button></div>;
   if (submitted) return (
     <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-10 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white"><Check size={28} /></div>
-      <h2 className="mt-4 text-2xl font-black text-slate-900">ส่งข้อมูลเรียบร้อย</h2>
-      <p className="mt-2 text-sm text-slate-600">ทรัพย์ถูกตั้งเป็น Pending Review และจะยังไม่เผยแพร่จนกว่าทีมงานตรวจสอบและอนุมัติ</p>
+      <h2 className="mt-4 text-2xl font-black text-slate-900">{draft && draft.status !== "draft" ? "แบบร่างนี้ปิดรับการแก้ไขแล้ว" : "ส่งข้อมูลเรียบร้อย"}</h2>
+      <p className="mt-2 text-sm text-slate-600">{draft && draft.status !== "draft" ? `สถานะ: ${draft.status}` : "ทรัพย์ถูกตั้งเป็น Pending Review และจะยังไม่เผยแพร่จนกว่าทีมงานตรวจสอบและอนุมัติ"}</p>
     </div>
   );
 
   const errorCount = Object.keys(fieldErrors).length;
   const pinFromLink = mapsStatus.state === "ok" && form.lat === mapsStatus.lat && form.lng === mapsStatus.lng;
-  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "saved" && payload === savedPayload.current ? "บันทึกแล้ว" : saveState === "error" ? "บันทึกไม่สำเร็จ" : null;
+  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก";
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -433,31 +529,38 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
         </span>
       </div>
 
-      <div className="divide-y divide-slate-100">
+      <fieldset disabled={submitting} className="min-w-0 divide-y divide-slate-100">
         {error && <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-8">{error}</div>}
 
         <section id="sell-type" className="scroll-mt-20 p-5 sm:p-8">
           {heading("type")}
-          <div role="radiogroup" aria-label="ประเภททรัพย์" {...invalid("property_type")} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div role="radiogroup" aria-label="ประเภททรัพย์" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {PROPERTY_TYPES.map((value) => (
-              <button
+              <label
                 key={value}
-                type="button"
-                role="radio"
-                aria-checked={form.property_type === value}
-                onClick={() => { setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }}
                 className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-bold leading-tight transition ${form.property_type === value ? "border-[#00A859] bg-emerald-50 text-emerald-800 ring-1 ring-[#00A859]" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
               >
+                <input type="radio" name="property_type" value={value} checked={form.property_type === value} {...invalid("property_type")} className="mr-2 accent-emerald-600" onChange={() => { setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }} />
                 {PROPERTY_TYPE_LABELS[value]}
-              </button>
+              </label>
             ))}
           </div>
           {fieldError("property_type")}
         </section>
 
         <section id="sell-location" className="scroll-mt-20 p-5 sm:p-8">
-          {heading("location","ปักหมุดตำแหน่งจริงได้เร็วที่สุดด้วยลิงก์ Google Maps หากไม่แน่ใจสามารถเว้นพิกัดไว้ให้ทีมงานตรวจสอบได้")}
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+          {heading("location","เลือกจังหวัด / อำเภอ / ตำบลก่อน แล้วปักหมุดด้วยลิงก์ Google Maps หรือคลิกบนแผนที่ หากไม่แน่ใจสามารถเว้นพิกัดได้")}
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label><span className="label">จังหวัด *</span><select className="input" {...invalid("province_id")} value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select>{fieldError("province_id")}</label>
+            <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
+            <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
+            <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" maxLength={500} value={form.address} onChange={(e) => setText("address", e.target.value)} /></label>
+          </div>
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <Info size={16} className="mt-0.5 shrink-0" />
+            <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น และจะล้างหมุดเดิม กรุณา<strong>วางลิงก์ด้านล่าง</strong>หรือ<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์</span>
+          </div>
+          <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
             <label htmlFor="sell-maps-link" className="flex items-center gap-2 text-sm font-bold text-slate-800"><Link2 size={16} className="text-blue-700" />วางลิงก์ Google Maps หรือพิกัด</label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
               <input
@@ -467,7 +570,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
                 maxLength={2048}
                 value={mapsInput}
                 placeholder="เช่น https://maps.app.goo.gl/... หรือ 13.0827, 101.0145"
-                onChange={(e) => { setMapsInput(e.target.value); if (mapsStatus.state === "error") setMapsStatus({ state: "idle" }); }}
+                onChange={(e) => { setMapsInput(e.target.value); cancelMapsLookup(); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void resolveMapsLink(); } }}
               />
               <button type="button" onClick={() => void resolveMapsLink()} disabled={mapsStatus.state === "loading"} className="btn-green justify-center disabled:opacity-60">
@@ -479,17 +582,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             {!pinFromLink && <p className="mt-2 text-[11px] text-slate-500">ใน Google Maps กด “แชร์” แล้วคัดลอกลิงก์ หรือกดค้างที่ตำแหน่งเพื่อคัดลอกพิกัด</p>}
           </div>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label><span className="label">จังหวัด *</span><select className="input" {...invalid("province_id")} value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select>{fieldError("province_id")}</label>
-            <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
-            <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
-            <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" maxLength={500} value={form.address} onChange={(e) => setText("address", e.target.value)} /></label>
-          </div>
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <Info size={16} className="mt-0.5 shrink-0" />
-            <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น และจะล้างหมุดเดิม กรุณา<strong>วางลิงก์ด้านบน</strong>หรือ<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์</span>
-          </div>
-          <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} onChange={(lat,lng) => setForm((v) => ({ ...v, lat, lng }))} /></div>
+          <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} disabled={submitting} onChange={(lat,lng) => { if (frozen.current) return; cancelMapsLookup(); setForm((v) => ({ ...v, lat, lng })); }} /></div>
           {form.lat != null && form.lng != null
             ? <div className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><MapPin size={13}/>ปักหมุดแล้ว: {form.lat.toFixed(7)}, {form.lng.toFixed(7)}</div>
             : <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13}/>ยังไม่ได้ปักหมุดตำแหน่งจริง (ไม่บังคับ)</div>}
@@ -504,13 +597,13 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
               <span className="label">ขนาดพื้นที่ *</span>
               <p className="mb-2 text-xs text-slate-500">กรอกช่องที่ตรงกับทรัพย์อย่างน้อยหนึ่งแบบ: ที่ดินใช้ ไร่/งาน/ตร.ว. ส่วนบ้าน คอนโด อาคาร ใช้พื้นที่ใช้สอย (ตร.ม.) หรือกรอกทั้งสองแบบก็ได้</p>
               <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <fieldset className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 p-3" {...invalid("area")}>
+                <fieldset className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 p-3">
                   <legend className="px-1 text-xs font-semibold text-slate-500">ขนาดที่ดิน</legend>
-                  <label><span className="text-xs text-slate-500">ไร่</span><input type="number" min="0" step="1" inputMode="numeric" className="input" value={numberValue(form.area_rai)} onChange={(e) => setNumber("area_rai", e.target.value)} /></label>
+                  <label><span className="text-xs text-slate-500">ไร่</span><input type="number" min="0" step="1" inputMode="numeric" className="input" {...invalid("area")} value={numberValue(form.area_rai)} onChange={(e) => setNumber("area_rai", e.target.value)} /></label>
                   <label><span className="text-xs text-slate-500">งาน</span><input type="number" min="0" max="3" step="1" inputMode="numeric" className="input" value={numberValue(form.area_ngan)} onChange={(e) => setNumber("area_ngan", e.target.value)} /></label>
                   <label><span className="text-xs text-slate-500">ตร.ว.</span><input type="number" min="0" max="99.99" step="0.1" inputMode="decimal" className="input" value={numberValue(form.area_sqwa)} onChange={(e) => setNumber("area_sqwa", e.target.value)} /></label>
                 </fieldset>
-                <fieldset className="rounded-xl border border-slate-200 p-3" {...invalid("area")}>
+                <fieldset className="rounded-xl border border-slate-200 p-3">
                   <legend className="px-1 text-xs font-semibold text-slate-500">พื้นที่ใช้สอย</legend>
                   <label><span className="text-xs text-slate-500">ตร.ม.</span><input type="number" min="0" step="any" inputMode="decimal" className="input" value={numberValue(form.usable_area_sqm)} onChange={(e) => setNumber("usable_area_sqm", e.target.value)} /></label>
                 </fieldset>
@@ -532,10 +625,11 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
         <section id="sell-media" className="scroll-mt-20 p-5 sm:p-8">
           {heading("media","ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private")}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,"image"))}/></label>
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,"document"))}/></label>
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "image"); e.target.value = ""; }}/></label>
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "document"); e.target.value = ""; }}/></label>
           </div>
           {uploading && <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><UploadCloud size={16}/>กำลังอัปโหลด...</div>}
+          {failedUploads.current.size > 0 && <button type="button" className="mt-3 text-sm font-bold text-red-700" disabled={submitting || uploading} onClick={() => { for (const kind of ["image", "document"] as const) uploadBatch([...failedUploads.current].filter(([, mediaKind]) => mediaKind === kind).map(([file]) => file), kind); }}>ลองอัปโหลดไฟล์ที่ไม่สำเร็จอีกครั้ง</button>}
           {draft?.media && draft.media.length > 0 && <div className="mt-4 divide-y rounded-2xl border border-slate-200">{draft.media.map((media) => <div key={media.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="truncate">{media.file_name}</span><span className="shrink-0 text-xs text-slate-400">{media.media_kind === "image" ? "รูป" : "เอกสาร"}</span></div>)}</div>}
         </section>
 
@@ -573,7 +667,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             <button type="button" onClick={() => void submit()} disabled={submitting} className="btn-green justify-center disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "กำลังส่ง..." : "ส่งให้ทีมงานตรวจสอบ"} <Check size={17}/></button>
           </div>
         </section>
-      </div>
+      </fieldset>
     </div>
   );
 }

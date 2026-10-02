@@ -181,7 +181,8 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
        area_rai = $12, area_ngan = $13, area_sqwa = $14, total_rai = $15,
        frontage_m = $16, depth_min_m = $17, depth_max_m = $18, road_name = $19, road_width_m = $20,
        zoning = $21, sale_price = $22, price_per_rai = $23,
-       description = $24, contact_name = $25, contact_phone = $26, contact_line = $27, usable_area_sqm = $28, updated_at = now()
+       description = $24, contact_name = $25, contact_phone = case when $29::boolean then $26 else contact_phone end,
+       contact_line = $27, usable_area_sqm = $28, updated_at = now()
      where id = $1 and draft_token = $2 and status = 'draft'
      returning *`,
     [
@@ -193,6 +194,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
       input.sale_price ?? null, pricePerRai,
       input.description ?? null, input.contact_name ?? null, input.contact_phone ?? null, input.contact_line ?? null,
       input.usable_area_sqm ?? null,
+      input.contact_phone !== undefined,
     ],
   );
   return rows[0] ? normalizeSubmission(rows[0]) : null;

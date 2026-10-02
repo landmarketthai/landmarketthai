@@ -121,7 +121,7 @@ test("Google Maps input parses coordinates from raw pairs and Google URLs only",
     return "invalid";
   };
   assert.deepEqual(coords(" 13.0827, 101.0145 "), { lat: 13.0827, lng: 101.0145 });
-  assert.deepEqual(coords("https://www.google.com/maps/@12.9236,100.8825,17z"), { lat: 12.9236, lng: 100.8825 });
+  assert.equal(coords("https://www.google.com/maps/@12.9236,100.8825,17z"), null, "camera coordinates are not an exact pin");
   assert.deepEqual(coords("https://maps.google.com/?q=13.75,100.5"), { lat: 13.75, lng: 100.5 });
   assert.deepEqual(coords("https://www.google.com/maps/search/?api=1&query=13.7563,100.5018"), { lat: 13.7563, lng: 100.5018 });
   assert.deepEqual(coords("https://www.google.co.th/maps/place/13.7,100.6"), { lat: 13.7, lng: 100.6 });
@@ -180,13 +180,25 @@ test("Google Maps resolver follows only allowlisted redirects and enforces Thail
   assert.deepEqual(await resolveMapsInput("https://evil.example/?q=13,100", neverFetch), { ok: false, error: MAPS_LINK_ERRORS.unsupported });
   assert.deepEqual(await resolveMapsInput("13.7563, 100.5018", neverFetch), { ok: true, lat: 13.7563, lng: 100.5018 });
   assert.deepEqual(await resolveMapsInput("100.5018, 13.7563", neverFetch), { ok: false, error: MAPS_LINK_ERRORS.outsideThailand }, "swapped lat/lng");
-  assert.deepEqual(await resolveMapsInput("https://www.google.com/maps/@35.68,139.76,12z", neverFetch), { ok: false, error: MAPS_LINK_ERRORS.outsideThailand });
+  assert.deepEqual(await resolveMapsInput("https://www.google.com/maps/@35.68,139.76,12z", neverFetch), { ok: false, error: MAPS_LINK_ERRORS.noCoordinates });
   assert.deepEqual(await resolveMapsInput("  ", neverFetch), { ok: false, error: MAPS_LINK_ERRORS.empty });
   assert.deepEqual(await resolveMapsInput(short, (async () => { throw new Error("offline"); }) as typeof fetch), { ok: false, error: MAPS_LINK_ERRORS.unreachable });
 
   const route = read("../app/api/maps-link/route.ts");
   assert.match(route, /resolveMapsInput\(input\)/);
   assert.doesNotMatch(route, /fetch\(/, "the route never fetches user URLs directly");
+});
+
+test("blank draft coordinates normalize to null while numeric zero and bounds remain explicit", () => {
+  const token = "00000000-0000-4000-8000-000000000000";
+  for (const value of ["", "   ", null]) {
+    const result = draftSchema.parse({ token, lat: value, lng: value });
+    assert.equal(result.lat, null);
+    assert.equal(result.lng, null);
+  }
+  assert.equal(draftSchema.parse({ token, lat: "0", lng: 0 }).lat, 0);
+  assert.equal(draftSchema.safeParse({ token, lat: 91 }).success, false);
+  assert.equal(draftSchema.safeParse({ token, lng: -181 }).success, false);
 });
 
 test("sell form is one page: section headings, one submit, autosave, no stepper", () => {

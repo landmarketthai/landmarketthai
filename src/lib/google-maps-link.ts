@@ -9,20 +9,19 @@ export type MapsLinkResult =
 export const MAPS_LINK_ERRORS = {
   empty: "กรุณาวางลิงก์ Google Maps หรือพิกัด",
   unsupported: "รองรับเฉพาะลิงก์ Google Maps หรือพิกัดรูปแบบ ละติจูด,ลองจิจูด",
-  noCoordinates: "ลิงก์นี้ไม่มีพิกัดตำแหน่ง กรุณาเปิดใน Google Maps แล้วกดค้างที่หมุดเพื่อคัดลอกพิกัด หรือปักหมุดบนแผนที่แทน",
+  noCoordinates: "ลิงก์นี้ไม่มีพิกัดหมุดที่แน่นอน พิกัดมุมมองแผนที่ใช้แทนหมุดไม่ได้ กรุณากดค้างที่ตำแหน่งใน Google Maps เพื่อคัดลอกพิกัด หรือปักหมุดบนแผนที่แทน",
   outsideThailand: "พิกัดอยู่นอกประเทศไทย กรุณาตรวจสอบลิงก์อีกครั้ง",
   unreachable: "เปิดลิงก์ย่อไม่สำเร็จ กรุณาลองใหม่ หรือวางพิกัดแทน",
 } as const;
 
 const NUMBER = String.raw`(-?\d{1,3}(?:\.\d+)?)`;
 const RAW_PAIR = new RegExp(String.raw`^\s*${NUMBER}\s*,\s*${NUMBER}\s*$`);
-// Order matters: !3d!4d is the dropped pin on place URLs, @lat,lng is only the viewport center.
+// Only explicit pins/places are exact. @lat,lng, ll and center describe the camera.
 const URL_PATTERNS = [
   new RegExp(String.raw`!3d${NUMBER}!4d${NUMBER}`),
-  new RegExp(String.raw`/maps/(?:place|search|dir)/(?:[^/]*/)*?${NUMBER},[+\s]*${NUMBER}(?:[/?,]|$)`),
-  new RegExp(String.raw`@${NUMBER},${NUMBER}`),
+  new RegExp(String.raw`/maps/(?:place|search)/${NUMBER},[+\s]*${NUMBER}(?:[/?,]|$)`),
 ];
-const QUERY_KEYS = ["q", "query", "ll", "center", "destination", "daddr"];
+const QUERY_KEYS = ["destination", "daddr", "q", "query"];
 
 /** Short-link hosts whose redirects are followed server-side. */
 const SHORT_HOSTS = new Set(["maps.app.goo.gl", "goo.gl"]);
@@ -51,12 +50,15 @@ function pair(lat: string, lng: string): MapsCoordinates | null {
 
 /** Extracts coordinates from an allowlisted, already-expanded Google Maps URL. Never geocodes place names. */
 export function coordinatesFromMapsUrl(url: URL): MapsCoordinates | null {
+  if (!isAllowedMapsUrl(url)) return null;
+  let text = url.pathname + url.search + url.hash;
+  try { text = decodeURIComponent(text); } catch { /* keep raw text */ }
+  const pin = text.match(URL_PATTERNS[0]);
+  if (pin) return pair(pin[1], pin[2]);
   for (const key of QUERY_KEYS) {
     const match = url.searchParams.get(key)?.match(RAW_PAIR);
     if (match) return pair(match[1], match[2]);
   }
-  let text = url.pathname + url.search + url.hash;
-  try { text = decodeURIComponent(text); } catch { /* keep raw text */ }
   for (const pattern of URL_PATTERNS) {
     const match = text.match(pattern);
     if (match) return pair(match[1], match[2]);
