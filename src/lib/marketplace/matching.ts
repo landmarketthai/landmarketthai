@@ -46,3 +46,24 @@ export function classifyBuyerMatch(property: Land, input: BuyerMatchCriteria): B
 
   return sizeOk && budgetOk && perRaiOk && zoningOk ? "full" : "near";
 }
+
+export async function findBuyerMatches(
+  input: BuyerMatchCriteria,
+  fetchPage: (limit: number, offset: number) => Promise<Land[]>,
+): Promise<{ full: Land[]; near: Land[]; status: "available" | "limited" | "unavailable" }> {
+  const matches: { full: Land[]; near: Land[] } = { full: [], near: [] };
+  // ponytail: scan at most 1,000 filtered properties; report the cap, use SQL ranking if it grows.
+  for (let offset = 0; offset < 1000; offset += 100) {
+    let candidates: Land[];
+    try { candidates = await fetchPage(100, offset); }
+    catch { return { full: [], near: [], status: "unavailable" }; }
+    for (const property of candidates) {
+      const kind = classifyBuyerMatch(property, input);
+      if (kind && matches[kind].length < 12) matches[kind].push(property);
+    }
+    // Later pages cannot change the first 12 ranked results in either group.
+    if (candidates.length < 100) return { ...matches, status: matches.full.length === 12 || matches.near.length === 12 ? "limited" : "available" };
+    if (matches.full.length === 12 && matches.near.length === 12) return { ...matches, status: "limited" };
+  }
+  return { ...matches, status: "limited" };
+}

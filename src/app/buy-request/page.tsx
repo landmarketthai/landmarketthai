@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2, Search, Shield, Users } from "lucide-react";
 import BuyerRequirementForm from "@/components/forms/BuyerRequirementForm";
-import { getAllProvinces } from "@/lib/neon/queries";
+import { getPersistedProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากความต้องการซื้อทรัพย์",
@@ -21,7 +21,7 @@ const notes = [
 
 export default async function BuyRequestPage({ searchParams }: { searchParams: Promise<Params> }) {
   const raw = await searchParams;
-  const provinces = await getAllProvinces().catch(() => []);
+  const provinces = await getPersistedProvinces().catch(() => []);
 
   return (
     <main className="bg-slate-50">

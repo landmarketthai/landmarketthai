@@ -11,20 +11,18 @@ import {
 import TrustStrip from "@/components/ui/TrustStrip";
 import MobileStickyCta from "@/components/ui/MobileStickyCta";
 import ListingCard from "@/components/listings/ListingCard";
-import PropertyMapPreview from "@/components/listings/PropertyMapPreview";
 import FacebookIcon from "@/components/ui/FacebookIcon";
 import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
-import { getActiveDemands, searchProperties } from "@/lib/neon/queries";
-import BuyerDemandList from "@/components/demand/BuyerDemandList";
+import { getActiveDemands, getFeaturedListings, searchProperties } from "@/lib/neon/queries";
+import BuyerDemandList, { isPublishedDemand } from "@/components/demand/BuyerDemandList";
 import HomePropertyMap from "@/components/search/HomePropertyMap";
 import {
   resolveListingPresentation,
-  sortSeedListings,
 } from "@/lib/seed-listings";
-import { getPublicInventory } from "@/lib/public-inventory";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "LandmarketThai – ที่ดินอุตสาหกรรม EEC ทั่วไทย",
@@ -89,13 +87,11 @@ const trustItems: { Icon: LucideIcon; label: string }[] = [
 ];
 
 export default async function HomePage() {
-  const [buyerDemands, inventory, mapProperties] = await Promise.all([
-    getActiveDemands(4).catch(() => []),
-    getPublicInventory().catch(() => []),
+  const [buyerDemands, sortedListings, mapProperties] = await Promise.all([
+    getActiveDemands(4).then((demands) => demands.filter(isPublishedDemand)).catch(() => null),
+    getFeaturedListings(6).catch(() => []),
     searchProperties({ limit: 100 }).catch(() => []),
   ]);
-
-  const sortedListings = sortSeedListings(inventory.filter(land => land.is_featured || land.status === "sold")).slice(0, 6);
 
   const orgSchema = {
     "@context": "https://schema.org",
@@ -147,10 +143,10 @@ export default async function HomePage() {
               </Link>
             </div>
             <Link
-              href="/submit-land"
+              href="/sell"
               className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#0f3478] underline-offset-2 hover:underline"
             >
-              มีที่ดินต้องการขาย
+              มีทรัพย์ต้องการขาย
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -231,10 +227,10 @@ export default async function HomePage() {
                 </Link>
               </div>
               <Link
-                href="/submit-land"
+                href="/sell"
                 className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-white underline-offset-2 hover:underline"
               >
-                มีที่ดินต้องการขาย
+                มีทรัพย์ต้องการขาย
                 <ArrowRight size={14} />
               </Link>
             </div>
@@ -243,7 +239,7 @@ export default async function HomePage() {
 
         {/* Benefit strip */}
         <div className="container-xl px-4 sm:px-6 lg:px-8">
-          <div className="relative z-30 mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-[0_8px_32px_rgba(4,16,44,0.14)] sm:-mt-28 md:-mt-36 lg:-mt-16">
+          <div className="relative z-30 mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-[0_8px_32px_rgba(4,16,44,0.14)] md:-mt-36 lg:-mt-16">
             <div className="grid grid-cols-1 divide-y divide-slate-100/80 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
               {benefits.map((b, index) => {
                 const Icon = b.Icon;
@@ -293,7 +289,6 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <PropertyMapPreview listings={inventory.filter(land => land.status === "active")} />
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {sortedListings.map((land) => {
               const presentation = resolveListingPresentation(land);
@@ -311,7 +306,10 @@ export default async function HomePage() {
       </section>
 
       {/* ── BUYER DEMAND (same buyer_demand source as /buyer-demand) ─────── */}
-      <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
+      {buyerDemands === null ? <section id="buyer-demand" className="container-xl py-8 text-center" role="alert">
+        <h2 className="font-bold">โหลดรายการความต้องการซื้อไม่ได้ในขณะนี้</h2>
+        <Link href="/buyer-demand" className="btn-outline mt-4">ลองใหม่</Link>
+      </section> : buyerDemands.length > 0 ? <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl">
           <div className="mb-7 flex flex-col items-center gap-3 text-center sm:relative sm:block">
             <h2 className="text-2xl font-bold text-[#0a2a63] sm:text-[28px]">
@@ -321,12 +319,14 @@ export default async function HomePage() {
               ดูทั้งหมด ›
             </Link>
           </div>
-          <BuyerDemandList
-            demands={buyerDemands}
-            emptyAction={<Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>}
-          />
+          <BuyerDemandList demands={buyerDemands} />
         </div>
-      </section>
+      </section> : <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-5 sm:px-6 lg:px-8">
+        <div className="container-xl flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">กำลังมองหาที่ดิน โรงงาน หรือโกดัง? ฝากเงื่อนไขให้ทีมงานช่วยจับคู่</p>
+          <Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>
+        </div>
+      </section>}
 
       {/* ── 4. HOW IT WORKS + WHO CAN EARN ───────────────────────────────── */}
       <section className="bg-[#eef2f9] px-4 py-12 sm:px-6 sm:py-14 lg:px-8">

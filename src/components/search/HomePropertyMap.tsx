@@ -59,7 +59,10 @@ export default function HomePropertyMap({ properties }: Props) {
         <span className="font-medium text-slate-400">แตะหมุดเพื่อดูทรัพย์ · เลื่อนผ่านรายการเพื่อเทียบตำแหน่ง</span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {!mapped.length ? <div role="status" className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+        <p>ยังไม่มีทรัพย์ที่มีพิกัดแผนที่ในขณะนี้</p>
+        <Link href="/search" className="mt-2 inline-block font-semibold text-blue-700 hover:underline">ดูรายการทรัพย์ทั้งหมด / ลองค้นหาใหม่ →</Link>
+      </div> : <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="relative overflow-hidden rounded-[20px] border border-slate-200 shadow-[0_2px_8px_rgba(13,30,70,0.06)]">
           <PropertyMap
             properties={mapped}
@@ -71,10 +74,10 @@ export default function HomePropertyMap({ properties }: Props) {
             className="h-[390px] sm:h-[470px] lg:h-[560px]"
           />
           {selected && (
-            <div className="absolute inset-x-3 bottom-3 z-[600] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:left-auto sm:w-80">
+            <div className="absolute inset-x-3 bottom-3 z-[600] max-h-[80%] overflow-y-auto break-words [overflow-wrap:anywhere] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:left-auto sm:w-80">
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="mb-1 flex items-center gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${selected.status === "sold" ? "bg-slate-500" : "bg-emerald-600"}`}>
                       {listingStatusLabel(selected)}
                     </span>
@@ -104,7 +107,7 @@ export default function HomePropertyMap({ properties }: Props) {
           )}
         </div>
 
-        <ul className="grid gap-3 sm:grid-cols-2 lg:max-h-[560px] lg:grid-cols-1 lg:content-start lg:overflow-y-auto lg:pr-1">
+        <ul className="grid max-h-[480px] content-start gap-3 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2 lg:max-h-[560px] lg:grid-cols-1 lg:content-start lg:overflow-y-auto lg:pr-1">
           {properties.map((property) => {
             const hasMapCoords = property.lat != null && property.lng != null;
             const isSelected = property.id === selectedId;
@@ -149,7 +152,7 @@ export default function HomePropertyMap({ properties }: Props) {
             );
           })}
         </ul>
-      </div>
+      </div>}
 
       <div className="mt-5 grid gap-2 min-[390px]:grid-cols-2 lg:grid-cols-3">
         <Link href="/sell" className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
@@ -172,7 +175,7 @@ function AssetMeta({ property }: { property: Land }) {
   const updatedLabel = formatUpdatedDate(property.updated_at);
   return (
     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-      {location && <span className="flex items-center gap-1"><MapPin size={12} className="shrink-0" />{location}</span>}
+      {location && <span className="flex min-w-0 items-center gap-1 break-words"><MapPin size={12} className="shrink-0" />{location}</span>}
       {property.size_rai != null && <span className="flex items-center gap-1"><Ruler size={12} className="shrink-0" />{formatRai(property.size_rai)}</span>}
       {price != null && <span className="font-bold text-[#0d1f44]">{formatMoneyFull(price)}</span>}
       {property.price_per_rai != null && <span>{formatMoneyFull(property.price_per_rai)} / ไร่</span>}

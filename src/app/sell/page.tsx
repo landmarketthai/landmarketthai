@@ -16,7 +16,9 @@ const notes = [
   { Icon: CheckCircle2, text: "กรอกเฉพาะข้อมูลจริงที่มีอยู่" },
 ];
 
-export default async function SellPage() {
+export default async function SellPage({ searchParams }: { searchParams: Promise<{ buyer_demand?: string }> }) {
+  const reference = (await searchParams).buyer_demand;
+  const buyerDemandSlug = typeof reference === "string" && /^buyer-demand-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference) ? reference : undefined;
   const provinces = await getAllProvinces().catch(() => []);
 
   return (
@@ -44,7 +46,8 @@ export default async function SellPage() {
               </div>
             ))}
           </div>
-          <SellWizard provinces={provinces} />
+          {buyerDemandSlug && <p className="mb-4 break-words [overflow-wrap:anywhere] text-sm text-slate-600">แนะนำทรัพย์สำหรับความต้องการซื้อ: {buyerDemandSlug}</p>}
+          <SellWizard provinces={provinces} buyerDemandSlug={buyerDemandSlug} />
         </div>
       </section>
     </main>

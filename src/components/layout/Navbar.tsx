@@ -15,7 +15,8 @@ const navLinks = [
   { label: "ที่ดินทั้งหมด", href: "/land" },
   { label: "แผนที่", href: "/search" },
   { label: "ราคาตั้งขาย", href: "/land-insights" },
-  { label: "ส่งที่ดิน", href: "/submit-land" },
+  { label: "ฝากซื้อ", href: "/buy-request" },
+  { label: "ฝากขาย", href: "/sell" },
   { label: "วิธีรับค่าตอบแทน", href: "/how-it-works" },
   { label: "ข่าวสาร", href: "/blog" },
   { label: "เกี่ยวกับเรา", href: "/about" },
@@ -121,19 +122,19 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-0.5">
+        <nav className="hidden xl:flex items-center gap-0.5">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-brand-50 hover:text-brand-600"
+              className="whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-brand-50 hover:text-brand-600"
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden lg:flex items-center gap-2 shrink-0">
+        <div className="hidden xl:flex items-center gap-2 shrink-0">
           {!loading &&
             (user ? (
               <UserMenu />
@@ -154,7 +155,7 @@ export default function Navbar() {
         </div>
 
         <button
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 xl:hidden"
           onClick={() => setOpen(!open)}
           aria-label="เมนู"
           aria-expanded={open}
@@ -164,7 +165,7 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="border-t border-slate-100 bg-white px-4 pb-4 lg:hidden">
+        <div className="border-t border-slate-100 bg-white px-4 pb-4 xl:hidden">
           {navLinks.map((link) => (
             <Link
               key={link.href}

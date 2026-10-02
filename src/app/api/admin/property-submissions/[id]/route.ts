@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAdminUser } from "@/lib/auth/admin";
+import { getSessionUser, isAdminUserAllowed } from "@/lib/auth/admin";
 import { canApplyAdminAction, publishReadinessIssues } from "@/lib/marketplace/listing-workflow";
 import { getReviewSubmission, publishSubmission, reviewSubmission, setPublishedPropertyStatus } from "@/lib/neon/marketplace";
 
@@ -14,13 +14,17 @@ const actionSchema = z.object({
 });
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await getAdminUser(request.headers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminUserAllowed(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const submission = await getReviewSubmission((await params).id);
   return submission ? NextResponse.json({ submission }) : NextResponse.json({ error: "Not found" }, { status: 404 });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await getAdminUser(request.headers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminUserAllowed(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 

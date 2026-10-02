@@ -7,7 +7,9 @@ export default function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const hasOAuthVerifier = request.nextUrl.searchParams.has("neon_auth_session_verifier");
   const isProtectedAdminRoute =
-    pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
+    pathname === "/admin" || pathname.startsWith("/admin/");
+
+  if (pathname === "/api/admin" || pathname.startsWith("/api/admin/")) return NextResponse.next();
 
   if (hasOAuthVerifier || isProtectedAdminRoute) {
     return authMiddleware(request);

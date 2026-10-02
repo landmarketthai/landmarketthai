@@ -5,11 +5,12 @@ const DEFAULT_NEON_AUTH_URL =
 
 const baseUrl = process.env.NEON_AUTH_BASE_URL?.trim() || DEFAULT_NEON_AUTH_URL;
 const configuredCookieSecret = process.env.NEON_AUTH_COOKIE_SECRET?.trim();
+const isLocalDevelopment = process.env.NODE_ENV === "development"
+  && !process.env.VERCEL && !process.env.VERCEL_ENV && !process.env.CI
+  && !process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.NETLIFY && !process.env.RENDER;
 const cookieSecret =
   configuredCookieSecret ||
-  (process.env.VERCEL_ENV === "production"
-    ? ""
-    : "landmarketthai-local-neon-auth-cookie-secret-2026");
+  (isLocalDevelopment ? `${crypto.randomUUID()}${crypto.randomUUID()}` : "");
 
 if (cookieSecret.length < 32) {
   throw new Error("NEON_AUTH_COOKIE_SECRET must be configured with at least 32 characters.");

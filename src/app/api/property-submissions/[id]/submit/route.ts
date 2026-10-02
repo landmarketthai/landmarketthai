@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const missing = submissionReadinessIssues(draft);
     if (missing.length) return NextResponse.json({ error: `ข้อมูลไม่ครบหรือไม่ถูกต้อง: ${missing.join(", ")}` }, { status: 400 });
 
-    const submitted = await submitPropertyDraft({ id, token: parsed.data.token, consentPdpa: true });
+    const submitted = await submitPropertyDraft({ id, token: parsed.data.token, consentPdpa: true, source: parsed.data.buyer_demand_slug ? `/buyer-demand/${parsed.data.buyer_demand_slug}` : "/sell" });
     if (!submitted) return NextResponse.json({ error: "ไม่สามารถส่งแบบร่างนี้ได้" }, { status: 409 });
     return NextResponse.json({ ok: true, id: submitted }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

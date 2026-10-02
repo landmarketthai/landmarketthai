@@ -122,7 +122,7 @@ function normalizeLand(value: unknown): Land {
     updated_at: stringOrNull(row.updated_at) ?? "",
     deleted_at: stringOrNull(row.deleted_at),
     verified_at: stringOrNull(row.verified_at),
-    verified_by: stringOrNull(row.verified_by),
+    verified_by: null,
     title_deed_on_file: row.title_deed_on_file === true,
     province: normalizeProvince(row.province),
     images,
@@ -296,6 +296,13 @@ export async function getRelatedListings(land: Land, limit = 4): Promise<Land[]>
   return rows.map(normalizeLand);
 }
 
+export async function getPersistedProvinces(): Promise<Province[]> {
+  const sql = getSqlIfConfigured();
+  if (!sql) throw new Error("Province database unavailable");
+  const rows = await sql`select * from provinces order by name_th`;
+  return rows.map(normalizeProvince).filter((row): row is Province => Boolean(row) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row!.id));
+}
+
 export async function getAllProvinces(): Promise<Province[]> {
   const seedProvinces = SEED_PUBLIC_LISTINGS
     .map((property) => property.province)
@@ -337,30 +344,49 @@ function normalizeDemand(value: unknown): BuyerDemand {
     land_type: row.land_type == null ? null : (row.land_type as BuyerDemand["land_type"]),
     size_min_rai: numberOrNull(row.size_min_rai),
     size_max_rai: numberOrNull(row.size_max_rai),
-    intended_use: stringOrNull(row.intended_use),
-    budget_note: stringOrNull(row.budget_note),
+    intended_use: null,
+    budget_note: null,
+    max_price: numberOrNull(row.max_price),
+    max_price_per_rai: numberOrNull(row.max_price_per_rai),
+    zoning: row.zoning == null ? null : row.zoning as BuyerDemand["zoning"],
+    container_access: row.container_access == null ? null : row.container_access === true,
+    high_voltage: row.high_voltage == null ? null : row.high_voltage === true,
+    province_names: Array.isArray(row.province_names) ? row.province_names.map(String) : [],
+    published_at: stringOrNull(row.published_at) ?? "",
     status: row.status as BuyerDemand["status"],
     is_public: Boolean(row.is_public),
-    seo_title: stringOrNull(row.seo_title),
-    seo_description: stringOrNull(row.seo_description),
+    seo_title: null,
+    seo_description: null,
     created_at: stringOrNull(row.created_at) ?? "",
     province: normalizeProvince(row.province),
   };
 }
 
-export async function getActiveDemands(limit = 20): Promise<BuyerDemand[]> {
-  const sql = getSqlIfConfigured();
-  if (!sql) return [];
+// Explicit allowlist: never select contact data, source IDs, review notes or user free text.
+const PUBLIC_DEMAND_SELECT = `select d.id,d.slug,d.province_id,d.land_type,d.size_min_rai,d.size_max_rai,
+  d.max_price,d.max_price_per_rai,d.zoning,d.container_access,d.high_voltage,
+  d.status,d.is_public,d.published_at,d.created_at,
+  case when p.id is null then null else jsonb_build_object(
+    'id',p.id,'name_th',p.name_th,'name_en',p.name_en,'slug',p.slug,
+    'region',p.region,'lat',p.lat,'lng',p.lng) end as province,
+  array(select p2.name_th from provinces p2 where p2.id = any(d.province_ids) order by p2.name_th) as province_names
+  from buyer_demand d left join provinces p on p.id = d.province_id`;
+const PUBLIC_DEMAND_WHERE = `d.status = 'published' and d.is_public = true
+  and d.buyer_requirement_id is not null and d.published_at is not null
+  and d.reviewed_at is not null and d.reviewed_by = 'reviewed'
+  and nullif(trim(d.slug), '') is not null`;
 
-  const safeLimit = Math.min(Math.max(limit, 1), 100);
+export async function getActiveDemands(limit = 20, offset = 0): Promise<BuyerDemand[]> {
+  const sql = getSqlIfConfigured();
+  if (!sql) throw new Error("Buyer demand database unavailable");
+
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 5000) : 20;
   const rows = await sql.query(
-    `select d.*, case when p.id is null then null else to_jsonb(p.*) end as province
-     from buyer_demand d
-     left join provinces p on p.id = d.province_id
-     where d.status = 'active' and d.is_public = true and nullif(trim(d.slug), '') is not null
-     order by d.created_at desc
-     limit $1`,
-    [safeLimit],
+    `${PUBLIC_DEMAND_SELECT}
+     where ${PUBLIC_DEMAND_WHERE}
+     order by d.published_at desc,d.id
+     limit $1 offset $2`,
+    [safeLimit, Number.isSafeInteger(offset) && offset >= 0 ? offset : 0],
   );
 
   return rows.map(normalizeDemand);
@@ -368,13 +394,11 @@ export async function getActiveDemands(limit = 20): Promise<BuyerDemand[]> {
 
 export async function getDemandBySlug(slug: string): Promise<BuyerDemand | null> {
   const sql = getSqlIfConfigured();
-  if (!sql) return null;
+  if (!sql) throw new Error("Buyer demand database unavailable");
 
   const rows = await sql.query(
-    `select d.*, case when p.id is null then null else to_jsonb(p.*) end as province
-     from buyer_demand d
-     left join provinces p on p.id = d.province_id
-     where d.slug = $1 and d.is_public = true
+    `${PUBLIC_DEMAND_SELECT}
+     where ${PUBLIC_DEMAND_WHERE} and d.slug = $1
      limit 1`,
     [slug],
   );
@@ -474,8 +498,9 @@ function enrichKnownListingCoordinates(property: Land): Land {
   };
 }
 
-export async function searchProperties(filters: PropertySearchFilters = {}): Promise<Land[]> {
+export async function searchProperties(filters: PropertySearchFilters = {}, options: { persistedOnly?: boolean } = {}): Promise<Land[]> {
   const sql = getSqlIfConfigured();
+  if (options.persistedOnly && !sql) throw new Error("Property database unavailable");
   const limit = Math.min(Math.max(filters.limit ?? 24, 1), 100);
   const offset = Math.min(Math.max(filters.offset ?? 0, 0), MAX_SEARCH_OFFSET);
   const needed = offset + limit;
@@ -522,6 +547,7 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
       dbMatches = matches;
       for (const row of seedRows) dbSlugs.add(String(row.slug));
     } catch (error) {
+      if (options.persistedOnly) throw error;
       console.error("[searchProperties] database search failed; using canonical seed listings", error);
       dbMatches = [];
       dbSlugs.clear();
@@ -529,7 +555,7 @@ export async function searchProperties(filters: PropertySearchFilters = {}): Pro
   }
 
   // A public DB row always replaces its canonical seed, even when the DB row does not match.
-  const matchingSeeds = SEED_PUBLIC_LISTINGS
+  const matchingSeeds = (options.persistedOnly ? [] : SEED_PUBLIC_LISTINGS)
     .filter((property) => !dbSlugs.has(property.slug))
     .filter((property) => propertyMatchesSearchFilters(property, filters));
 

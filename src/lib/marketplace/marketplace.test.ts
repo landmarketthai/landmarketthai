@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyBuyerMatch } from "./matching.ts";
+import { classifyBuyerMatch, findBuyerMatches } from "./matching.ts";
 import { submissionReadinessIssues } from "./submission-readiness.ts";
-import { SEED_PUBLIC_LISTINGS } from "../seed-listings.ts";
+import { SEED_PUBLIC_LISTINGS, resolveListingPresentation } from "../seed-listings.ts";
 import { sortPropertyResults } from "./search-sort.ts";
 import { buyerRequirementSchema, draftSchema } from "./schemas.ts";
 import type { PropertySubmission } from "../types/database.ts";
@@ -279,16 +279,142 @@ test("homepage and /buyer-demand render the same real buyer_demand source", () =
   const page = readFileSync(new URL("../../app/buyer-demand/page.tsx", import.meta.url), "utf8");
   for (const source of [home, page]) {
     assert.match(source, /getActiveDemands\(/);
+    assert.match(source, /\.filter\(isPublishedDemand\)/);
     assert.match(source, /<BuyerDemandList/);
     assert.doesNotMatch(source, /fallbackDemands|ที่แล้ว/);
   }
 });
 
-test("BuyerDemandList empty state is based on linkable demands", () => {
+test("BuyerDemandList empty state is based on published public linkable demands", () => {
   const source = readFileSync(new URL("../../components/demand/BuyerDemandList.tsx", import.meta.url), "utf8");
-  assert.match(source, /const visible = demands\.filter\(\(demand\) => demand\.slug\?\.trim\(\)\);/);
+  assert.match(source, /demand\.status === "published" && demand\.is_public && !!demand\.published_at && !!demand\.slug\?\.trim\(\)/);
+  assert.match(source, /const visible = demands\.filter\(isPublishedDemand\);/);
   assert.match(source, /if \(!visible\.length\)/);
   assert.match(source, /visible\.map\(/);
+});
+
+test("homepage keeps one map, featured inventory and a compact demand fallback", () => {
+  const source = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
+  assert.equal((source.match(/<HomePropertyMap\b/g) ?? []).length, 1);
+  assert.doesNotMatch(source, /PropertyMapPreview/);
+  assert.match(source, /getFeaturedListings\(6\)/);
+  assert.match(source, /sortedListings\.map\(/);
+  assert.match(source, /buyerDemands\.length > 0 \? <section/);
+  const fallback = source.split("</section> : <section")[1]?.split("</section>}")[0];
+  assert.ok(fallback);
+  assert.match(fallback, /href="\/buy-request"/);
+  assert.doesNotMatch(fallback, /BuyerDemandList|py-12|py-14/);
+});
+
+test("public demand cards and detail metadata only render allowlisted typed criteria", () => {
+  const list = readFileSync(new URL("../../components/demand/BuyerDemandList.tsx", import.meta.url), "utf8");
+  const detail = readFileSync(new URL("../../app/buyer-demand/[slug]/page.tsx", import.meta.url), "utf8");
+  const allowed = new Set([
+    "status", "is_public", "published_at", "slug", "province_names", "province", "land_type",
+    "size_min_rai", "size_max_rai", "max_price", "max_price_per_rai", "zoning", "container_access", "high_voltage",
+  ]);
+  for (const source of [list, detail]) {
+    for (const match of source.matchAll(/demand\.([a-z_]+)/g)) assert.ok(allowed.has(match[1]), match[1]);
+    assert.doesNotMatch(source, /"active"|\.created_at|\.seo_title|\.seo_description/);
+    assert.match(source, /<BuyerDemandCriteria demand=\{demand\}/);
+  }
+  for (const field of ["max_price", "max_price_per_rai", "zoning", "container_access", "high_voltage"]) {
+    assert.ok(list.includes(`demand.${field}`), field);
+  }
+  assert.match(list, /demand\.province_names\.join/);
+  assert.match(list, /if \(demand\.size_max_rai != null\) return/);
+  assert.doesNotMatch(detail, /generateStaticParams/);
+  assert.equal((detail.match(/!demand \|\| !isPublishedDemand\(demand\)/g) ?? []).length, 2);
+});
+
+test("demand-bearing public pages render dynamically so withdrawals take effect", () => {
+  for (const path of ["../../app/page.tsx", "../../app/buyer-demand/page.tsx", "../../app/buyer-demand/[slug]/page.tsx", "../../app/sitemap.ts"]) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /export const dynamic = "force-dynamic"/);
+    assert.match(source, /export const revalidate = 0/);
+    assert.doesNotMatch(source, /generateStaticParams|unstable_cache/);
+  }
+  const sitemap = readFileSync(new URL("../../app/sitemap.ts", import.meta.url), "utf8");
+  assert.match(sitemap, /lastModified: new Date\(d\.published_at\)/);
+});
+
+test("buyer matching finds full results after 100 rejected or near candidates", async () => {
+  const source = readFileSync(new URL("../neon/marketplace.ts", import.meta.url), "utf8");
+  assert.match(source, /findBuyerMatches\(input, \(limit, offset\) => searchProperties\([\s\S]*status: "active", limit, offset/);
+  const input = { transaction_type: "sale" as const, preferred_locations: [], province_ids: [rayong.province_id], max_price: 100 };
+  const candidates = Array.from({ length: 250 }, (_, index) => ({
+    ...rayong, id: String(index), total_price: index >= 200 ? 100 : 200,
+    province_id: index < 100 ? "elsewhere" : rayong.province_id,
+  }));
+  const offsets: number[] = [];
+  const matches = await findBuyerMatches(input, async (limit, offset) => {
+    offsets.push(offset);
+    return candidates.slice(offset, offset + limit);
+  });
+  assert.deepEqual(offsets, [0, 100, 200]);
+  assert.deepEqual(matches.full.map((row) => row.id), Array.from({ length: 12 }, (_, index) => String(200 + index)));
+  assert.deepEqual(matches.near.map((row) => row.id), Array.from({ length: 12 }, (_, index) => String(100 + index)));
+  assert.deepEqual(await findBuyerMatches(input, async () => { throw new Error("unavailable"); }), { full: [], near: [], status: "unavailable" });
+  let pages = 0;
+  const exhausted = await findBuyerMatches(input, async () => { pages++; return candidates.slice(0, 100); });
+  assert.equal(pages, 10);
+  assert.deepEqual(exhausted, { full: [], near: [], status: "limited" });
+});
+
+test("matching discards partial results after lookup failure and labels result truncation", async () => {
+  const input = { transaction_type: "sale" as const, preferred_locations: [], province_ids: [] };
+  const rows = Array.from({ length: 100 }, (_, i) => ({ ...rayong, id: String(i) }));
+  assert.deepEqual(await findBuyerMatches(input, async (_limit, offset) => {
+    if (offset) throw new Error("second page failed");
+    return rows;
+  }), { full: [], near: [], status: "unavailable" });
+  assert.equal((await findBuyerMatches(input, async () => rows.slice(0, 20))).status, "limited");
+  assert.equal((await findBuyerMatches(input, async () => rows.slice(0, 2))).status, "available");
+});
+
+test("known listing presentation preserves DB images, zoning, price and status", () => {
+  for (const seed of SEED_PUBLIC_LISTINGS) {
+    const live = { ...seed, status: "active" as const, zoning: "green" as const, price_per_rai: 123,
+      images: [{ id: "db-cover", land_id: seed.id, url_or_cdn_path: "/db.jpg", width: null, height: null, alt_th: "DB", is_cover: true, sort_order: 0, created_at: "", storage_key: "db" }] };
+    const presentation = resolveListingPresentation(live);
+    assert.equal(presentation.imageOverride, undefined);
+    assert.equal(presentation.metaTagLabel, undefined);
+    assert.equal(presentation.pricePerRaiLabel, undefined);
+    assert.equal(presentation.soldOut, false);
+    assert.equal(resolveListingPresentation({ ...live, status: "sold" }).soldOut, true);
+    const fallback = resolveListingPresentation({ ...live, images: [], zoning: null, price_per_rai: null });
+    assert.ok(fallback.imageOverride);
+  }
+});
+
+test("buyer province filtering is parameterized and agrees with the in-memory recheck", () => {
+  const ids = [rayong.province_id];
+  const values: unknown[] = [];
+  const sql = propertySearchSqlClauses({ province_ids: ids }, (value) => {
+    values.push(value); return `$${values.length}`;
+  }, []).join(" and ");
+  assert.match(sql, /l\.province_id = any\(\$1::uuid\[\]\)/);
+  assert.deepEqual(values, [ids]);
+  assert.ok(propertyMatchesSearchFilters(rayong, { province_ids: ids }));
+  assert.equal(propertyMatchesSearchFilters(rayong, { province_ids: ["other"] }), false);
+  const terms = [rayong.province!.name_th, "nowhere"];
+  const locationValues: unknown[] = [];
+  const locationSql = propertySearchSqlClauses({ location_terms: terms }, (value) => {
+    locationValues.push(value); return `$${locationValues.length}`;
+  }, []).join(" and ");
+  assert.match(locationSql, /strpos\([\s\S]* or strpos\(/);
+  assert.deepEqual(locationValues, terms);
+  assert.ok(propertyMatchesSearchFilters(rayong, { location_terms: terms }));
+  assert.equal(propertyMatchesSearchFilters(rayong, { location_terms: ["nowhere"] }), false);
+});
+
+test("home list scrolls on mobile and the benefit strip only overlaps above the mobile hero breakpoint", () => {
+  const map = readFileSync(new URL("../../components/search/HomePropertyMap.tsx", import.meta.url), "utf8");
+  assert.match(map, /<ul className="[^"\n]*max-h-\[480px\][^"\n]*overflow-y-auto[^"\n]*overscroll-contain/);
+  const home = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
+  assert.match(home, /bottom-0[^"\n]*md:hidden/);
+  assert.doesNotMatch(home, /sm:-mt-/);
+  assert.match(home, /mt-4[^"\n]*md:-mt-36/);
 });
 
 test("location choices are a strict hierarchy from listing data", () => {

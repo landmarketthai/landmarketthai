@@ -5,27 +5,34 @@ export interface AdminUser {
   name?: string;
   email: string;
   role?: string;
+  emailVerified?: boolean;
 }
 
 export function isAdminUserAllowed(
   user: AdminUser | null,
   adminEmails = process.env.ADMIN_EMAILS ?? "",
 ): boolean {
-  if (!user?.email) return false;
+  if (!user?.id) return false;
   const allowed = new Set(
     adminEmails
       .split(",")
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
-  return user.role === "admin" || allowed.has(user.email.toLowerCase());
+  // role is accepted only from the server-authenticated getSession user, never request input.
+  return user.role === "admin" || (user.emailVerified === true && allowed.has((user.email ?? "").trim().toLowerCase()));
 }
 
-export async function getAdminUser(_headers?: Headers): Promise<AdminUser | null> {
-  const result = await auth.getSession().catch(() => null);
+export async function getSessionUser(): Promise<AdminUser | null> {
+  const result = await auth.getSession({ query: { disableCookieCache: "true" } }).catch(() => null);
   const sessionResult = result as
-    | { data?: { user?: AdminUser | null } | null; user?: AdminUser | null }
+    | { data?: { user?: AdminUser | null } | null; user?: AdminUser | null; error?: unknown }
     | null;
-  const sessionUser = sessionResult?.data?.user ?? sessionResult?.user ?? null;
-  return isAdminUserAllowed(sessionUser) ? sessionUser : null;
+  const sessionUser = sessionResult?.error ? null : sessionResult?.data?.user ?? sessionResult?.user ?? null;
+  return sessionUser;
+}
+
+export async function getAdminUser(): Promise<AdminUser | null> {
+  const user = await getSessionUser();
+  return isAdminUserAllowed(user) ? user : null;
 }

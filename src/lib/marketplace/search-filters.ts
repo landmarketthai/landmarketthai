@@ -10,6 +10,8 @@ export interface PropertySearchFilters {
   property_type?: PropertyType;
   status?: "active" | "sold";
   province_slug?: string;
+  province_ids?: string[];
+  location_terms?: string[];
   district?: string;
   subdistrict?: string;
   min_price?: number;
@@ -100,6 +102,11 @@ function propertyDepth(property: Land): number | null {
 }
 
 export function propertyMatchesSearchFilters(property: Land, filters: PropertySearchFilters): boolean {
+  if (filters.province_ids?.length && !filters.province_ids.includes(property.province_id)) return false;
+  if (filters.location_terms?.length) {
+    const text = [property.title_th, property.address, property.subdistrict, property.district, property.province?.name_th].filter(Boolean).join(" ").toLocaleLowerCase("th");
+    if (!filters.location_terms.some((term) => text.includes(term.trim().toLocaleLowerCase("th")))) return false;
+  }
   if (property.deleted_at || (property.status !== "active" && property.status !== "sold")) return false;
   if (property.transaction_type !== "sale") return false;
 
@@ -219,6 +226,11 @@ export function propertySearchSqlClauses(
       when l.land_type::text in ('factory', 'warehouse') then l.land_type::text else 'land' end) = ${add(filters.property_type)}`);
   }
   if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
+  if (filters.province_ids?.length) clauses.push(`l.province_id = any(${add(filters.province_ids)}::uuid[])`);
+  if (filters.location_terms?.length) {
+    const text = `lower(concat_ws(' ', l.title_th, ${v2Text("address")}, ${v2Text("subdistrict")}, l.district, p.name_th))`;
+    clauses.push(`(${filters.location_terms.map((term) => `strpos(${text}, lower(${add(term.trim())})) > 0`).join(" or ")})`);
+  }
   if (filters.province_slug) clauses.push(`p.slug = ${add(filters.province_slug)}`);
   // Raw text contains the normalized text, so matching the normalized filter against it never drops a match.
   const area = (column: string, filter: string) =>

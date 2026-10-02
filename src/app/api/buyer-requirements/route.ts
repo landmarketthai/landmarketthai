@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buyerRequirementSchema } from "@/lib/marketplace/schemas";
-import { createBuyerRequirement } from "@/lib/neon/marketplace";
-
-const buckets = new Map<string, { count: number; resetAt: number }>();
+import { createBuyerRequirement, UnknownBuyerProvinceError } from "@/lib/neon/marketplace";
+import { allowBuyerSubmission } from "@/lib/neon/buyer-rate-limit";
+import type { BuyerRequirementSubmissionResult } from "@/lib/types/database";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const now = Date.now();
-  const bucket = buckets.get(ip);
-  if (bucket && bucket.resetAt > now && bucket.count >= 6) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  buckets.set(ip, bucket && bucket.resetAt > now ? { ...bucket, count: bucket.count + 1 } : { count: 1, resetAt: now + 60_000 });
+  if (!await allowBuyerSubmission(ip)) return NextResponse.json({ error: "ส่งคำขอบ่อยเกินไป กรุณารอ 1 นาที", code: "rate_limited" }, { status: 429 });
 
   const body = await request.json().catch(() => null);
   const parsed = buyerRequirementSchema.safeParse(body);
@@ -17,9 +14,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await createBuyerRequirement(parsed.data);
-    return NextResponse.json(result, { status: 201, headers: { "Cache-Control": "no-store" } });
+    const response: BuyerRequirementSubmissionResult = { status: "pending_review", matches: result.matches };
+    return NextResponse.json(response, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("Buyer requirement error:", error);
+    if (error instanceof UnknownBuyerProvinceError) return NextResponse.json({ error: "จังหวัดที่เลือกไม่ถูกต้อง กรุณาโหลดตัวเลือกใหม่", field: "province_ids" }, { status: 400 });
+    console.error("Buyer requirement could not be saved");
     return NextResponse.json({ error: "บันทึกความต้องการไม่สำเร็จ" }, { status: 500 });
   }
 }

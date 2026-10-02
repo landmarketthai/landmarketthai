@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/neon/server";
+import { BUYER_ACTIONS, type BuyerAdminAction } from "@/lib/marketplace/buyer-demand-workflow";
 import { searchProperties } from "@/lib/neon/queries";
-import { classifyBuyerMatch, type BuyerMatchCriteria } from "@/lib/marketplace/matching";
+import { findBuyerMatches, type BuyerMatchCriteria } from "@/lib/marketplace/matching";
 import { normalizeVerificationStatus } from "@/lib/marketplace/verification";
 import {
   ADMIN_ACTIONS,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/marketplace/listing-workflow";
 import type {
   DocType,
-  Land,
+  BuyerRequirement,
   PropertySubmission,
   PropertySubmissionMedia,
   PropertyType,
@@ -399,14 +400,21 @@ export interface BuyerRequirementInput extends BuyerMatchCriteria {
   container_access?: boolean | null;
   high_voltage?: boolean | null;
   water_requirement?: string | null;
+  special_requirements?: string | null;
   name: string;
   phone: string;
   line_id?: string | null;
   consent_pdpa: boolean;
+  consent_public: boolean;
 }
 
-export async function createBuyerRequirement(input: BuyerRequirementInput): Promise<{ id: string; matches: { full: Land[]; near: Land[] } }> {
+export async function createBuyerRequirement(input: BuyerRequirementInput): Promise<{ id: string; matches: Awaited<ReturnType<typeof findBuyerMatches>> }> {
+  if (!input.consent_pdpa) throw new Error("PDPA consent required");
   const sql = getSql();
+  if (input.province_ids.length) {
+    const provinces = await sql.query(`select id from provinces where id = any($1::uuid[])`, [input.province_ids]);
+    if (provinces.length !== input.province_ids.length) throw new UnknownBuyerProvinceError();
+  }
   const rows = await sql.query(
     `with new_lead as (
        insert into leads (lead_type,name,phone,line_id,source,details,consent_pdpa,consent_at,status)
@@ -414,8 +422,10 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
      ), req as (
        insert into buyer_requirements (
          lead_id,property_type,transaction_type,preferred_locations,province_ids,min_size_rai,max_size_rai,max_price,max_price_per_rai,
-         zoning,purpose,container_access,high_voltage,water_requirement,name,phone,line_id,status
-       ) select id,$6,$7,$8::text[],$9::uuid[],$10,$11,$12,$13,$14,$15,$16,$17,$18,$1,$2,$3,'active' from new_lead
+         zoning,purpose,container_access,high_voltage,water_requirement,name,phone,line_id,status,
+         special_requirements,consent_pdpa,consent_pdpa_at,consent_public,consent_public_at,submitted_at
+       ) select id,$6,$7,$8::text[],$9::uuid[],$10,$11,$12,$13,$14,$15,$16,$17,$18,$1,$2,$3,'pending_review',
+         $19,$5,now(),$20,case when $20::boolean then now() end,now() from new_lead
        returning id
      ) select id from req`,
     [
@@ -424,23 +434,70 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
       input.consent_pdpa, input.property_type ?? null, "sale", input.preferred_locations, input.province_ids,
       input.min_size_rai ?? null, input.max_size_rai ?? null, input.max_price ?? null, input.max_price_per_rai ?? null,
       input.zoning ?? null, input.purpose ?? null, input.container_access ?? null, input.high_voltage ?? null, input.water_requirement ?? null,
+      input.special_requirements ?? null, input.consent_public,
     ],
   );
   const id = rows[0]?.id ? String(rows[0].id) : "";
   if (!id) throw new Error("Requirement insert failed");
 
-  const candidates = await searchProperties({
-    property_type: input.property_type ?? undefined,
-    limit: 100,
-  });
+  // Saving succeeded even if the independent inventory lookup is unavailable.
+  const matches = await findBuyerMatches(input, (limit, offset) => searchProperties({
+    property_type: input.property_type ?? undefined, province_ids: input.province_ids, location_terms: input.preferred_locations, status: "active", limit, offset,
+  }, { persistedOnly: true }));
+  return { id, matches };
+}
 
-  const full: Land[] = [];
-  const near: Land[] = [];
-  for (const property of candidates) {
-    const match = classifyBuyerMatch(property, input);
-    if (match === "full") full.push(property);
-    if (match === "near") near.push(property);
-  }
+export class UnknownBuyerProvinceError extends Error {}
 
-  return { id, matches: { full: full.slice(0, 12), near: near.slice(0, 12) } };
+function normalizeBuyerRequirement(row: Record<string, unknown>): BuyerRequirement {
+  // Private admin response only. Public queries use a separate explicit projection.
+  const normalized = { ...row };
+  for (const key of ["min_size_rai", "max_size_rai", "max_price", "max_price_per_rai"]) normalized[key] = num(row[key]);
+  for (const key of ["created_at", "updated_at", "submitted_at", "reviewed_at", "published_at", "closed_at", "consent_pdpa_at", "consent_public_at"]) normalized[key] = str(row[key]);
+  return normalized as unknown as BuyerRequirement;
+}
+
+export async function getBuyerRequirements(offset = 0, status = "", id = ""): Promise<BuyerRequirement[]> {
+  // Preserve PostgreSQL microseconds for the displayed optimistic concurrency token.
+  const rows = await getSql().query(`select *, (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+    from buyer_requirements where ($2 = '' or status = $2) and ($3 = '' or id::text = $3)
+    order by submitted_at desc, id limit 51 offset $1`,
+    [Number.isSafeInteger(offset) && offset >= 0 ? offset : 0, status, id]);
+  return rows.map(normalizeBuyerRequirement);
+}
+
+export async function getBuyerRequirement(id: string): Promise<BuyerRequirement | null> {
+  const rows = await getSql().query(`select *, (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+    from buyer_requirements where id = $1`, [id]);
+  return rows[0] ? normalizeBuyerRequirement(rows[0]) : null;
+}
+
+export async function applyBuyerAdminAction(id: string, action: BuyerAdminAction, adminId: string, expectedUpdatedAt: string, note?: string): Promise<boolean> {
+  if (!Object.hasOwn(BUYER_ACTIONS, action) || !adminId.trim()) return false;
+  if (action === "reject" && !note?.trim()) return false;
+  const transition = BUYER_ACTIONS[action];
+  // Compare the version the admin actually reviewed, including after a prior action completed.
+  // The database trigger atomically upserts or hides the sanitized projection.
+  const rows = await getSql().query(
+    `with locked_lead as materialized (
+       select l.id,l.consent_pdpa,l.consent_at from leads l
+       join buyer_requirements source on source.lead_id = l.id where source.id = $1 for update of l
+     )
+     update buyer_requirements r set status = $2, updated_at = now(),
+       reviewed_at = case when $3 in ('approve','reject') then now() else reviewed_at end,
+       reviewed_by = case when $3 in ('approve','reject') then $4 else reviewed_by end,
+       review_note = coalesce($5,review_note),
+       published_at = case when $3 = 'publish' then coalesce(published_at,now()) else published_at end,
+       closed_at = case when $3 = 'closed' then now() else closed_at end
+     where r.id = $1 and r.updated_at = $7::timestamptz and status = any($6::text[])
+       and (r.lead_id is null or exists (select 1 from locked_lead))
+       and ($3 not in ('approve','publish') or r.lead_id is null or exists (
+         select 1 from locked_lead where consent_pdpa and consent_at is not null))
+       and ($3 <> 'approve' or (consent_pdpa and consent_pdpa_at is not null))
+       and ($3 <> 'publish' or (consent_pdpa and consent_public and consent_public_at is not null and consent_pdpa_at is not null
+         and reviewed_at is not null and nullif(trim(reviewed_by), '') is not null))
+     returning r.id`,
+    [id, transition.to, action, adminId.trim(), note?.trim() || null, [...transition.from], expectedUpdatedAt],
+  );
+  return rows.length > 0;
 }

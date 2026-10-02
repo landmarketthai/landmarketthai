@@ -1,28 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getActiveDemands } from "@/lib/neon/queries";
-import BuyerDemandList from "@/components/demand/BuyerDemandList";
+import BuyerDemandList, { isPublishedDemand } from "@/components/demand/BuyerDemandList";
 import LineButton from "@/components/ui/LineButton";
 import JsonLd from "@/components/seo/JsonLd";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Buyer กำลังหาที่ดิน – ตลาดย้อนกลับ LandmarketThai",
+  title: "Buyer กำลังหาที่ดิน โรงงาน โกดัง – ตลาดย้อนกลับ LandmarketThai",
   description:
-    "รายการ Buyer ที่กำลังมองหาที่ดินอุตสาหกรรม EEC ระยอง ชลบุรี คุณมีที่ดินตรงนี้ไหม? แนะนำได้ทันที",
+    "รายการผู้ซื้อที่กำลังมองหาที่ดิน โรงงาน และโกดังทั่วประเทศไทย แนะนำทรัพย์ที่ตรงความต้องการได้ทันที",
   alternates: { canonical: "/buyer-demand" },
 };
 
-export default async function BuyerDemandPage() {
-  const demands = await getActiveDemands(50).catch(() => []);
+export default async function BuyerDemandPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const raw = Number((await searchParams).page ?? 1);
+  const page = Number.isSafeInteger(raw) && raw > 0 && raw <= Math.floor(Number.MAX_SAFE_INTEGER / 50) ? raw : 1;
+  const rows = await getActiveDemands(51, (page - 1) * 50).then((rows) => rows.filter(isPublishedDemand)).catch(() => null);
+  if (rows === null) return <div className="container-xl section text-center" role="alert">
+    <h1 className="text-xl font-bold">โหลดรายการความต้องการซื้อไม่ได้ในขณะนี้</h1>
+    <p className="my-4">กรุณาลองใหม่อีกครั้ง</p>
+    <Link href={`/buyer-demand?page=${page}`} className="btn-outline">ลองใหม่</Link>
+  </div>;
+  const demands = rows.slice(0, 50);
 
   const listSchema = {
     "@context": "https://schema.org",
     "@type": "ItemList",
     itemListElement: demands.map((d, i) => ({
       "@type": "ListItem",
-      position: i + 1,
+      position: (page - 1) * 50 + i + 1,
       url: `/buyer-demand/${d.slug}`,
     })),
   };
@@ -34,12 +43,12 @@ export default async function BuyerDemandPage() {
       <div className="bg-slate-900 text-white py-14 px-4 sm:px-6 lg:px-8">
         <div className="container-xl max-w-2xl text-center">
           <div className="inline-flex items-center gap-2 bg-green-500/20 text-green-300 text-xs px-4 py-1.5 rounded-full border border-green-500/30 mb-4">
-            🔍 Buyer กำลังหาที่ดิน
+            🔍 Buyer กำลังหาทรัพย์
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold mb-3">ตลาดย้อนกลับ</h1>
           <p className="text-slate-400">
-            รายการผู้ซื้อที่ต้องการที่ดินอุตสาหกรรม EEC
-            คุณรู้จักที่ดินที่ตรงกับความต้องการ? แนะนำเพื่อรับค่าคอม
+            รายการผู้ซื้อที่ต้องการที่ดิน โรงงาน และโกดังทั่วประเทศไทย
+            คุณรู้จักทรัพย์ที่ตรงกับความต้องการ? แนะนำเพื่อรับค่าคอม
           </p>
         </div>
       </div>
@@ -55,13 +64,17 @@ export default async function BuyerDemandPage() {
           }
         />
 
+        <nav aria-label="หน้ารายการ" className="mt-6 flex justify-center gap-6">
+          {page > 1 && <Link href={`/buyer-demand?page=${page - 1}`} className="btn-outline">ก่อนหน้า</Link>}
+          {rows.length > 50 && <Link href={`/buyer-demand?page=${page + 1}`} className="btn-outline">ถัดไป</Link>}
+        </nav>
         <div className="mt-12 text-center bg-brand-50 rounded-2xl p-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-2">คุณรู้จักที่ดินที่ตรงกับ Buyer ไหม?</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">คุณรู้จักทรัพย์ที่ตรงกับ Buyer ไหม?</h2>
           <p className="text-slate-500 text-sm mb-5">
-            แนะนำที่ดินให้ตรงกับ Buyer รับค่าแนะนำเมื่อปิดดีล
+            แนะนำทรัพย์ให้ตรงกับ Buyer รับค่าแนะนำเมื่อปิดดีล
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/submit-land" className="btn-primary">ส่งข้อมูลที่ดิน</Link>
+            <Link href="/sell" className="btn-primary">ส่งข้อมูลทรัพย์</Link>
             <Link href="/become-partner" className="btn-outline">สมัครพาร์ทเนอร์</Link>
           </div>
         </div>

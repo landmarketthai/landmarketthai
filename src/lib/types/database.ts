@@ -33,7 +33,8 @@ export type SubmissionStatus =
 export type LeadType = "buyer" | "partner" | "owner";
 export type LeadStatus = "new" | "contacting" | "qualified" | "won" | "lost";
 export type DocType = "title_deed" | "map" | "brochure" | "other";
-export type DemandStatus = "active" | "matched" | "closed";
+export type DemandStatus = "published" | "unpublished" | "matched" | "closed" | "expired";
+export type BuyerRequirementStatus = "pending_review" | "approved" | "published" | "rejected" | "matched" | "closed" | "expired";
 export type DealStatus = "in_progress" | "closed" | "cancelled";
 export type PartnerStatus = "pending" | "active" | "inactive";
 export type PostStatus = "draft" | "published";
@@ -269,6 +270,13 @@ export interface BuyerDemand {
   intended_use: string | null;
   budget_note: string | null;
   status: DemandStatus;
+  max_price: number | null;
+  max_price_per_rai: number | null;
+  zoning: ZoningColor | null;
+  container_access: boolean | null;
+  high_voltage: boolean | null;
+  province_names: string[];
+  published_at: string;
   is_public: boolean;
   seo_title: string | null;
   seo_description: string | null;
@@ -276,7 +284,15 @@ export interface BuyerDemand {
   province?: Province;
 }
 
+/** Public rendering contract excludes contacts, source IDs, SEO overrides and free text. */
+export type PublicBuyerDemand = Pick<BuyerDemand,
+  | "slug" | "land_type" | "size_min_rai" | "size_max_rai"
+  | "max_price" | "max_price_per_rai" | "zoning" | "container_access" | "high_voltage"
+  | "province_names" | "published_at" | "status" | "is_public"
+> & { province?: Pick<Province, "name_th"> };
+
 export interface BuyerRequirement {
+  public_slug?: string | null;
   id: string;
   lead_id: string | null;
   property_type: PropertyType | null;
@@ -292,12 +308,28 @@ export interface BuyerRequirement {
   container_access: boolean | null;
   high_voltage: boolean | null;
   water_requirement: string | null;
+  special_requirements: string | null;
   name: string;
   phone: string;
   line_id: string | null;
-  status: DemandStatus;
+  status: BuyerRequirementStatus;
+  consent_pdpa: boolean;
+  consent_pdpa_at: string | null;
+  consent_public: boolean;
+  consent_public_at: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_note: string | null;
+  published_at: string | null;
+  closed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BuyerRequirementSubmissionResult {
+  status: Extract<BuyerRequirementStatus, "pending_review">;
+  matches: { full: Land[]; near: Land[]; status: "available" | "limited" | "unavailable" };
 }
 
 export interface Category {

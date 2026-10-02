@@ -5,7 +5,7 @@ import { Check, ChevronLeft, ChevronRight, FileText, ImagePlus, MapPin, Save, Up
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import LocationPicker from "./LocationPicker";
 
-interface Props { provinces: Province[] }
+interface Props { provinces: Province[]; buyerDemandSlug?: string }
 
 type DraftForm = {
   property_type: PropertyType | null;
@@ -92,7 +92,7 @@ function fromDraft(draft: PropertySubmission): DraftForm {
   };
 }
 
-export default function SellWizard({ provinces }: Props) {
+export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const [step, setStep] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export default function SellWizard({ provinces }: Props) {
     setSaving(true);
     try {
       const response = await fetch(`/api/property-submissions/${draftId}/submit`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, consent_pdpa: true }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "ส่งข้อมูลไม่สำเร็จ");

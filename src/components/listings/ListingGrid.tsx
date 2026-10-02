@@ -51,8 +51,8 @@ export default async function ListingGrid({ provinceSlug, landType, filters, pag
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <LineButton label="สอบถามที่ดินผ่าน LINE" />
-          <Link href="/submit-land" className="btn-outline">
-            ส่งที่ดินของคุณ
+          <Link href="/sell" className="btn-outline">
+            ฝากขายทรัพย์ของคุณ
           </Link>
         </div>
       </div>

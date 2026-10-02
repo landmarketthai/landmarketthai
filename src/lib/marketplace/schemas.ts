@@ -44,6 +44,7 @@ export const draftSchema = z.object({
 
 export const submitDraftSchema = z.object({
   token: z.string().uuid(),
+  buyer_demand_slug: z.string().regex(/^buyer-demand-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
   consent_pdpa: z.literal(true),
 });
 
@@ -60,21 +61,27 @@ export const buyerRequirementSchema = z.object({
   property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
   transaction_type: z.literal("sale").default("sale"),
   preferred_locations: z.array(z.string().trim().min(1).max(120)).max(10).default([]),
-  province_ids: z.array(z.string().uuid()).max(10).default([]),
-  min_size_rai: optionalNumber.optional(),
-  max_size_rai: optionalNumber.optional(),
-  max_price: optionalNumber.optional(),
-  max_price_per_rai: optionalNumber.optional(),
+  province_ids: z.array(z.string().uuid().toLowerCase()).max(10).default([]).refine(
+    (ids) => new Set(ids).size === ids.length, "กรุณาเลือกจังหวัดไม่ซ้ำกัน",
+  ),
+  min_size_rai: z.number().finite().nonnegative().max(999_999_999.99999).multipleOf(0.00001).nullable().optional(),
+  max_size_rai: z.number().finite().nonnegative().max(999_999_999.99999).multipleOf(0.00001).nullable().optional(),
+  max_price: z.number().finite().nonnegative().max(99_999_999_999_999.99).multipleOf(0.01).nullable().optional(),
+  max_price_per_rai: z.number().finite().nonnegative().max(99_999_999_999_999.99).multipleOf(0.01).nullable().optional(),
   zoning: z.enum(["purple", "purple_light", "brown", "orange", "yellow", "green", "other"]).nullable().optional(),
   purpose: z.string().trim().max(1000).nullable().optional(),
   container_access: z.boolean().nullable().optional(),
   high_voltage: z.boolean().nullable().optional(),
   water_requirement: z.string().trim().max(1000).nullable().optional(),
+  special_requirements: z.string().trim().max(2000).nullable().optional(),
   name: z.string().trim().min(2).max(120),
-  phone: thaiPhone,
+  phone: z.string().max(32).pipe(thaiPhone),
   line_id: z.string().trim().max(100).nullable().optional(),
   consent_pdpa: z.literal(true),
-}).refine((value) => value.max_size_rai == null || value.min_size_rai == null || value.min_size_rai <= value.max_size_rai, {
+  consent_public: z.boolean().default(false),
+}).strict().refine((value) => value.max_size_rai == null || value.min_size_rai == null || value.min_size_rai <= value.max_size_rai, {
   message: "ช่วงขนาดไม่ถูกต้อง",
   path: ["max_size_rai"],
 });
+
+export type BuyerRequirementInput = z.infer<typeof buyerRequirementSchema>;
