@@ -1,7 +1,6 @@
 import type { Land, PropertyType } from "@/lib/types/database";
 import type { PropertySort } from "@/lib/marketplace/search-sort";
-
-export const PROPERTY_TYPES: readonly PropertyType[] = ["land", "factory", "warehouse"];
+import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 export const PROPERTY_SORTS: readonly PropertySort[] = ["newest", "price_asc", "price_desc", "price_per_rai_asc", "size_desc"];
 const ZONINGS = ["purple", "purple_light", "brown", "orange", "yellow", "green", "other"] as const;
 
@@ -222,8 +221,10 @@ export function propertySearchSqlClauses(
     clauses.push(`strpos(lower(${haystack}), lower(${add(q)})) > 0`);
   }
   if (filters.property_type) {
-    clauses.push(`(case when ${v2Text("property_type")} in ('land', 'factory', 'warehouse') then ${v2Text("property_type")}
-      when l.land_type::text in ('factory', 'warehouse') then l.land_type::text else 'land' end) = ${add(filters.property_type)}`);
+    // Mirrors normalizeLand: a canonical property_type wins, else a canonical land_type, else legacy rows are land.
+    const canonical = add([...PROPERTY_TYPES]);
+    clauses.push(`(case when ${v2Text("property_type")} = any(${canonical}::text[]) then ${v2Text("property_type")}
+      when l.land_type::text = any(${canonical}::text[]) then l.land_type::text else 'land' end) = ${add(filters.property_type)}`);
   }
   if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
   if (filters.province_ids?.length) clauses.push(`l.province_id = any(${add(filters.province_ids)}::uuid[])`);

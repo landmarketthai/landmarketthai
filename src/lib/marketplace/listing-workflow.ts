@@ -62,6 +62,11 @@ export function coordinateIssues(input: {
   return [];
 }
 
+/** Land area (rai) or building usable area (sq.m.) — whichever applies to the asset — must be positive. */
+export function hasPositiveArea(input: { total_rai: number | null; usable_area_sqm?: number | null }): boolean {
+  return (input.total_rai != null && input.total_rai > 0) || (input.usable_area_sqm != null && input.usable_area_sqm > 0);
+}
+
 /** Fields a submission must have before an admin can publish it as a public sale listing. */
 export function publishReadinessIssues(submission: PropertySubmission): string[] {
   const issues: string[] = [];
@@ -70,7 +75,7 @@ export function publishReadinessIssues(submission: PropertySubmission): string[]
   if (!submission.property_type) issues.push("ประเภททรัพย์");
   if (!submission.title?.trim()) issues.push("ชื่อทรัพย์");
   if (!submission.province_id) issues.push("จังหวัด");
-  if (submission.total_rai == null || submission.total_rai <= 0) issues.push("ขนาดพื้นที่");
+  if (!hasPositiveArea(submission)) issues.push("ขนาดพื้นที่");
   // The schema has no "price on request" flag, so a positive sale price is mandatory.
   if (submission.sale_price == null || submission.sale_price <= 0) issues.push("ราคาขาย");
   issues.push(...coordinateIssues(submission));

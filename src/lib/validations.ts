@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { LAND_TYPE_LABELS, ZONING_LABELS } from "@/lib/utils";
+import { LAND_CATEGORY_TYPES, ZONING_LABELS } from "@/lib/utils";
 import { LOCATION_ANCHORS } from "@/lib/location-intelligence";
 
 export const buyerRequirementsSchema = z.object({
   province: z.string().trim().min(1).max(80).optional(),
-  land_type: z.enum(Object.keys(LAND_TYPE_LABELS) as [string, ...string[]]).optional(),
+  land_type: z.enum(LAND_CATEGORY_TYPES).optional(),
   size_min_rai: z.number().nonnegative().max(1e12).optional(),
   size_max_rai: z.number().nonnegative().max(1e12).optional(),
   budget_min: z.number().nonnegative().max(1e12).optional(),

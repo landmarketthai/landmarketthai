@@ -4,16 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
-import type { Land, Province } from "@/lib/types/database";
-import { formatMoneyFull, formatRai, listingStatusLabel } from "@/lib/utils";
+import type { Land, PropertyType, Province } from "@/lib/types/database";
+import { formatMoneyFull, listingStatusLabel } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
+import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
 import { locationChoices, type LocationOption } from "@/lib/marketplace/search-filters";
 import PropertyMap, { type MapBounds } from "./PropertyMap";
 import SearchPropertyCard from "./SearchPropertyCard";
 
 export interface SearchValues {
   q?: string;
-  property_type?: "land" | "factory" | "warehouse";
+  property_type?: PropertyType;
   status?: "active" | "sold";
   province?: string;
   district?: string;
@@ -41,12 +42,7 @@ interface Props {
   initialMode?: "list" | "map";
 }
 
-const propertyTypes = [
-  ["", "ทั้งหมด"],
-  ["land", "ที่ดิน"],
-  ["factory", "โรงงาน"],
-  ["warehouse", "โกดัง"],
-] as const;
+const propertyTypes: ReadonlyArray<readonly [string, string]> = [["", "ทั้งหมด"], ...PROPERTY_TYPES.map((type) => [type, PROPERTY_TYPE_LABELS[type]] as const)];
 
 const zoningOptions = [
   ["", "ทุกผังเมือง"],
@@ -459,8 +455,8 @@ export default function SearchExperience({ initialProperties, provinces, locatio
                 {selectedMapProperty.total_price != null && (
                   <span className="text-base font-black text-[#082f63]">{formatMoneyFull(selectedMapProperty.total_price)}</span>
                 )}
-                {selectedMapProperty.size_rai != null && (
-                  <span className="text-sm font-bold text-slate-600">{formatRai(selectedMapProperty.size_rai)}</span>
+                {propertySizeLabel(selectedMapProperty) && (
+                  <span className="text-sm font-bold text-slate-600">{propertySizeLabel(selectedMapProperty)}</span>
                 )}
                 {selectedMapProperty.price_per_rai != null && (
                   <span className="text-xs text-slate-500">{formatMoneyFull(selectedMapProperty.price_per_rai)} / ไร่</span>

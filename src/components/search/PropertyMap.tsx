@@ -34,8 +34,9 @@ function markerPrice(property: Land): string {
 }
 
 function markerArea(property: Land): string | null {
-  if (property.size_rai == null) return null;
-  return `${property.size_rai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ไร่`;
+  if (property.size_rai != null) return `${property.size_rai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ไร่`;
+  if (property.usable_area_sqm != null) return `${property.usable_area_sqm.toLocaleString("th-TH", { maximumFractionDigits: 0 })} ตร.ม.`;
+  return null;
 }
 
 function markerLabel(property: Land): string {

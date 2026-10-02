@@ -12,6 +12,7 @@ import * as searchSort from "./marketplace/search-sort.ts";
 import { findBuyerMatches } from "./marketplace/matching.ts";
 import { normalizeVerificationStatus } from "./marketplace/verification.ts";
 import { SEED_PUBLIC_LISTINGS } from "./seed-listings.ts";
+import * as presentation from "./marketplace/presentation.ts";
 
 // Run the actual server modules with in-memory dependencies; never connect to a database.
 function loadSource<T>(path: string, modules: Record<string, unknown>, globals: Record<string, unknown> = {}): T {
@@ -155,7 +156,7 @@ test("unknown initial province recovers after a valid selection and submits with
       if (!(index in states)) states[index] = initial;
       return [states[index], (value: unknown) => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
     } },
-    "@/components/listings/ListingCard": "listing",
+    "@/components/listings/ListingCard": "listing", "@/lib/marketplace/presentation": presentation,
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: () => ({ success: true, data: {} }) } },
   }, { fetch: async () => { posts++; return { ok: true, json: async () => ({ status: "pending_review", matches: { status: "available", full: [], near: [] } }) }; } });
   const render = () => { cursor = 0; return form.default({ provinces: [province], initial: { province: "unknown" } }); };
@@ -742,7 +743,7 @@ test("homepage map skips the tall map when no properties have coordinates and wr
   const component = loadSource<{ default: (props: { properties: unknown[] }) => unknown }>("../components/search/HomePropertyMap.tsx", {
     "react/jsx-runtime": jsxRuntime, react: { useState: () => [null, () => {}] },
     "next/link": "link", "lucide-react": {}, "@/lib/utils": {},
-    "@/lib/marketplace/verification": {}, "./PropertyMap": "map",
+    "@/lib/marketplace/verification": {}, "@/lib/marketplace/presentation": presentation, "./PropertyMap": "map",
   });
   const view = JSON.stringify(component.default({ properties: [] }));
   assert.doesNotMatch(view, /"type":"map"|h-\[390px\]/);
@@ -764,7 +765,7 @@ test("buyer validation names the invalid field, marks it and focuses it before s
       if (!(index in states)) states[index] = initial;
       return [states[index], (value: unknown) => { states[index] = value; }];
     } },
-    "@/components/listings/ListingCard": "listing",
+    "@/components/listings/ListingCard": "listing", "@/lib/marketplace/presentation": presentation,
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: () => ({ success: false, error: { issues: [{ path: ["phone"] }] } }) } },
   }, { fetch: async () => { posts++; } });
   const props = { provinces: [{ id: "province", slug: "rayong" }] };

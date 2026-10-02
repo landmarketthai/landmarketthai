@@ -5,12 +5,12 @@ import { getPersistedProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากขายทรัพย์",
-  description: "ฝากขายที่ดิน โรงงาน และโกดัง ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
+  description: "ฝากขายที่ดิน บ้าน คอนโด อาคารพาณิชย์ โรงงาน โกดัง และอสังหาริมทรัพย์อื่น ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
   alternates: { canonical: "/sell" },
 };
 
 const notes = [
-  { Icon: Save, text: "บันทึกแบบร่างและกลับมาทำต่อได้" },
+  { Icon: Save, text: "บันทึกแบบร่างอัตโนมัติ กลับมาทำต่อได้" },
   { Icon: Shield, text: "ข้อมูลจะไม่เผยแพร่อัตโนมัติ" },
   { Icon: FileCheck, text: "ทีมงานตรวจสอบก่อนขึ้นเว็บไซต์" },
   { Icon: CheckCircle2, text: "กรอกเฉพาะข้อมูลจริงที่มีอยู่" },
@@ -29,7 +29,7 @@ export default async function SellPage({ searchParams }: { searchParams: Promise
           <div className="text-xs font-bold tracking-[0.16em] text-gold-400">SELL</div>
           <h1 className="mt-2 text-3xl font-black sm:text-4xl">ฝากขายทรัพย์</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
-            เพิ่มข้อมูลที่ดิน โรงงาน หรือโกดังแบบเป็นขั้นตอน บันทึกไว้ก่อนแล้วกลับมาทำต่อได้
+            กรอกข้อมูลทรัพย์ในหน้าเดียว ระบบบันทึกแบบร่างให้อัตโนมัติ กลับมาทำต่อได้
             และทีมงานจะตรวจสอบก่อนเผยแพร่ทุกครั้ง
           </p>
         </div>

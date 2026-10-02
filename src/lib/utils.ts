@@ -1,15 +1,18 @@
 import type { Land, LandType, ZoningColor } from "./types/database";
+import { PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 
+/** Labels for every stored land_type (legacy categories + canonical property types). */
 export const LAND_TYPE_LABELS: Record<LandType, string> = {
-  land: "ที่ดิน",
+  ...PROPERTY_TYPE_LABELS,
   industrial: "ที่ดินอุตสาหกรรม",
   eec: "EEC",
-  factory: "โรงงาน",
-  warehouse: "คลังสินค้า",
   logistics: "โลจิสติกส์",
   data_center: "Data Center",
   investment: "ที่ดินลงทุน",
 };
+
+/** Land categories with /land/[province]/[type] SEO pages, filters and lead-form choices. Unchanged by new property types. */
+export const LAND_CATEGORY_TYPES = ["land", "industrial", "eec", "factory", "warehouse", "logistics", "data_center", "investment"] as const satisfies readonly LandType[];
 
 export const ZONING_LABELS: Record<ZoningColor, string> = {
   purple: "ม่วง (อุตสาหกรรม)",
@@ -83,7 +86,7 @@ export function landTypeSlug(type: LandType): string {
 
 export function slugToLandType(slug: string): LandType | null {
   const t = slug.replace(/-/g, "_") as LandType;
-  if (Object.keys(LAND_TYPE_LABELS).includes(t)) return t;
+  if ((LAND_CATEGORY_TYPES as readonly LandType[]).includes(t)) return t;
   return null;
 }
 

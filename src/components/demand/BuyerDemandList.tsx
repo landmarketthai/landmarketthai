@@ -58,7 +58,7 @@ export default function BuyerDemandList({ demands, emptyAction }: { demands: Pub
               <div className="min-w-0 flex-1">
                 <div className="mb-1 text-xs text-slate-500">
                   {demandProvinceLabel(demand)}
-                  {demand.land_type ? ` · ${LAND_TYPE_LABELS[demand.land_type]}` : " · ทุกประเภท: ที่ดิน โรงงาน โกดัง"}
+                  {demand.land_type ? ` · ${LAND_TYPE_LABELS[demand.land_type]}` : " · ทุกประเภททรัพย์"}
                 </div>
                 <div className="font-semibold text-slate-800 transition-colors group-hover:text-brand-600">
                   ต้องการ {demandSizeLabel(demand)}

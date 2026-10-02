@@ -39,7 +39,9 @@ function exactAreaLabel(land: Land): string | null {
     }
     if (parts.length > 0) return parts.join(" ");
   }
-  if (land.size_rai == null) return null;
+  if (land.size_rai == null) {
+    return land.usable_area_sqm != null ? `${land.usable_area_sqm.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ม.` : null;
+  }
 
   const wholeRai = Math.floor(land.size_rai);
   const remainingSqwa = Math.round((land.size_rai - wholeRai) * 400 * 100) / 100;
@@ -61,8 +63,8 @@ function exactAreaLabel(land: Land): string | null {
 }
 
 function propertyTypeLabel(land: Land): string {
-  if (land.property_type === "factory") return "โรงงาน";
-  if (land.property_type === "warehouse") return "โกดัง";
+  // Land keeps its legacy category label (e.g. ที่ดินอุตสาหกรรม); other assets use the property type label.
+  if (land.property_type && land.property_type !== "land") return LAND_TYPE_LABELS[land.property_type] ?? "ที่ดิน";
   return LAND_TYPE_LABELS[land.land_type] ?? "ที่ดิน";
 }
 

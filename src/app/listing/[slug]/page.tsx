@@ -175,6 +175,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
             const facts: Fact[] = [
               { icon: <MapPin size={16} />, label: "จังหวัด", value: land.province?.name_th ?? "–" },
               ...(land.size_rai != null ? [{ icon: <Ruler size={16} />, label: "พื้นที่", value: formatRai(land.size_rai) }] : []),
+              ...(land.usable_area_sqm != null ? [{ icon: <Ruler size={16} />, label: "พื้นที่ใช้สอย", value: `${land.usable_area_sqm.toLocaleString("th-TH")} ตร.ม.` }] : []),
               ...(land.price_per_rai != null ? [{ icon: <Tag size={16} />, label: "ราคา/ไร่", value: `${formatMoney(land.price_per_rai)} ฿` }] : []),
               ...(land.frontage_m ? [{ icon: <Ruler size={16} />, label: "หน้ากว้าง", value: `${land.frontage_m} ม.` }] : []),
               ...(land.zoning ? [{ icon: <Tag size={16} />, label: "ผังสีเมือง", value: ZONING_LABELS[land.zoning] }] : []),

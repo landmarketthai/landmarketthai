@@ -36,8 +36,7 @@ export function searchProperties(listings: Land[], filters: PropertySearchFilter
     if (filters.transaction_type && filters.transaction_type !== "sale") return false;
     if (filters.province && land.province?.slug !== filters.province) return false;
     if (type && land.land_type !== type && !(type === "eec" && land.is_eec)) return false;
-    if (filters.property_type === "land" && ["factory", "warehouse"].includes(land.land_type)) return false;
-    if (filters.property_type && filters.property_type !== "land" && land.land_type !== filters.property_type) return false;
+    if (filters.property_type && land.property_type !== filters.property_type) return false;
     if (minPrice !== null && (land.price_per_rai == null || land.price_per_rai < minPrice) || maxPrice !== null && (land.price_per_rai == null || land.price_per_rai > maxPrice)) return false;
     if (minSize !== null && (land.size_rai == null || land.size_rai < minSize) || maxSize !== null && (land.size_rai == null || land.size_rai > maxSize)) return false;
     const searchable = [land.title_th, land.slug, land.district, land.province?.name_th,

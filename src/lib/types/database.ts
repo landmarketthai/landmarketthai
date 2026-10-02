@@ -1,12 +1,25 @@
-export type LandType =
+/** Canonical seller/buyer property categories (labels: PROPERTY_TYPE_LABELS). */
+export type PropertyType =
   | "land"
-  | "industrial"
-  | "eec"
+  | "house"
+  | "house_with_land"
+  | "townhouse"
+  | "condo"
+  | "housing_project"
+  | "commercial_building"
+  | "office"
   | "factory"
   | "warehouse"
-  | "logistics"
-  | "data_center"
-  | "investment";
+  | "apartment"
+  | "hotel_resort"
+  | "retail"
+  | "business_property"
+  | "other";
+
+/** Legacy public land categories kept for existing lands rows and /land/[province]/[type] SEO pages. */
+export type LegacyLandType = "industrial" | "eec" | "logistics" | "data_center" | "investment";
+/** Published submissions store land_type = property_type, so land_type accepts both sets. */
+export type LandType = PropertyType | LegacyLandType;
 
 export type ZoningColor =
   | "purple"
@@ -18,7 +31,6 @@ export type ZoningColor =
   | "other";
 
 export type LocationPrecision = "exact" | "approx";
-export type PropertyType = "land" | "factory" | "warehouse";
 export type TransactionType = "sale";
 export type VerificationStatus = "pending" | "verified" | "rejected";
 export type ListingStatus = "draft" | "active" | "reserved" | "sold" | "expired" | "archived";
@@ -73,6 +85,8 @@ export interface Land {
   area_rai: number | null;
   area_ngan: number | null;
   area_sqwa: number | null;
+  /** Building / unit usable area for non-land assets; optional because older schemas lack the column. */
+  usable_area_sqm?: number | null;
   zoning: ZoningColor | null;
   frontage_m: number | null;
   depth_min_m: number | null;
@@ -151,6 +165,7 @@ export interface PropertySubmission {
   area_ngan: number | null;
   area_sqwa: number | null;
   total_rai: number | null;
+  usable_area_sqm: number | null;
   frontage_m: number | null;
   depth_min_m: number | null;
   depth_max_m: number | null;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LAND_TYPE_LABELS, ZONING_LABELS } from "@/lib/utils";
+import { LAND_CATEGORY_TYPES, LAND_TYPE_LABELS, ZONING_LABELS } from "@/lib/utils";
 import { landSearchParams, type LandFilters } from "@/lib/land-search";
 import type { Province } from "@/lib/types/database";
 
@@ -19,7 +19,7 @@ export default function FilterBar({ filters, provinces }: { filters: LandFilters
       <label className="text-sm">ประเภทที่ดิน
         <select name="type" defaultValue={filters.land_type ?? ""} className="input mt-1">
           <option value="">ทุกประเภท</option>
-          {Object.entries(LAND_TYPE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          {LAND_CATEGORY_TYPES.map((key) => <option key={key} value={key}>{LAND_TYPE_LABELS[key]}</option>)}
         </select>
       </label>
       <label className="text-sm">ผังเมือง

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { MapPin, Ruler, Search } from "lucide-react";
 import type { Land } from "@/lib/types/database";
-import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel } from "@/lib/utils";
+import { formatMoneyFull, formatUpdatedDate, listingStatusLabel } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
+import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
 import PropertyMap from "./PropertyMap";
 
 interface Props {
@@ -43,9 +44,7 @@ export default function HomePropertyMap({ properties }: Props) {
         </label>
         <select name="property_type" className="input" defaultValue="" aria-label="ประเภททรัพย์">
           <option value="">ทุกประเภท</option>
-          <option value="land">ที่ดิน</option>
-          <option value="factory">โรงงาน</option>
-          <option value="warehouse">โกดัง</option>
+          {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{PROPERTY_TYPE_LABELS[type]}</option>)}
         </select>
         <button type="submit" className="btn-green w-full justify-center sm:col-span-2 lg:col-span-1 lg:w-auto">
           <Search size={16} /> ค้นหาทรัพย์
@@ -173,10 +172,11 @@ function AssetMeta({ property }: { property: Land }) {
   const price = property.total_price;
   const location = [property.district, property.province?.name_th].filter(Boolean).join(" · ");
   const updatedLabel = formatUpdatedDate(property.updated_at);
+  const sizeLabel = propertySizeLabel(property);
   return (
     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
       {location && <span className="flex min-w-0 items-center gap-1 break-words"><MapPin size={12} className="shrink-0" />{location}</span>}
-      {property.size_rai != null && <span className="flex items-center gap-1"><Ruler size={12} className="shrink-0" />{formatRai(property.size_rai)}</span>}
+      {sizeLabel && <span className="flex items-center gap-1"><Ruler size={12} className="shrink-0" />{sizeLabel}</span>}
       {price != null && <span className="font-bold text-[#0d1f44]">{formatMoneyFull(price)}</span>}
       {property.price_per_rai != null && <span>{formatMoneyFull(property.price_per_rai)} / ไร่</span>}
       {updatedLabel && <span className="text-slate-400">อัปเดต {updatedLabel}</span>}

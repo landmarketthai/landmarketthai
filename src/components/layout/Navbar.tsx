@@ -14,7 +14,6 @@ const navLinks = [
   { label: "หน้าแรก", href: "/" },
   { label: "ที่ดินทั้งหมด", href: "/land" },
   { label: "แผนที่", href: "/search" },
-  { label: "ราคาตั้งขาย", href: "/land-insights" },
   { label: "ฝากซื้อ", href: "/buy-request" },
   { label: "ฝากขาย", href: "/sell" },
   { label: "วิธีรับค่าตอบแทน", href: "/how-it-works" },

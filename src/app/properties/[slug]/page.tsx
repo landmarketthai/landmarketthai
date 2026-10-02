@@ -22,6 +22,7 @@ import { getListingBySlug } from "@/lib/neon/queries";
 import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
 import type { Land } from "@/lib/types/database";
 import { landVerification } from "@/lib/marketplace/verification";
+import { PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
 import ListingCard from "@/components/listings/ListingCard";
 import { getPublicInventory } from "@/lib/public-inventory";
@@ -54,9 +55,13 @@ function locationLabel(property: Land): string {
 }
 
 function propertyTypeLabel(property: Land): string {
-  if (property.property_type === "factory") return "โรงงาน";
-  if (property.property_type === "warehouse") return "โกดัง";
-  return "ที่ดิน";
+  return PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.land;
+}
+
+function usableArea(property: Land): string | null {
+  return property.usable_area_sqm != null && property.usable_area_sqm > 0
+    ? `${property.usable_area_sqm.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ม.`
+    : null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
@@ -93,6 +98,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
   const isSoldOut = property.status === "sold";
   const cover = property.images?.find((image) => image.is_cover) ?? property.images?.[0];
   const area = legalArea(property);
+  const usable = usableArea(property);
   const location = locationLabel(property);
   const price = property.total_price;
   const updatedLabel = formatUpdatedDate(property.updated_at);
@@ -103,6 +109,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
 
   const facts = [
     area ? ["ขนาด", area] : null,
+    usable ? ["พื้นที่ใช้สอย", usable] : null,
     property.total_price != null ? ["ราคารวม", formatMoneyFull(property.total_price)] : null,
     property.price_per_rai != null ? ["ราคา / ไร่", formatMoneyFull(property.price_per_rai)] : null,
     property.zoning ? ["ผังเมือง", ZONING_LABELS[property.zoning]] : null,
@@ -123,6 +130,7 @@ export default async function PropertyPage({ params }: { params: Promise<Params>
 
   const heroHighlights = [
     area ? `ขนาด ${area}` : null,
+    usable ? `พื้นที่ใช้สอย ${usable}` : null,
     property.frontage_m != null ? `หน้ากว้าง ${property.frontage_m.toLocaleString("th-TH")} เมตร` : null,
     property.road_width_m != null ? `ถนนกว้าง ${property.road_width_m.toLocaleString("th-TH")} เมตร` : null,
     property.is_eec ? "อยู่ในพื้นที่ EEC" : null,

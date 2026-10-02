@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FileText, ImagePlus, Info, MapPin, Save, UploadCloud } from "lucide-react";
+import { Check, CheckCircle2, FileText, ImagePlus, Info, Link2, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
+import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import LocationPicker, { type MapFocus } from "./LocationPicker";
 
 interface Props { provinces: Province[]; buyerDemandSlug?: string }
@@ -44,6 +45,7 @@ type DraftForm = {
   area_rai: number | null;
   area_ngan: number | null;
   area_sqwa: number | null;
+  usable_area_sqm: number | null;
   frontage_m: number | null;
   depth_min_m: number | null;
   depth_max_m: number | null;
@@ -71,6 +73,7 @@ const emptyForm: DraftForm = {
   area_rai: null,
   area_ngan: null,
   area_sqwa: null,
+  usable_area_sqm: null,
   frontage_m: null,
   depth_min_m: null,
   depth_max_m: null,
@@ -85,7 +88,35 @@ const emptyForm: DraftForm = {
   contact_line: "",
 };
 
-const steps = ["ประเภททรัพย์", "ตำแหน่ง", "รายละเอียดและราคา", "รูปและเอกสาร", "ข้อมูลติดต่อ", "ตรวจสอบและส่ง"];
+// Section headings only — the whole form is one page with a single submit button.
+const SECTIONS = {
+  type: "ประเภททรัพย์",
+  location: "ตำแหน่ง",
+  details: "รายละเอียดและราคา",
+  media: "รูปและเอกสาร",
+  contact: "ข้อมูลติดต่อ",
+  review: "ตรวจสอบและส่ง",
+} as const;
+type SectionId = keyof typeof SECTIONS;
+
+type FieldKey = "property_type" | "province_id" | "title" | "area" | "sale_price" | "contact_name" | "contact_phone" | "consent";
+const FIELD_SECTION: Record<FieldKey, SectionId> = {
+  property_type: "type", province_id: "location", title: "details", area: "details", sale_price: "details",
+  contact_name: "contact", contact_phone: "contact", consent: "review",
+};
+
+/** Thai labels for server-side draft validation errors (PATCH issues.fieldErrors). */
+const SERVER_FIELD_LABELS: Record<string, string> = {
+  area_rai: "ไร่ (จำนวนเต็ม)", area_ngan: "งาน (0–3)", area_sqwa: "ตร.ว. (น้อยกว่า 100)", usable_area_sqm: "พื้นที่ใช้สอย",
+  sale_price: "ราคาขาย", title: "ชื่อทรัพย์", contact_phone: "เบอร์โทรศัพท์", lat: "พิกัด", lng: "พิกัด",
+};
+
+const AUTOSAVE_DELAY_MS = 1500;
+const DRAFT_STORAGE_KEY = "landmarketthai:sell-draft";
+
+function phoneLooksValid(value: string): boolean {
+  return /^0\d{8,9}$/.test(value.replace(/[\s\-().]/g, "").replace(/^\+?66(?=\d{9}$)/, "0"));
+}
 
 function fromDraft(draft: PropertySubmission): DraftForm {
   return {
@@ -101,6 +132,7 @@ function fromDraft(draft: PropertySubmission): DraftForm {
     area_rai: draft.area_rai,
     area_ngan: draft.area_ngan,
     area_sqwa: draft.area_sqwa,
+    usable_area_sqm: draft.usable_area_sqm,
     frontage_m: draft.frontage_m,
     depth_min_m: draft.depth_min_m,
     depth_max_m: draft.depth_max_m,
@@ -116,22 +148,31 @@ function fromDraft(draft: PropertySubmission): DraftForm {
   };
 }
 
+type SaveState = "idle" | "saving" | "saved" | "error";
+type MapsStatus = { state: "idle" | "loading" | "error"; message?: string } | { state: "ok"; lat: number; lng: number };
+
 export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
-  const [step, setStep] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [draft, setDraft] = useState<PropertySubmission | null>(null);
   const [form, setForm] = useState<DraftForm>(emptyForm);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [districtData, setDistrictData] = useState<{ province: string; items: AreaOption[] }>({ province: "", items: [] });
   const [subdistrictData, setSubdistrictData] = useState<{ key: string; items: AreaOption[] }>({ key: "", items: [] });
   const [mapFocus, setMapFocus] = useState<MapFocus | null>(null);
+  const [mapsInput, setMapsInput] = useState("");
+  const [mapsStatus, setMapsStatus] = useState<MapsStatus>({ state: "idle" });
   const focusProvinceOnLoad = useRef<string | null>(null);
+  const savedPayload = useRef<string | null>(null);
+  const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
 
   const provinceName = provinces.find((province) => province.id === form.province_id)?.name_th ?? "";
   const isBangkok = provinceName.replace(/^จังหวัด\s*/, "").startsWith("กรุงเทพ");
@@ -162,11 +203,19 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     return () => { cancelled = true; };
   }, [provinceName, form.district]);
 
+  function clearFieldError(...keys: FieldKey[]) {
+    setFieldErrors((current) => keys.some((key) => current[key])
+      ? Object.fromEntries(Object.entries(current).filter(([key]) => !keys.includes(key as FieldKey))) as Partial<Record<FieldKey, string>>
+      : current);
+  }
+
   // Dropdowns only move the map to an approximate center; any previous exact pin is cleared so
-  // coordinates never silently disagree with the selected area. Exact lat/lng come from a map click only.
+  // coordinates never silently disagree with the selected area. Exact lat/lng come from a map click
+  // or a pasted Google Maps link only.
   function selectProvince(provinceId: string) {
     setForm((v) => ({ ...v, province_id: provinceId, district: "", subdistrict: "", lat: null, lng: null }));
     focusProvinceOnLoad.current = provinces.find((province) => province.id === provinceId)?.name_th ?? null;
+    clearFieldError("province_id");
   }
   function selectDistrict(name: string) {
     setForm((v) => ({ ...v, district: name, subdistrict: "", lat: null, lng: null }));
@@ -180,7 +229,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const saved = localStorage.getItem("landmarketthai:sell-draft");
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved) as { id: string; token: string };
@@ -197,7 +246,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       const response = await fetch("/api/property-submissions", { method: "POST" });
       if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
       const created = (await response.json()) as { id: string; token: string };
-      localStorage.setItem("landmarketthai:sell-draft", JSON.stringify(created));
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
       if (!cancelled) { setDraftId(created.id); setToken(created.token); setLoading(false); }
     }
     void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setLoading(false); } });
@@ -208,47 +257,80 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     if (form.area_rai == null && form.area_ngan == null && form.area_sqwa == null) return null;
     return (form.area_rai ?? 0) + (form.area_ngan ?? 0) / 4 + (form.area_sqwa ?? 0) / 400;
   }, [form.area_rai, form.area_ngan, form.area_sqwa]);
+  // Price per rai only exists when there is land area; building-only assets leave it empty.
   const derivedPricePerRai = useMemo(() => (
     totalRai != null && totalRai > 0 && form.sale_price != null && form.sale_price > 0
       ? Math.round((form.sale_price / totalRai) * 100) / 100
       : null
   ), [form.sale_price, totalRai]);
+  const hasArea = (totalRai != null && totalRai > 0) || (form.usable_area_sqm != null && form.usable_area_sqm > 0);
 
-  async function saveDraft(): Promise<boolean> {
+  // A half-typed phone number would fail server validation on every autosave; keep it local until valid.
+  const payload = useMemo(() => JSON.stringify({
+    ...form,
+    contact_phone: form.contact_phone.trim() === "" || phoneLooksValid(form.contact_phone) ? form.contact_phone : null,
+    price_per_rai: derivedPricePerRai,
+  }), [form, derivedPricePerRai]);
+
+  async function persist(body: string): Promise<boolean> {
     if (!draftId || !token) return false;
-    setSaving(true); setError(null);
+    setSaveState("saving"); setSaveError(null);
     try {
       const response = await fetch(`/api/property-submissions/${draftId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, ...form, price_per_rai: derivedPricePerRai }),
+        body: JSON.stringify({ token, ...JSON.parse(body) }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "บันทึกแบบร่างไม่สำเร็จ");
-      setDraft(body.draft as PropertySubmission);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const fields = Object.keys(result?.issues?.fieldErrors ?? {}).map((key) => SERVER_FIELD_LABELS[key] ?? key);
+        throw new Error(fields.length ? `บันทึกไม่สำเร็จ กรุณาตรวจสอบ: ${[...new Set(fields)].join(", ")}` : result.error || "บันทึกแบบร่างไม่สำเร็จ");
+      }
+      savedPayload.current = body;
+      setDraft(result.draft as PropertySubmission);
+      setSaveState("saved");
       return true;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "บันทึกแบบร่างไม่สำเร็จ");
+      setSaveError(reason instanceof Error ? reason.message : "บันทึกแบบร่างไม่สำเร็จ");
+      setSaveState("error");
       return false;
-    } finally { setSaving(false); }
-  }
-
-  function stepError(): string | null {
-    if (step === 0 && !form.property_type) return "กรุณาเลือกประเภททรัพย์";
-    if (step === 1 && !form.province_id) return "กรุณาเลือกจังหวัด";
-    if (step === 2) {
-      if (!form.title.trim()) return "กรุณาระบุชื่อทรัพย์";
-      if (totalRai == null || totalRai <= 0) return "กรุณาระบุขนาดพื้นที่";
-      if (form.sale_price == null || form.sale_price <= 0) return "กรุณาระบุราคาขายที่มากกว่า 0";
     }
-    if (step === 4 && (!form.contact_name.trim() || !form.contact_phone.trim())) return "กรุณาระบุชื่อและเบอร์โทรศัพท์";
-    return null;
   }
 
-  async function next() {
-    const validation = stepError();
-    if (validation) { setError(validation); return; }
-    if (await saveDraft()) setStep((current) => Math.min(current + 1, steps.length - 1));
+  /** Saves the current form; saves run one at a time so an older PATCH never lands after a newer one. */
+  function saveDraft(): Promise<boolean> {
+    const body = payload;
+    const run = saveQueue.current.then(() => body === savedPayload.current ? true : persist(body));
+    saveQueue.current = run.catch(() => false);
+    return run;
+  }
+  const saveDraftRef = useRef(saveDraft);
+  useEffect(() => { saveDraftRef.current = saveDraft; });
+
+  // Debounced autosave after meaningful edits. The first payload after loading is the baseline
+  // (nothing to save), and nothing autosaves while submitting or after submission.
+  useEffect(() => {
+    if (loading || submitting || submitted || !draftId || !token) return;
+    if (savedPayload.current === null) { savedPayload.current = payload; return; }
+    if (payload === savedPayload.current) return;
+    const timer = setTimeout(() => void saveDraftRef.current(), AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [payload, loading, submitting, submitted, draftId, token]);
+
+  async function resolveMapsLink() {
+    if (!mapsInput.trim()) { setMapsStatus({ state: "error", message: "กรุณาวางลิงก์ Google Maps หรือพิกัด" }); return; }
+    setMapsStatus({ state: "loading" });
+    try {
+      const response = await fetch("/api/maps-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: mapsInput }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.lat !== "number" || typeof body.lng !== "number") throw new Error(body.error || "อ่านพิกัดจากลิงก์ไม่สำเร็จ");
+      const { lat, lng } = body as { lat: number; lng: number };
+      setForm((v) => ({ ...v, lat, lng }));
+      setMapFocus((current) => ({ lat, lng, zoom: 17, key: (current?.key ?? 0) + 1 }));
+      setMapsStatus({ state: "ok", lat, lng });
+    } catch (reason) {
+      setMapsStatus({ state: "error", message: reason instanceof Error ? reason.message : "อ่านพิกัดจากลิงก์ไม่สำเร็จ" });
+    }
   }
 
   async function upload(file: File, mediaKind: "image" | "document") {
@@ -273,24 +355,61 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     finally { setUploading(false); }
   }
 
+  function validate(): Partial<Record<FieldKey, string>> {
+    const errors: Partial<Record<FieldKey, string>> = {};
+    if (!form.property_type) errors.property_type = "กรุณาเลือกประเภททรัพย์";
+    if (!form.province_id) errors.province_id = "กรุณาเลือกจังหวัด";
+    if (!form.title.trim()) errors.title = "กรุณาระบุชื่อทรัพย์";
+    if (!hasArea) errors.area = "กรุณาระบุขนาดที่ดิน (ไร่/งาน/ตร.ว.) หรือพื้นที่ใช้สอย (ตร.ม.) อย่างน้อยหนึ่งอย่าง";
+    if (form.sale_price == null || form.sale_price <= 0) errors.sale_price = "กรุณาระบุราคาขายที่มากกว่า 0";
+    if (!form.contact_name.trim()) errors.contact_name = "กรุณาระบุชื่อผู้ติดต่อ";
+    if (!phoneLooksValid(form.contact_phone)) errors.contact_phone = "กรุณาระบุเบอร์โทรศัพท์ที่ถูกต้อง เช่น 0812345678";
+    if (!consent) errors.consent = "กรุณายอมรับนโยบายความเป็นส่วนตัว";
+    return errors;
+  }
+
   async function submit() {
-    if (!consent || !draftId || !token) { setError("กรุณายอมรับนโยบายความเป็นส่วนตัว"); return; }
-    if (!(await saveDraft())) return;
-    setSaving(true);
+    const errors = validate();
+    setFieldErrors(errors);
+    const first = (Object.keys(errors) as FieldKey[])[0];
+    if (first) {
+      setError(null);
+      document.getElementById(`sell-${FIELD_SECTION[first]}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (!draftId || !token) return;
+    setSubmitting(true); setError(null);
     try {
+      if (!(await saveDraft())) throw new Error("บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
       const response = await fetch(`/api/property-submissions/${draftId}/submit`, {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
       });
-      const body = await response.json();
+      const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "ส่งข้อมูลไม่สำเร็จ");
-      localStorage.removeItem("landmarketthai:sell-draft");
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
       setSubmitted(true);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "ส่งข้อมูลไม่สำเร็จ"); }
-    finally { setSaving(false); }
+    finally { setSubmitting(false); }
   }
 
+  function setText(key: "title" | "address" | "road_name" | "description" | "contact_name" | "contact_phone" | "contact_line", value: string) {
+    setForm((current) => ({ ...current, [key]: value }));
+    if (key === "title" || key === "contact_name" || key === "contact_phone") clearFieldError(key);
+  }
   function numberValue(value: number | null) { return value == null ? "" : String(value); }
-  function setNumber(key: keyof DraftForm, raw: string) { setForm((current) => ({ ...current, [key]: raw === "" ? null : Number(raw) })); }
+  function setNumber(key: keyof DraftForm, raw: string) {
+    setForm((current) => ({ ...current, [key]: raw === "" ? null : Number(raw) }));
+    if (key === "sale_price") clearFieldError("sale_price");
+    if (key === "area_rai" || key === "area_ngan" || key === "area_sqwa" || key === "usable_area_sqm") clearFieldError("area");
+  }
+  const invalid = (key: FieldKey) => fieldErrors[key] ? { "aria-invalid": true as const, "aria-describedby": `sell-error-${key}` } : {};
+  const fieldError = (key: FieldKey) => fieldErrors[key] && <p id={`sell-error-${key}`} className="mt-1 text-xs font-semibold text-red-600">{fieldErrors[key]}</p>;
+  const heading = (id: SectionId, hint?: string) => (
+    <div className="mb-4">
+      <h2 className="text-lg font-black text-slate-900">{SECTIONS[id]}</h2>
+      {hint && <p className="mt-1 text-sm text-slate-500">{hint}</p>}
+    </div>
+  );
 
   if (loading) return <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">กำลังเปิดแบบร่าง...</div>;
   if (submitted) return (
@@ -301,121 +420,159 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     </div>
   );
 
+  const errorCount = Object.keys(fieldErrors).length;
+  const pinFromLink = mapsStatus.state === "ok" && form.lat === mapsStatus.lat && form.lng === mapsStatus.lng;
+  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "saved" && payload === savedPayload.current ? "บันทึกแล้ว" : saveState === "error" ? "บันทึกไม่สำเร็จ" : null;
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 p-5 sm:p-7">
-        <div className="grid grid-cols-6 gap-1">
-          {steps.map((label, index) => (
-            <div key={label} className="text-center">
-              <div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${index <= step ? "bg-[#00A859] text-white" : "bg-slate-100 text-slate-400"}`}>{index + 1}</div>
-              <div className="mt-1 hidden text-[11px] font-semibold text-slate-500 md:block">{label}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 text-center text-xs font-bold text-slate-600 md:hidden">ขั้นตอน {step + 1}/{steps.length} · {steps[step]}</div>
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 sm:px-8">
+        <span className="text-sm font-bold text-slate-700">ฝากขายทรัพย์ · กรอกได้ในหน้าเดียว</span>
+        <span role="status" aria-live="polite" className={`text-xs font-semibold ${saveState === "error" ? "text-red-600" : "text-slate-500"}`}>
+          {saveLabel ?? "บันทึกแบบร่างอัตโนมัติ"}
+        </span>
       </div>
 
-      <div className="p-5 sm:p-8">
-        {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {error && <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-8">{error}</div>}
 
-        {step === 0 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">ประเภททรัพย์ที่ต้องการขาย</h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              {([['land','ที่ดิน'],['factory','โรงงาน'],['warehouse','โกดัง']] as const).map(([value,label]) => (
-                <button key={value} type="button" onClick={() => setForm((v) => ({ ...v, property_type: value }))} className={`min-h-20 rounded-2xl border-2 p-4 text-left font-bold ${form.property_type === value ? "border-[#00A859] bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-700"}`}>{label}</button>
-              ))}
-            </div>
+        <section id="sell-type" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("type")}
+          <div role="radiogroup" aria-label="ประเภททรัพย์" {...invalid("property_type")} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {PROPERTY_TYPES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={form.property_type === value}
+                onClick={() => { setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }}
+                className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-bold leading-tight transition ${form.property_type === value ? "border-[#00A859] bg-emerald-50 text-emerald-800 ring-1 ring-[#00A859]" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
+              >
+                {PROPERTY_TYPE_LABELS[value]}
+              </button>
+            ))}
           </div>
-        )}
+          {fieldError("property_type")}
+        </section>
 
-        {step === 1 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">ตำแหน่งทรัพย์</h2>
-            <p className="mt-1 text-sm text-slate-500">ปักหมุดเฉพาะตำแหน่งจริง หากไม่แน่ใจสามารถเว้นพิกัดไว้ให้ทีมงานตรวจสอบได้</p>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label><span className="label">จังหวัด *</span><select className="input" value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select></label>
-              <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
-              <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
-              <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" value={form.address} onChange={(e) => setForm((v) => ({ ...v, address: e.target.value }))} /></label>
+        <section id="sell-location" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("location","ปักหมุดตำแหน่งจริงได้เร็วที่สุดด้วยลิงก์ Google Maps หากไม่แน่ใจสามารถเว้นพิกัดไว้ให้ทีมงานตรวจสอบได้")}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+            <label htmlFor="sell-maps-link" className="flex items-center gap-2 text-sm font-bold text-slate-800"><Link2 size={16} className="text-blue-700" />วางลิงก์ Google Maps หรือพิกัด</label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                id="sell-maps-link"
+                className="input flex-1"
+                inputMode="url"
+                maxLength={2048}
+                value={mapsInput}
+                placeholder="เช่น https://maps.app.goo.gl/... หรือ 13.0827, 101.0145"
+                onChange={(e) => { setMapsInput(e.target.value); if (mapsStatus.state === "error") setMapsStatus({ state: "idle" }); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void resolveMapsLink(); } }}
+              />
+              <button type="button" onClick={() => void resolveMapsLink()} disabled={mapsStatus.state === "loading"} className="btn-green justify-center disabled:opacity-60">
+                <MapPin size={16} />{mapsStatus.state === "loading" ? "กำลังอ่านพิกัด..." : "ปักหมุดจากลิงก์"}
+              </button>
             </div>
-            <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <Info size={16} className="mt-0.5 shrink-0" />
-              <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น กรุณา<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์ (การเปลี่ยนพื้นที่จะล้างหมุดเดิม)</span>
-            </div>
-            <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} onChange={(lat,lng) => setForm((v) => ({ ...v, lat, lng }))} /></div>
-            {form.lat != null && form.lng != null
-              ? <div className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><MapPin size={13}/>ปักหมุดแล้ว: {form.lat.toFixed(7)}, {form.lng.toFixed(7)}</div>
-              : <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13}/>ยังไม่ได้ปักหมุดตำแหน่งจริง</div>}
-            <p className="mt-2 text-[11px] text-slate-400">ข้อมูลเขตการปกครอง: <a className="underline" href="https://openadmindata.org/th/" target="_blank" rel="noopener noreferrer">Open Admin Data</a> (CC-BY-4.0)</p>
+            {mapsStatus.state === "error" && <p role="alert" className="mt-2 text-xs font-semibold text-red-600">{mapsStatus.message}</p>}
+            {pinFromLink && <p role="status" className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={14} />ปักหมุดตามลิงก์แล้ว (พิกัดจริง) — คลิกบนแผนที่เพื่อปรับตำแหน่งได้</p>}
+            {!pinFromLink && <p className="mt-2 text-[11px] text-slate-500">ใน Google Maps กด “แชร์” แล้วคัดลอกลิงก์ หรือกดค้างที่ตำแหน่งเพื่อคัดลอกพิกัด</p>}
           </div>
-        )}
 
-        {step === 2 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">รายละเอียดและราคา</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="sm:col-span-2"><span className="label">ชื่อทรัพย์ *</span><input className="input" value={form.title} onChange={(e) => setForm((v) => ({ ...v, title: e.target.value }))} placeholder="เช่น ที่ดินอุตสาหกรรม อ.นิคมพัฒนา ระยอง" /></label>
-              <label><span className="label">ไร่ *</span><input type="number" min="0" className="input" value={numberValue(form.area_rai)} onChange={(e) => setNumber('area_rai', e.target.value)} /></label>
-              <div className="grid grid-cols-2 gap-3"><label><span className="label">งาน</span><input type="number" min="0" max="3" className="input" value={numberValue(form.area_ngan)} onChange={(e) => setNumber('area_ngan', e.target.value)} /></label><label><span className="label">ตร.ว.</span><input type="number" min="0" max="99.99" step="0.1" className="input" value={numberValue(form.area_sqwa)} onChange={(e) => setNumber('area_sqwa', e.target.value)} /></label></div>
-              <label><span className="label">ราคาขายรวม *</span><input type="number" min="0" className="input" value={numberValue(form.sale_price)} onChange={(e) => setNumber('sale_price', e.target.value)} /></label>
-              <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณจากราคาขายและขนาด" /></label>
-              <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ''} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
-              <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber('frontage_m', e.target.value)} /></label>
-              <label><span className="label">ความลึกต่ำสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_min_m)} onChange={(e) => setNumber('depth_min_m', e.target.value)} /></label>
-              <label><span className="label">ความลึกสูงสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_max_m)} onChange={(e) => setNumber('depth_max_m', e.target.value)} /></label>
-              <label><span className="label">ชื่อถนน</span><input className="input" value={form.road_name} onChange={(e) => setForm((v) => ({ ...v, road_name: e.target.value }))} /></label>
-              <label><span className="label">ความกว้างถนน (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.road_width_m)} onChange={(e) => setNumber('road_width_m', e.target.value)} /></label>
-              <label className="sm:col-span-2"><span className="label">รายละเอียดเพิ่มเติม</span><textarea className="input min-h-28" value={form.description} onChange={(e) => setForm((v) => ({ ...v, description: e.target.value }))} /></label>
-            </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label><span className="label">จังหวัด *</span><select className="input" {...invalid("province_id")} value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select>{fieldError("province_id")}</label>
+            <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
+            <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
+            <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" maxLength={500} value={form.address} onChange={(e) => setText("address", e.target.value)} /></label>
           </div>
-        )}
-
-        {step === 3 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">รูปและเอกสาร</h2>
-            <p className="mt-1 text-sm text-slate-500">รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private</p>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,'image'))}/></label>
-              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,'document'))}/></label>
-            </div>
-            {uploading && <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><UploadCloud size={16}/>กำลังอัปโหลด...</div>}
-            {draft?.media && draft.media.length > 0 && <div className="mt-5 divide-y rounded-2xl border border-slate-200">{draft.media.map((media) => <div key={media.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="truncate">{media.file_name}</span><span className="shrink-0 text-xs text-slate-400">{media.media_kind === 'image' ? 'รูป' : 'เอกสาร'}</span></div>)}</div>}
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <Info size={16} className="mt-0.5 shrink-0" />
+            <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น และจะล้างหมุดเดิม กรุณา<strong>วางลิงก์ด้านบน</strong>หรือ<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์</span>
           </div>
-        )}
+          <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} onChange={(lat,lng) => setForm((v) => ({ ...v, lat, lng }))} /></div>
+          {form.lat != null && form.lng != null
+            ? <div className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><MapPin size={13}/>ปักหมุดแล้ว: {form.lat.toFixed(7)}, {form.lng.toFixed(7)}</div>
+            : <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13}/>ยังไม่ได้ปักหมุดตำแหน่งจริง (ไม่บังคับ)</div>}
+          <p className="mt-2 text-[11px] text-slate-400">ข้อมูลเขตการปกครอง: <a className="underline" href="https://openadmindata.org/th/" target="_blank" rel="noopener noreferrer">Open Admin Data</a> (CC-BY-4.0)</p>
+        </section>
 
-        {step === 4 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">ข้อมูลติดต่อ</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label><span className="label">ชื่อ – นามสกุล *</span><input className="input" value={form.contact_name} onChange={(e) => setForm((v) => ({ ...v, contact_name: e.target.value }))}/></label>
-              <label><span className="label">เบอร์โทรศัพท์ *</span><input className="input" inputMode="tel" value={form.contact_phone} onChange={(e) => setForm((v) => ({ ...v, contact_phone: e.target.value }))}/></label>
-              <label className="sm:col-span-2"><span className="label">LINE ID</span><input className="input" value={form.contact_line} onChange={(e) => setForm((v) => ({ ...v, contact_line: e.target.value }))}/></label>
+        <section id="sell-details" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("details")}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2"><span className="label">ชื่อทรัพย์ *</span><input className="input" {...invalid("title")} maxLength={180} value={form.title} onChange={(e) => setText("title", e.target.value)} placeholder="เช่น ที่ดินอุตสาหกรรม อ.นิคมพัฒนา ระยอง" />{fieldError("title")}</label>
+            <div className="sm:col-span-2">
+              <span className="label">ขนาดพื้นที่ *</span>
+              <p className="mb-2 text-xs text-slate-500">กรอกช่องที่ตรงกับทรัพย์อย่างน้อยหนึ่งแบบ: ที่ดินใช้ ไร่/งาน/ตร.ว. ส่วนบ้าน คอนโด อาคาร ใช้พื้นที่ใช้สอย (ตร.ม.) หรือกรอกทั้งสองแบบก็ได้</p>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <fieldset className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 p-3" {...invalid("area")}>
+                  <legend className="px-1 text-xs font-semibold text-slate-500">ขนาดที่ดิน</legend>
+                  <label><span className="text-xs text-slate-500">ไร่</span><input type="number" min="0" step="1" inputMode="numeric" className="input" value={numberValue(form.area_rai)} onChange={(e) => setNumber("area_rai", e.target.value)} /></label>
+                  <label><span className="text-xs text-slate-500">งาน</span><input type="number" min="0" max="3" step="1" inputMode="numeric" className="input" value={numberValue(form.area_ngan)} onChange={(e) => setNumber("area_ngan", e.target.value)} /></label>
+                  <label><span className="text-xs text-slate-500">ตร.ว.</span><input type="number" min="0" max="99.99" step="0.1" inputMode="decimal" className="input" value={numberValue(form.area_sqwa)} onChange={(e) => setNumber("area_sqwa", e.target.value)} /></label>
+                </fieldset>
+                <fieldset className="rounded-xl border border-slate-200 p-3" {...invalid("area")}>
+                  <legend className="px-1 text-xs font-semibold text-slate-500">พื้นที่ใช้สอย</legend>
+                  <label><span className="text-xs text-slate-500">ตร.ม.</span><input type="number" min="0" step="any" inputMode="decimal" className="input" value={numberValue(form.usable_area_sqm)} onChange={(e) => setNumber("usable_area_sqm", e.target.value)} /></label>
+                </fieldset>
+              </div>
+              {fieldError("area")}
             </div>
+            <label><span className="label">ราคาขายรวม (บาท) *</span><input type="number" min="0" inputMode="numeric" className="input" {...invalid("sale_price")} value={numberValue(form.sale_price)} onChange={(e) => setNumber("sale_price", e.target.value)} />{fieldError("sale_price")}</label>
+            <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณเมื่อมีขนาดที่ดิน (ไร่)" /></label>
+            <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ""} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
+            <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber("frontage_m", e.target.value)} /></label>
+            <label><span className="label">ความลึกต่ำสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_min_m)} onChange={(e) => setNumber("depth_min_m", e.target.value)} /></label>
+            <label><span className="label">ความลึกสูงสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_max_m)} onChange={(e) => setNumber("depth_max_m", e.target.value)} /></label>
+            <label><span className="label">ชื่อถนน</span><input className="input" maxLength={160} value={form.road_name} onChange={(e) => setText("road_name", e.target.value)} /></label>
+            <label><span className="label">ความกว้างถนน (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.road_width_m)} onChange={(e) => setNumber("road_width_m", e.target.value)} /></label>
+            <label className="sm:col-span-2"><span className="label">รายละเอียดเพิ่มเติม</span><textarea className="input min-h-28" maxLength={5000} value={form.description} onChange={(e) => setText("description", e.target.value)} /></label>
           </div>
-        )}
+        </section>
 
-        {step === 5 && (
-          <div>
-            <h2 className="text-xl font-black text-slate-900">ตรวจสอบและส่ง</h2>
-            <div className="mt-5 grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm sm:grid-cols-2">
-              <div><span className="text-slate-400">ประเภท</span><div className="font-bold">{form.property_type === 'factory' ? 'โรงงาน' : form.property_type === 'warehouse' ? 'โกดัง' : 'ที่ดิน'} · ขาย</div></div>
-              <div><span className="text-slate-400">ชื่อทรัพย์</span><div className="font-bold">{form.title || '-'}</div></div>
-              <div><span className="text-slate-400">ขนาด</span><div className="font-bold">{totalRai != null ? `${totalRai.toLocaleString('th-TH',{maximumFractionDigits:5})} ไร่` : '-'}</div></div>
-              <div className="min-w-0"><span className="text-slate-400">ผู้ติดต่อ</span><div className="break-words font-bold">{form.contact_name} · {form.contact_phone}</div></div>
+        <section id="sell-media" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("media","ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private")}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,"image"))}/></label>
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={uploading} onChange={(e) => Array.from(e.target.files ?? []).forEach((file) => void upload(file,"document"))}/></label>
+          </div>
+          {uploading && <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><UploadCloud size={16}/>กำลังอัปโหลด...</div>}
+          {draft?.media && draft.media.length > 0 && <div className="mt-4 divide-y rounded-2xl border border-slate-200">{draft.media.map((media) => <div key={media.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="truncate">{media.file_name}</span><span className="shrink-0 text-xs text-slate-400">{media.media_kind === "image" ? "รูป" : "เอกสาร"}</span></div>)}</div>}
+        </section>
+
+        <section id="sell-contact" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("contact")}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label><span className="label">ชื่อ – นามสกุล *</span><input className="input" autoComplete="name" maxLength={120} {...invalid("contact_name")} value={form.contact_name} onChange={(e) => setText("contact_name", e.target.value)}/>{fieldError("contact_name")}</label>
+            <label><span className="label">เบอร์โทรศัพท์ *</span><input className="input" type="tel" autoComplete="tel" inputMode="tel" maxLength={32} {...invalid("contact_phone")} value={form.contact_phone} onChange={(e) => setText("contact_phone", e.target.value)}/>{fieldError("contact_phone")}</label>
+            <label className="sm:col-span-2"><span className="label">LINE ID</span><input className="input" maxLength={100} value={form.contact_line} onChange={(e) => setText("contact_line", e.target.value)}/></label>
+          </div>
+        </section>
+
+        <section id="sell-review" className="scroll-mt-20 p-5 sm:p-8">
+          {heading("review")}
+          <div className="grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm sm:grid-cols-2">
+            <div><span className="text-slate-400">ประเภท</span><div className="font-bold">{form.property_type ? PROPERTY_TYPE_LABELS[form.property_type] : "-"} · ขาย</div></div>
+            <div><span className="text-slate-400">ชื่อทรัพย์</span><div className="font-bold">{form.title || "-"}</div></div>
+            <div><span className="text-slate-400">ขนาด</span><div className="font-bold">{[
+              totalRai != null && totalRai > 0 ? `${totalRai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่` : null,
+              form.usable_area_sqm != null && form.usable_area_sqm > 0 ? `${form.usable_area_sqm.toLocaleString("th-TH")} ตร.ม.` : null,
+            ].filter(Boolean).join(" · ") || "-"}</div></div>
+            <div className="min-w-0"><span className="text-slate-400">ผู้ติดต่อ</span><div className="break-words font-bold">{[form.contact_name, form.contact_phone].filter(Boolean).join(" · ") || "-"}</div></div>
+          </div>
+          <label className={`mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm text-slate-600 ${fieldErrors.consent ? "border-red-300" : "border-slate-200"}`}><input type="checkbox" className="mt-1" {...invalid("consent")} checked={consent} onChange={(e) => { setConsent(e.target.checked); clearFieldError("consent"); }}/><span>ยินยอมให้ LandmarketThai เก็บและใช้ข้อมูลที่ส่งเพื่อการตรวจสอบทรัพย์และติดต่อกลับตามนโยบายความเป็นส่วนตัว</span></label>
+          {fieldError("consent")}
+          <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">ข้อมูลจะเข้าสถานะ Pending Review และไม่เผยแพร่อัตโนมัติ</div>
+          {errorCount > 0 && (
+            <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              กรุณาตรวจสอบ {errorCount} รายการ: {[...new Set((Object.keys(fieldErrors) as FieldKey[]).map((key) => SECTIONS[FIELD_SECTION[key]]))].join(", ")}
             </div>
-            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-slate-200 p-4 text-sm text-slate-600"><input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)}/><span>ยินยอมให้ LandmarketThai เก็บและใช้ข้อมูลที่ส่งเพื่อการตรวจสอบทรัพย์และติดต่อกลับตามนโยบายความเป็นส่วนตัว</span></label>
-            <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">ข้อมูลจะเข้าสถานะ Pending Review และไม่เผยแพร่อัตโนมัติ</div>
+          )}
+          {saveState === "error" && saveError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>}
+          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button type="button" onClick={() => void saveDraft()} disabled={submitting} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold text-slate-500"><Save size={16}/>{saveState === "saving" ? "กำลังบันทึก..." : "บันทึกแบบร่าง"}</button>
+            <button type="button" onClick={() => void submit()} disabled={submitting} className="btn-green justify-center disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "กำลังส่ง..." : "ส่งให้ทีมงานตรวจสอบ"} <Check size={17}/></button>
           </div>
-        )}
-      </div>
-
-      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
-        <button type="button" onClick={() => setStep((current) => Math.max(0,current-1))} disabled={step===0 || saving} className="btn-outline disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17}/>ย้อนกลับ</button>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button type="button" onClick={() => void saveDraft()} disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold text-slate-500"><Save size={16}/>{saving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</button>
-          {step < steps.length - 1 ? <button type="button" onClick={() => void next()} disabled={saving} className="btn-green">ถัดไป <ChevronRight size={17}/></button> : <button type="button" onClick={() => void submit()} disabled={saving || !consent} className="btn-green disabled:cursor-not-allowed disabled:opacity-50">ส่งให้ทีมงานตรวจสอบ <Check size={17}/></button>}
-        </div>
+        </section>
       </div>
     </div>
   );

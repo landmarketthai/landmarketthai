@@ -33,7 +33,10 @@ export default function AdminSubmissionDetail({ id }: { id: string }) {
   const facts = [
     ["ประเภท", item.property_type && item.transaction_type ? `${PROPERTY_TYPE_LABELS[item.property_type]} / ${TRANSACTION_TYPE_LABELS[item.transaction_type]}` : "-"],
     ["ที่ตั้ง", [item.address, item.subdistrict, item.district, item.province?.name_th].filter(Boolean).join(" · ") || "-"],
-    ["ขนาด", item.total_rai != null ? `${item.total_rai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่` : "-"],
+    ["ขนาด", [
+      item.total_rai != null && `${item.total_rai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่`,
+      item.usable_area_sqm != null && `พื้นที่ใช้สอย ${item.usable_area_sqm.toLocaleString("th-TH", { maximumFractionDigits: 2 })} ตร.ม.`,
+    ].filter(Boolean).join(" · ") || "-"],
     ["ราคาขาย", item.sale_price != null ? `${item.sale_price.toLocaleString("th-TH")} บาท` : "-"],
     ["ราคา / ไร่", item.price_per_rai != null ? `${item.price_per_rai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท` : "-"],
     ["พิกัด", item.lat != null && item.lng != null ? `${item.lat.toFixed(7)}, ${item.lng.toFixed(7)} · ${item.location_precision === "exact" ? "พิกัดแบบ Exact" : "โดยประมาณ"}` : "ไม่ได้ระบุ"],

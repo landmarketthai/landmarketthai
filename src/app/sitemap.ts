@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getAllProvinces, getActiveDemands, getPublishedPosts } from "@/lib/neon/queries";
-import { LAND_TYPE_LABELS, landTypeSlug } from "@/lib/utils";
+import { LAND_CATEGORY_TYPES, landTypeSlug } from "@/lib/utils";
 import { getPublicInventory } from "@/lib/public-inventory";
-import type { LandType } from "@/lib/types/database";
 import { isPublishedDemand } from "@/components/demand/BuyerDemandList";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://landmarketthai.com";
@@ -31,7 +30,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE, changeFrequency: "daily", priority: 1 },
     { url: `${SITE}/land`, changeFrequency: "hourly", priority: 0.9 },
     { url: `${SITE}/search`, changeFrequency: "hourly", priority: 0.9 },
-    { url: `${SITE}/land-insights`, changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE}/property/37-rai-eec-rayong`, changeFrequency: "weekly", priority: 0.85 },
     { url: `${SITE}/property/101-rai-kabin-buri`, changeFrequency: "weekly", priority: 0.85 },
     { url: `${SITE}/property/109-rai-eec-rayong`, changeFrequency: "monthly", priority: 0.7 },
@@ -55,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.8,
     };
-    const typePages: MetadataRoute.Sitemap = (Object.keys(LAND_TYPE_LABELS) as LandType[]).map((type) => ({
+    const typePages: MetadataRoute.Sitemap = LAND_CATEGORY_TYPES.map((type) => ({
       url: `${SITE}/land/${p.slug}/${landTypeSlug(type)}`,
       changeFrequency: "weekly" as const,
       priority: 0.75,

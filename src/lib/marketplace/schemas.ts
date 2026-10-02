@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizePhone } from "@/lib/validations";
+import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 
 const optionalNumber = z.preprocess(
   (value) => value === "" || value === undefined ? null : value,
@@ -21,7 +22,7 @@ const optionalThaiPhone = z.string().trim().max(32).transform(normalizePhone).re
 
 export const draftSchema = z.object({
   token: z.string().uuid(),
-  property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
+  property_type: z.enum(PROPERTY_TYPES).nullable().optional(),
   transaction_type: z.literal("sale").nullable().optional(),
   title: z.string().trim().max(180).nullable().optional(),
   province_id: optionalUuid.optional(),
@@ -33,6 +34,7 @@ export const draftSchema = z.object({
   area_rai: z.coerce.number().int().nonnegative().nullable().optional(),
   area_ngan: z.coerce.number().int().min(0).max(3).nullable().optional(),
   area_sqwa: z.coerce.number().min(0).lt(100).nullable().optional(),
+  usable_area_sqm: z.coerce.number().finite().nonnegative().max(9_999_999_999.99).nullable().optional(),
   frontage_m: optionalNumber.optional(),
   depth_min_m: optionalNumber.optional(),
   depth_max_m: optionalNumber.optional(),
@@ -63,7 +65,7 @@ export const submissionUploadSchema = z.object({
 });
 
 export const buyerRequirementSchema = z.object({
-  property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
+  property_type: z.enum(PROPERTY_TYPES).nullable().optional(),
   transaction_type: z.literal("sale").default("sale"),
   preferred_locations: z.array(z.string().trim().min(1).max(120)).max(10).default([]),
   province_ids: z.array(z.string().uuid().toLowerCase()).max(10).default([]).refine(

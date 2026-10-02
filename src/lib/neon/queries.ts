@@ -68,18 +68,17 @@ function normalizeImage(value: unknown): LandImage {
   };
 }
 
+const LEGACY_LAND_CATEGORIES: readonly string[] = ["industrial", "eec", "logistics", "data_center", "investment"];
+
 function normalizeLand(value: unknown): Land {
   const row = value as Record<string, unknown>;
   const images = Array.isArray(row.images) ? row.images.map(normalizeImage) : [];
   const landType = row.land_type as Land["land_type"];
-  const propertyType =
-    row.property_type === "factory" || row.property_type === "warehouse" || row.property_type === "land"
-      ? (row.property_type as Land["property_type"])
-      : landType === "factory"
-        ? "factory"
-        : landType === "warehouse"
-          ? "warehouse"
-          : "land";
+  // lands_property_type_check limits property_type to the canonical set. Pre-V2 rows lack the
+  // column; derive it from land_type, where legacy land categories (industrial/eec/...) are land.
+  const propertyType = (typeof row.property_type === "string" && row.property_type
+    ? row.property_type
+    : landType && !LEGACY_LAND_CATEGORIES.includes(landType) ? landType : "land") as Land["property_type"];
 
   return {
     id: String(row.id ?? ""),
@@ -97,6 +96,7 @@ function normalizeLand(value: unknown): Land {
     area_rai: numberOrNull(row.area_rai),
     area_ngan: numberOrNull(row.area_ngan),
     area_sqwa: numberOrNull(row.area_sqwa),
+    usable_area_sqm: numberOrNull(row.usable_area_sqm),
     zoning: row.zoning == null ? null : (row.zoning as Land["zoning"]),
     frontage_m: numberOrNull(row.frontage_m),
     depth_min_m: numberOrNull(row.depth_min_m),

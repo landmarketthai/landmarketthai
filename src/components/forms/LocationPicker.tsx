@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-/** Approximate area to show (e.g. a district center). Only moves the map; never sets lat/lng. */
+/** Area to show (district center, or an exact pin from a Google Maps link). Only moves the map; never sets lat/lng. */
 export interface MapFocus {
   lat: number;
   lng: number;
@@ -76,7 +76,9 @@ export default function LocationPicker({ lat, lng, onChange, focus = null }: Pro
       if (cancelled || mapRef.current !== map) return;
       if (!markerRef.current) markerRef.current = L.marker([lat, lng]).addTo(map);
       else markerRef.current.setLatLng([lat, lng]);
-      map.panTo([lat, lng]);
+      // A pin that arrives with a matching focus (Google Maps link) is zoomed by flyTo; panTo would cancel it.
+      const pending = focusRef.current;
+      if (!(pending && pending.lat === lat && pending.lng === lng)) map.panTo([lat, lng]);
     }
     void sync();
     return () => { cancelled = true; };

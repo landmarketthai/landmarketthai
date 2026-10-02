@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import ListingCard from "@/components/listings/ListingCard";
 import { buyerRequirementSchema } from "@/lib/marketplace/schemas";
+import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import type { BuyerRequirementSubmissionResult, Province } from "@/lib/types/database";
 
 interface Props {
@@ -85,7 +86,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
       {(!provinces.length || (initial.province && !initialProvince && !form.province_ids.length)) && <p role="alert" className="mb-5 text-red-700">กรุณาเลือกจังหวัดที่ถูกต้อง หรือโหลดหน้าใหม่หากไม่มีตัวเลือกจังหวัด</p>}
       {error && <div role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <label><span className="label">ประเภททรัพย์ (ซื้อเท่านั้น)</span><select name="property_type" {...invalid("property_type")} className="input" value={form.property_type} onChange={(e) => set("property_type", e.target.value)}><option value="">ทั้งหมด</option><option value="land">ที่ดิน</option><option value="factory">โรงงาน</option><option value="warehouse">โกดัง</option></select></label>
+        <label><span className="label">ประเภททรัพย์ (ซื้อเท่านั้น)</span><select name="property_type" {...invalid("property_type")} className="input" value={form.property_type} onChange={(e) => set("property_type", e.target.value)}><option value="">ทั้งหมด</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{PROPERTY_TYPE_LABELS[type]}</option>)}</select></label>
         <fieldset><legend className="label">จังหวัด (เลือกได้สูงสุด 10 จังหวัด · ไม่เลือก = ทุกจังหวัด)</legend><div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 p-3">{provinces.map((province) => <label key={province.id} className="flex items-center gap-2 py-1 text-sm"><input name="province_ids" {...invalid("province_ids")} value={province.id} type="checkbox" checked={form.province_ids.includes(province.id)} disabled={!form.province_ids.includes(province.id) && form.province_ids.length >= 10} onChange={(e) => set("province_ids", e.target.checked ? [...form.province_ids, province.id] : form.province_ids.filter((id) => id !== province.id))} />{province.name_th}</label>)}</div></fieldset>
         <label><span className="label">ทำเลเพิ่มเติม</span><input name="preferred_locations" {...invalid("preferred_locations")} maxLength={1209} className="input" value={form.preferred_locations} onChange={(e) => set("preferred_locations", e.target.value)} placeholder="อำเภอ, ตำบล, นิคม (คั่นด้วย ,)" /></label>
         <label><span className="label">ขนาดขั้นต่ำ (ไร่)</span><input name="min_size_rai" {...invalid("min_size_rai")} type="number" min="0" max="999999999.99999" step="0.00001" className="input" value={form.min_size_rai} onChange={(e) => set("min_size_rai", e.target.value)} /></label>

@@ -6,8 +6,7 @@ import ListingGrid from "@/components/listings/ListingGrid";
 import JsonLd from "@/components/seo/JsonLd";
 import { getProvinceBySlug } from "@/lib/neon/queries";
 import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
-import type { LandType } from "@/lib/types/database";
+import { LAND_CATEGORY_TYPES, LAND_TYPE_LABELS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -30,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   };
 }
 
-const LAND_TYPES = Object.keys(LAND_TYPE_LABELS) as LandType[];
+const LAND_TYPES = LAND_CATEGORY_TYPES;
 
 export default async function ProvincePage({
   params,

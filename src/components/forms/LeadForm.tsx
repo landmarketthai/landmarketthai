@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
-import { LAND_TYPE_LABELS } from "@/lib/utils";
+import { LAND_CATEGORY_TYPES, LAND_TYPE_LABELS } from "@/lib/utils";
 import { THAI_PROVINCES } from "@/lib/constants/provinces";
 
 type LeadType = "buyer" | "partner" | "owner";
@@ -166,7 +166,7 @@ export default function LeadForm({
           <select name="province" className="input mt-1" disabled={isLoading}><option value="">ทุกจังหวัด</option>{THAI_PROVINCES.map(province => <option key={province} value={province}>{province}</option>)}</select>
         </label>
         <label className="label">ประเภทที่ดิน
-          <select name="land_type" className="input mt-1" disabled={isLoading}><option value="">ทุกประเภท</option>{Object.entries(LAND_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select name="land_type" className="input mt-1" disabled={isLoading}><option value="">ทุกประเภท</option>{LAND_CATEGORY_TYPES.map((value) => <option key={value} value={value}>{LAND_TYPE_LABELS[value]}</option>)}</select>
         </label>
         {([["size_min_rai", "ขนาดขั้นต่ำ (ไร่)"], ["size_max_rai", "ขนาดสูงสุด (ไร่)"], ["budget_min", "งบประมาณรวมขั้นต่ำ (บาท)"], ["budget_max", "งบประมาณรวมสูงสุด (บาท)"]] as const).map(([name, label]) => <div key={name}>
           <label className="label" htmlFor={`lead-${name}`}>{label}</label>

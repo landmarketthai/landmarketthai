@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as presentation from '../src/lib/marketplace/presentation.ts';
 
 const require = createRequire(import.meta.url);
 
@@ -83,6 +84,7 @@ function harness(file, extra = {}) {
     'next/link': { default: 'Link' }, 'next/navigation': { useRouter: () => ({ replace() {} }) },
     'lucide-react': {}, '@/lib/utils': {}, '@/lib/marketplace/verification': { verificationBadges: () => [] },
     '@/lib/marketplace/search-filters': { locationChoices: () => ({ districts: [], subdistricts: [] }) },
+    '@/lib/marketplace/presentation': presentation,
     './PropertyMap': 'PropertyMap', './SearchPropertyCard': 'SearchPropertyCard',
   };
   const code = ts.transpileModule(readFileSync(new URL(file, import.meta.url), 'utf8'), {

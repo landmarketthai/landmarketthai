@@ -43,6 +43,7 @@ function normalizeSubmission(value: unknown): PropertySubmission {
     user_id: str(row.user_id),
     owner_lead_id: str(row.owner_lead_id),
     linked_land_id: str(row.linked_land_id),
+    // property_submissions_property_type_check limits stored values to the canonical set.
     property_type: (row.property_type as PropertyType | null) ?? null,
     transaction_type: (row.transaction_type as TransactionType | null) ?? null,
     title: str(row.title),
@@ -57,6 +58,7 @@ function normalizeSubmission(value: unknown): PropertySubmission {
     area_ngan: num(row.area_ngan),
     area_sqwa: num(row.area_sqwa),
     total_rai: num(row.total_rai),
+    usable_area_sqm: num(row.usable_area_sqm),
     frontage_m: num(row.frontage_m),
     depth_min_m: num(row.depth_min_m),
     depth_max_m: num(row.depth_max_m),
@@ -123,6 +125,7 @@ export interface SubmissionDraftInput {
   area_rai?: number | null;
   area_ngan?: number | null;
   area_sqwa?: number | null;
+  usable_area_sqm?: number | null;
   frontage_m?: number | null;
   depth_min_m?: number | null;
   depth_max_m?: number | null;
@@ -178,7 +181,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
        area_rai = $12, area_ngan = $13, area_sqwa = $14, total_rai = $15,
        frontage_m = $16, depth_min_m = $17, depth_max_m = $18, road_name = $19, road_width_m = $20,
        zoning = $21, sale_price = $22, price_per_rai = $23,
-       description = $24, contact_name = $25, contact_phone = $26, contact_line = $27, updated_at = now()
+       description = $24, contact_name = $25, contact_phone = $26, contact_line = $27, usable_area_sqm = $28, updated_at = now()
      where id = $1 and draft_token = $2 and status = 'draft'
      returning *`,
     [
@@ -189,6 +192,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
       input.depth_max_m ?? null, input.road_name ?? null, input.road_width_m ?? null, input.zoning ?? null,
       input.sale_price ?? null, pricePerRai,
       input.description ?? null, input.contact_name ?? null, input.contact_phone ?? null, input.contact_line ?? null,
+      input.usable_area_sqm ?? null,
     ],
   );
   return rows[0] ? normalizeSubmission(rows[0]) : null;
@@ -208,7 +212,7 @@ export async function submitPropertyDraft(input: {
          and property_type is not null and transaction_type is not null
          and title is not null and province_id is not null
          and nullif(trim(contact_name), '') is not null and nullif(trim(contact_phone), '') is not null
-         and total_rai is not null and total_rai > 0
+         and (total_rai > 0 or usable_area_sqm > 0)
          and transaction_type = 'sale' and sale_price is not null and sale_price > 0
          and (($3::boolean = true))
      ), new_lead as (
@@ -322,6 +326,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
 
   const propertyType = String(source.property_type) as PropertyType;
   const transactionType: TransactionType = "sale";
+  // lands_land_type_check accepts every canonical property type (20261003 migration), so land_type mirrors it.
   const landType = propertyType;
   const slug = slugify(String(source.title), String(source.id));
   const rows = await sql.query(
@@ -332,10 +337,10 @@ export async function publishSubmission(id: string): Promise<string | null> {
        title_th, slug, province_id, district, subdistrict, address, land_type, property_type, transaction_type,
        size_rai, area_rai, area_ngan, area_sqwa, zoning, frontage_m, depth_min_m, depth_max_m, road_name, road_width_m,
        price_per_rai, total_price, is_eec, description, lat, lng, location_precision,
-       status, verification_status, is_featured, owner_lead_id, published_at
+       status, verification_status, is_featured, owner_lead_id, published_at, usable_area_sqm
        ) select
        $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-       false,$23,$24,$25,$26,'active','verified',false,$27,now()
+       false,$23,$24,$25,$26,'active','verified',false,$27,now(),$28
        from source returning id
      ), inserted_images as (
        insert into land_images (land_id, storage_key, url_or_cdn_path, alt_th, sort_order, is_cover)
@@ -360,7 +365,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
       landType, propertyType, transactionType, num(source.total_rai), num(source.area_rai), num(source.area_ngan), num(source.area_sqwa),
       str(source.zoning), num(source.frontage_m), num(source.depth_min_m), num(source.depth_max_m), str(source.road_name), num(source.road_width_m),
       num(source.price_per_rai), num(source.sale_price), str(source.description), num(source.lat), num(source.lng),
-      source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id),
+      source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id), num(source.usable_area_sqm),
     ],
   );
   const landId = rows[0]?.id ? String(rows[0].id) : null;

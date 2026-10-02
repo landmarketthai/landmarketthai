@@ -3,8 +3,8 @@
 P2 intelligence integration:
 
 - Pure helpers and types: `@/lib/land-intelligence` (overlays, anchors, distances, analytics, forward/reverse matching, validated buyer requirements).
-- Read-only components: `@/components/intelligence` (`InventoryAnalytics`, `PropertyIntelligence`, `PropertyBuyerRecommendations`). Render buyer recommendations only behind `requireAdmin`; never pass leads to public pages.
-- Public route: `/land-insights`, active asking-inventory statistics by province, type and reported zoning. No navigation changes. Reverse recommendations are integrated into `/admin/properties/[id]`; existing buyer recommendations remain in `/admin/leads/[id]`.
+- Read-only components: `@/components/intelligence` (`PropertyIntelligence`, `PropertyBuyerRecommendations`). Render buyer recommendations only behind `requireAdmin`; never pass leads to public pages.
+- The former `/land-insights` page was removed. Reverse recommendations are integrated into `/admin/properties/[id]`; existing buyer recommendations remain in `/admin/leads/[id]`.
 - Buyer JSON API and server action accept `zoning`, `is_eec`, `frontage_min_m`, and paired `anchor_id` / `distance_max_km`, alongside the existing province/type/size/budget requirements. Use registered anchor IDs. Matching is deterministic, advisory, and requires human approval; it sends no messages and creates no deals automatically.
 
 Data limitations:

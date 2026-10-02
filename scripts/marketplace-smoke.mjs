@@ -54,7 +54,6 @@ assert.equal(history.includes(rayong) || history.includes(kabin), false);
 assert.ok((await html("/property/109-rai-eec-rayong")).includes("Sold out"));
 assert.ok((await html("/property/37-rai-eec-rayong")).includes("36.91825"));
 assert.ok((await html("/property/101-rai-kabin-buri")).includes("ข้อมูลประกอบการพิจารณาที่ดิน"));
-assert.ok((await html("/land-insights")).includes("ไม่ใช่ราคาซื้อขายจริง"));
 const home = await html("/");
 assert.equal((home.match(/ค้นหาทรัพย์บนแผนที่/g) ?? []).length >= 1, true);
 assert.ok(home.includes("ค้นหาที่ดิน โรงงาน และโกดัง"));

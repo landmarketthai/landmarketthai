@@ -4,14 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Building2, MapPin, Ruler, Tag } from "lucide-react";
 import type { Land } from "@/lib/types/database";
-import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
+import { formatMoneyFull, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
-
-const propertyTypeLabel = {
-  land: "ที่ดิน",
-  factory: "โรงงาน",
-  warehouse: "โกดัง",
-} as const;
+import { PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
 
 interface Props {
   property: Land;
@@ -27,6 +22,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
   const priceLabel = "ราคารวม";
   const updatedLabel = formatUpdatedDate(property.updated_at);
   const badges = verificationBadges(property);
+  const sizeLabel = propertySizeLabel(property);
 
   return (
     <article
@@ -49,7 +45,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
             )}
             <div className="absolute left-2 top-2 flex flex-wrap gap-1">
               <span className="rounded-full bg-white/95 px-2 py-1 text-[11px] font-bold text-slate-800 shadow-sm">
-                {propertyTypeLabel[property.property_type]}
+                {PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.land}
               </span>
               <span className={`rounded-full px-2 py-1 text-[11px] font-bold text-white ${property.status === "sold" ? "bg-red-600" : "bg-emerald-600"}`}>
                 {listingStatusLabel(property)}
@@ -66,8 +62,8 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
                   <span className="truncate">{[property.subdistrict, property.district, property.province?.name_th].filter(Boolean).join(" · ")}</span>
                 </div>
               )}
-              {property.size_rai != null && (
-                <div className="flex items-center gap-1.5"><Ruler size={13} />{formatRai(property.size_rai)}</div>
+              {sizeLabel && (
+                <div className="flex items-center gap-1.5"><Ruler size={13} />{sizeLabel}</div>
               )}
               {property.zoning && (
                 <div className="flex items-center gap-1.5"><Tag size={13} />{ZONING_LABELS[property.zoning]}</div>
