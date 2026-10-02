@@ -62,6 +62,39 @@ test("seller readiness rejects zero price and zero area", () => {
   assert.ok(issues.includes("ราคาขาย"));
 });
 
+test("seller draft accepts blank province before the location step", () => {
+  const draft = draftSchema.safeParse({
+    token: "00000000-0000-4000-8000-000000000000",
+    property_type: "land",
+    transaction_type: "sale",
+    province_id: "",
+    title: "",
+    district: "",
+    subdistrict: "",
+    address: "",
+    lat: null,
+    lng: null,
+    area_rai: null,
+    area_ngan: null,
+    area_sqwa: null,
+    frontage_m: null,
+    depth_min_m: null,
+    depth_max_m: null,
+    road_name: "",
+    road_width_m: null,
+    zoning: null,
+    sale_price: null,
+    price_per_rai: null,
+    description: "",
+    contact_name: "",
+    contact_phone: "",
+    contact_line: "",
+  });
+
+  assert.equal(draft.success, true);
+  if (draft.success) assert.equal(draft.data.province_id, null);
+});
+
 test("sale-only schemas reject rental transactions", () => {
   const draft = draftSchema.safeParse({
     token: "00000000-0000-4000-8000-000000000000",

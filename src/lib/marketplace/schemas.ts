@@ -6,6 +6,11 @@ const optionalNumber = z.preprocess(
   z.coerce.number().finite().nonnegative().nullable(),
 );
 
+const optionalUuid = z.preprocess(
+  (value) => value === "" ? null : value,
+  z.string().uuid().nullable(),
+);
+
 const thaiPhone = z.string().trim().transform(normalizePhone).pipe(
   z.string().regex(/^0[0-9]{8,9}$/, "กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง"),
 );
@@ -19,7 +24,7 @@ export const draftSchema = z.object({
   property_type: z.enum(["land", "factory", "warehouse"]).nullable().optional(),
   transaction_type: z.literal("sale").nullable().optional(),
   title: z.string().trim().max(180).nullable().optional(),
-  province_id: z.string().uuid().nullable().optional(),
+  province_id: optionalUuid.optional(),
   district: z.string().trim().max(120).nullable().optional(),
   subdistrict: z.string().trim().max(120).nullable().optional(),
   address: z.string().trim().max(500).nullable().optional(),
