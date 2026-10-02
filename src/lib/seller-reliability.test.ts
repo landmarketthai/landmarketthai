@@ -25,6 +25,13 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
+test("submission locks the eligible draft before creating its owner lead", () => {
+  const marketplace = read("./neon/marketplace.ts");
+  const submit = marketplace.slice(marketplace.indexOf("export async function submitPropertyDraft("), marketplace.indexOf("export async function propertyDraftExists("));
+  assert.match(submit, /with target as \([\s\S]*?status = 'draft'[\s\S]*?for update\s*\), new_lead as/);
+  assert.match(submit, /insert into leads[\s\S]*?from target/);
+});
+
 test("restore returns missing only for 404/null; transient and malformed responses remain retryable", async () => {
   for (const status of [401, 403, 429, 500, 503]) {
     await assert.rejects(loadSellerDraft("draft-a", "token", async () => response(status)));

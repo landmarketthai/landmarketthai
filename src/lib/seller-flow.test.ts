@@ -117,13 +117,32 @@ test("readiness accepts land area or usable area, and requires at least one", ()
   assert.match(marketplace, /published_at, usable_area_sqm\r?\n/);
 });
 
+test("draft numeric bounds reject database overflows before autosave", () => {
+  const token = "00000000-0000-4000-8000-000000000000";
+  for (const [field, valid, overflow] of [
+    ["area_rai", 999_999_999, 1_000_000_000],
+    ["frontage_m", 9_999_999_999.99, 10_000_000_000],
+    ["depth_min_m", 9_999_999_999.99, 10_000_000_000],
+    ["depth_max_m", 9_999_999_999.99, 10_000_000_000],
+    ["road_width_m", 9_999_999_999.99, 10_000_000_000],
+    ["sale_price", 99_999_999_999_999.98, 100_000_000_000_000],
+    ["price_per_rai", 99_999_999_999_999.98, 100_000_000_000_000],
+  ] as const) {
+    assert.equal(draftSchema.safeParse({ token, [field]: valid }).success, true, field);
+    assert.equal(draftSchema.safeParse({ token, [field]: overflow }).success, false, field);
+    assert.equal(draftSchema.safeParse({ token, [field]: null }).success, true, field);
+  }
+  assert.equal(draftSchema.safeParse({ token, area_sqwa: 0.01, sale_price: 10_000_000_000 }).success, false, "derived price cannot overflow when price_per_rai is omitted");
+  assert.equal(draftSchema.safeParse({ token, usable_area_sqm: 80, sale_price: 10_000_000_000 }).success, true, "building-only drafts have no derived price per rai");
+});
+
 test("blank coordinates normalize to null and Maps pin coordinates outrank viewport centers", () => {
   const parsed = draftSchema.parse({ token: "00000000-0000-4000-8000-000000000000", lat: "", lng: "" });
   assert.equal(parsed.lat, null);
   assert.equal(parsed.lng, null);
   const maps = "https://www.google.com/maps/place/Foo/@13.1,100.1,15z/data=!3d13.2345678!4d100.8765432";
   assert.deepEqual(coordinatesFromMapsUrl(new URL(maps)), { lat: 13.2345678, lng: 100.8765432 });
-  assert.deepEqual(coordinatesFromMapsUrl(new URL("https://www.google.com/maps/@13.1,100.1,15z")), { lat: 13.1, lng: 100.1 });
+  assert.equal(coordinatesFromMapsUrl(new URL("https://www.google.com/maps/@13.1,100.1,15z")), null);
 });
 
 test("Google Maps input parses coordinates from raw pairs and Google URLs only", () => {
@@ -236,11 +255,11 @@ test("sell form is one page: section headings, one submit, autosave, no stepper"
   assert.doesNotMatch(wizard, /"rent"|เช่า/, "sale only");
 });
 
-test("Land Insights redirects to land and stays out of navigation and sitemap", () => {
+test("Land Insights redirects to search and stays out of navigation and sitemap", () => {
   assert.doesNotMatch(read("../components/layout/Navbar.tsx"), /land-insights|ราคาตั้งขาย/);
   assert.doesNotMatch(read("../app/sitemap.ts"), /land-insights/);
   assert.doesNotMatch(read("../components/intelligence/index.ts"), /InventoryAnalytics/);
-  assert.match(read("../../next.config.ts"), /source: "\/land-insights", destination: "\/land", permanent: true/);
+  assert.match(read("../../next.config.ts"), /source: "\/land-insights", destination: "\/search", permanent: true/);
   // Property detail intelligence stays.
   assert.match(read("../components/intelligence/index.ts"), /PropertyIntelligence/);
 });

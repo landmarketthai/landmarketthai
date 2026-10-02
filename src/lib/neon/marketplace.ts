@@ -217,6 +217,7 @@ export async function submitPropertyDraft(input: {
          and (total_rai > 0 or usable_area_sqm > 0)
          and transaction_type = 'sale' and sale_price is not null and sale_price > 0
          and (($3::boolean = true))
+       for update
      ), new_lead as (
        insert into leads (lead_type, name, phone, line_id, source, details, consent_pdpa, consent_at, status)
        select 'owner', contact_name, contact_phone, contact_line, $4,

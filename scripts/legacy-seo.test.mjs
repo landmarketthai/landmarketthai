@@ -19,5 +19,6 @@ test("legacy detail presents usable area and canonical listing href without land
 });
 
 test("removed land insights URL redirects permanently to search", () => {
-  assert.match(read("../middleware.ts"), /pathname === "\/land-insights"[\s\S]*?NextResponse\.redirect\(new URL\("\/search", request\.url\), 308\)/);
+  assert.match(read("../next.config.ts"), /source: "\/land-insights", destination: "\/search", permanent: true/);
+  assert.doesNotMatch(read("../middleware.ts"), /land-insights/);
 });

@@ -2,10 +2,13 @@ import { z } from "zod";
 import { normalizePhone } from "@/lib/validations";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 
+const MAX_PRICE = 99_999_999_999_999.99;
 const optionalNumber = z.preprocess(
   (value) => value === "" || value === undefined ? null : value,
-  z.coerce.number().finite().nonnegative().nullable(),
+  z.coerce.number().finite().nonnegative().max(MAX_PRICE).nullable(),
 );
+
+const optionalMeasurement = optionalNumber.refine((value) => value == null || value <= 9_999_999_999.99);
 
 const optionalUuid = z.preprocess(
   (value) => value === "" ? null : value,
@@ -37,15 +40,15 @@ export const draftSchema = z.object({
     (value) => typeof value === "string" && value.trim() === "" ? null : value,
     z.coerce.number().min(-180).max(180).nullable().optional(),
   ),
-  area_rai: z.coerce.number().int().nonnegative().nullable().optional(),
+  area_rai: z.coerce.number().int().nonnegative().max(999_999_999).nullable().optional(),
   area_ngan: z.coerce.number().int().min(0).max(3).nullable().optional(),
   area_sqwa: z.coerce.number().min(0).lt(100).nullable().optional(),
   usable_area_sqm: z.coerce.number().finite().nonnegative().max(9_999_999_999.99).nullable().optional(),
-  frontage_m: optionalNumber.optional(),
-  depth_min_m: optionalNumber.optional(),
-  depth_max_m: optionalNumber.optional(),
+  frontage_m: optionalMeasurement.optional(),
+  depth_min_m: optionalMeasurement.optional(),
+  depth_max_m: optionalMeasurement.optional(),
   road_name: z.string().trim().max(160).nullable().optional(),
-  road_width_m: optionalNumber.optional(),
+  road_width_m: optionalMeasurement.optional(),
   zoning: z.enum(["purple", "purple_light", "brown", "orange", "yellow", "green", "other"]).nullable().optional(),
   sale_price: optionalNumber.optional(),
   price_per_rai: optionalNumber.optional(),
@@ -53,7 +56,10 @@ export const draftSchema = z.object({
   contact_name: z.string().trim().max(120).nullable().optional(),
   contact_phone: optionalThaiPhone.nullable().optional(),
   contact_line: z.string().trim().max(100).nullable().optional(),
-});
+}).refine((value) => {
+  const totalRai = (value.area_rai ?? 0) + (value.area_ngan ?? 0) / 4 + (value.area_sqwa ?? 0) / 400;
+  return totalRai <= 0 || value.sale_price == null || value.sale_price / totalRai <= MAX_PRICE;
+}, { path: ["sale_price"], message: "ราคาต่อไร่เกินช่วงที่รองรับ" });
 
 export const submitDraftSchema = z.object({
   token: z.string().uuid(),

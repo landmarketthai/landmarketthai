@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src/",
-    "test": "node --import ./scripts/register-ts-paths.mjs --test --experimental-strip-types \"src/lib/*.test.ts\" \"src/lib/marketplace/marketplace.test.ts\" \"scripts/search-map.test.mjs\" \"scripts/legacy-seo.test.mjs\""
+    "test": "node --import ./scripts/register-ts-paths.mjs --test --experimental-strip-types \"src/lib/*.test.ts\" \"src/lib/marketplace/marketplace.test.ts\" \"src/app/admin/buyer-requirements/*.test.ts\" \"scripts/search-map.test.mjs\" \"scripts/legacy-seo.test.mjs\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1060.0",
