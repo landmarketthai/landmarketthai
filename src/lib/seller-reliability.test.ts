@@ -276,5 +276,7 @@ test("location ordering, native radios, invalid-field focus, restore lock and si
   const picker = read("../components/forms/LocationPicker.tsx");
   assert.equal((picker.match(/L\.marker\(/g) ?? []).length, 1);
   assert.match(picker, /markerRef\.current = L\.marker/);
+  assert.match(picker, /sell-location-pin-wrap/);
+  assert.match(picker, /sell-location-pin-dot/);
   assert.match(picker, /\[lat, lng, mapReady\]/);
 });

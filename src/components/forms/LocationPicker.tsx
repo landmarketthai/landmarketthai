@@ -81,8 +81,20 @@ export default function LocationPicker({ lat, lng, onChange, focus = null, disab
       }
       const L = await import("leaflet");
       if (cancelled || mapRef.current !== map) return;
-      if (!markerRef.current) markerRef.current = L.marker([lat, lng]).addTo(map);
-      else markerRef.current.setLatLng([lat, lng]);
+      if (!markerRef.current) {
+        markerRef.current = L.marker([lat, lng], {
+          title: "ตำแหน่งทรัพย์",
+          alt: "หมุดตำแหน่งทรัพย์",
+          icon: L.divIcon({
+            className: "sell-location-pin-wrap",
+            html: '<span class="sell-location-pin" aria-hidden="true"><span class="sell-location-pin-dot"></span></span>',
+            iconSize: [44, 52],
+            iconAnchor: [22, 48],
+          }),
+        }).addTo(map);
+      } else {
+        markerRef.current.setLatLng([lat, lng]);
+      }
       // A pin that arrives with a matching focus (Google Maps link) is zoomed by flyTo; panTo would cancel it.
       const pending = focusRef.current;
       if (!(pending && pending.lat === lat && pending.lng === lng)) map.panTo([lat, lng]);
