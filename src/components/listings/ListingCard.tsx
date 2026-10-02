@@ -64,8 +64,8 @@ function exactAreaLabel(land: Land): string | null {
 
 function propertyTypeLabel(land: Land): string {
   // Land keeps its legacy category label (e.g. ที่ดินอุตสาหกรรม); other assets use the property type label.
-  if (land.property_type && land.property_type !== "land") return LAND_TYPE_LABELS[land.property_type] ?? "ที่ดิน";
-  return LAND_TYPE_LABELS[land.land_type] ?? "ที่ดิน";
+  if (land.property_type && land.property_type !== "land") return LAND_TYPE_LABELS[land.property_type] ?? LAND_TYPE_LABELS.other;
+  return LAND_TYPE_LABELS[land.land_type] ?? LAND_TYPE_LABELS.other;
 }
 
 function locationLabel(land: Land): string | null {

@@ -45,7 +45,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
             )}
             <div className="absolute left-2 top-2 flex flex-wrap gap-1">
               <span className="rounded-full bg-white/95 px-2 py-1 text-[11px] font-bold text-slate-800 shadow-sm">
-                {PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.land}
+                {PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.other}
               </span>
               <span className={`rounded-full px-2 py-1 text-[11px] font-bold text-white ${property.status === "sold" ? "bg-red-600" : "bg-emerald-600"}`}>
                 {listingStatusLabel(property)}

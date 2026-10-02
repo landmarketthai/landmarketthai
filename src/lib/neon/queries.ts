@@ -1,3 +1,4 @@
+import { isPropertyType } from "@/lib/marketplace/presentation";
 import { unstable_cache } from "next/cache";
 import { getSqlIfConfigured } from "@/lib/neon/server";
 import type {
@@ -76,9 +77,11 @@ function normalizeLand(value: unknown): Land {
   const landType = row.land_type as Land["land_type"];
   // lands_property_type_check limits property_type to the canonical set. Pre-V2 rows lack the
   // column; derive it from land_type, where legacy land categories (industrial/eec/...) are land.
-  const propertyType = (typeof row.property_type === "string" && row.property_type
-    ? row.property_type
-    : landType && !LEGACY_LAND_CATEGORIES.includes(landType) ? landType : "land") as Land["property_type"];
+  // Anything unrecognised is "other", never silently relabelled as land.
+  const propertyType: Land["property_type"] = isPropertyType(row.property_type) ? row.property_type
+    : typeof row.property_type === "string" && row.property_type ? "other"
+    : isPropertyType(landType) ? landType
+    : !landType || LEGACY_LAND_CATEGORIES.includes(landType) ? "land" : "other";
 
   return {
     id: String(row.id ?? ""),
@@ -341,9 +344,11 @@ function normalizeDemand(value: unknown): BuyerDemand {
     id: String(row.id ?? ""),
     slug: String(row.slug ?? ""),
     province_id: stringOrNull(row.province_id),
-    land_type: row.land_type == null ? null : (row.land_type as BuyerDemand["land_type"]),
+    land_type: row.land_type == null ? null : isPropertyType(row.land_type) ? row.land_type : "other",
     size_min_rai: numberOrNull(row.size_min_rai),
     size_max_rai: numberOrNull(row.size_max_rai),
+    min_usable_area_sqm: numberOrNull(row.min_usable_area_sqm),
+    max_usable_area_sqm: numberOrNull(row.max_usable_area_sqm),
     intended_use: null,
     budget_note: null,
     max_price: numberOrNull(row.max_price),
@@ -364,6 +369,10 @@ function normalizeDemand(value: unknown): BuyerDemand {
 
 // Explicit allowlist: never select contact data, source IDs, review notes or user free text.
 const PUBLIC_DEMAND_SELECT = `select d.id,d.slug,d.province_id,d.land_type,d.size_min_rai,d.size_max_rai,
+  (select (l.details->>'min_usable_area_sqm')::numeric from buyer_requirements r join leads l on l.id = r.lead_id
+    where r.id = d.buyer_requirement_id and r.status = 'published' and r.consent_pdpa and r.consent_public and l.consent_pdpa and l.consent_at is not null) as min_usable_area_sqm,
+  (select (l.details->>'max_usable_area_sqm')::numeric from buyer_requirements r join leads l on l.id = r.lead_id
+    where r.id = d.buyer_requirement_id and r.status = 'published' and r.consent_pdpa and r.consent_public and l.consent_pdpa and l.consent_at is not null) as max_usable_area_sqm,
   d.max_price,d.max_price_per_rai,d.zoning,d.container_access,d.high_voltage,
   d.status,d.is_public,d.published_at,d.created_at,
   case when p.id is null then null else jsonb_build_object(

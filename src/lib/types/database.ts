@@ -282,6 +282,8 @@ export interface BuyerDemand {
   land_type: LandType | null;
   size_min_rai: number | null;
   size_max_rai: number | null;
+  min_usable_area_sqm?: number | null;
+  max_usable_area_sqm?: number | null;
   intended_use: string | null;
   budget_note: string | null;
   status: DemandStatus;
@@ -301,7 +303,7 @@ export interface BuyerDemand {
 
 /** Public rendering contract excludes contacts, source IDs, SEO overrides and free text. */
 export type PublicBuyerDemand = Pick<BuyerDemand,
-  | "slug" | "land_type" | "size_min_rai" | "size_max_rai"
+  | "slug" | "land_type" | "size_min_rai" | "size_max_rai" | "min_usable_area_sqm" | "max_usable_area_sqm"
   | "max_price" | "max_price_per_rai" | "zoning" | "container_access" | "high_voltage"
   | "province_names" | "published_at" | "status" | "is_public"
 > & { province?: Pick<Province, "name_th"> };
@@ -316,6 +318,8 @@ export interface BuyerRequirement {
   province_ids: string[];
   min_size_rai: number | null;
   max_size_rai: number | null;
+  min_usable_area_sqm?: number | null;
+  max_usable_area_sqm?: number | null;
   max_price: number | null;
   max_price_per_rai: number | null;
   zoning: ZoningColor | null;

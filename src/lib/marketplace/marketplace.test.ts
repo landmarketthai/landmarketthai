@@ -344,7 +344,7 @@ test("public demand cards and detail metadata only render allowlisted typed crit
   const detail = readFileSync(new URL("../../app/buyer-demand/[slug]/page.tsx", import.meta.url), "utf8");
   const allowed = new Set([
     "status", "is_public", "published_at", "slug", "province_names", "province", "land_type",
-    "size_min_rai", "size_max_rai", "max_price", "max_price_per_rai", "zoning", "container_access", "high_voltage",
+    "size_min_rai", "size_max_rai", "min_usable_area_sqm", "max_usable_area_sqm", "max_price", "max_price_per_rai", "zoning", "container_access", "high_voltage",
   ]);
   for (const source of [list, detail]) {
     for (const match of source.matchAll(/demand\.([a-z_]+)/g)) assert.ok(allowed.has(match[1]), match[1]);
@@ -355,7 +355,8 @@ test("public demand cards and detail metadata only render allowlisted typed crit
     assert.ok(list.includes(`demand.${field}`), field);
   }
   assert.match(list, /demand\.province_names\.join/);
-  assert.match(list, /if \(demand\.size_max_rai != null\) return/);
+  assert.match(list, /range\(demand\.size_min_rai, demand\.size_max_rai, "ไร่"\)/);
+  assert.match(list, /range\(demand\.min_usable_area_sqm, demand\.max_usable_area_sqm/);
   assert.doesNotMatch(detail, /generateStaticParams/);
   assert.equal((detail.match(/!demand \|\| !isPublishedDemand\(demand\)/g) ?? []).length, 2);
 });

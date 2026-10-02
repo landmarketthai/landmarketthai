@@ -1,3 +1,4 @@
+import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
 import type { Land, LandType, ZoningColor } from "@/lib/types/database";
 import { ZONING_LABELS, slugToLandType } from "@/lib/utils";
 
@@ -86,10 +87,9 @@ export function matchesLandFilters(land: Land, filters: LandFilters = {}): boole
   return (!filters.province_slug || land.province?.slug === filters.province_slug)
     && (!filters.land_type || (filters.land_type === "eec" ? land.is_eec || land.land_type === "eec" : land.land_type === filters.land_type))
     && (!filters.q || [land.title_th, land.district, land.description].some(text => text?.toLocaleLowerCase().includes(filters.q!.toLocaleLowerCase())))
-    && (filters.size_min === undefined || land.size_rai != null && land.size_rai >= filters.size_min)
-    && (filters.size_max === undefined || land.size_rai != null && land.size_rai <= filters.size_max)
-    && (filters.price_min === undefined || land.price_per_rai != null && land.price_per_rai >= filters.price_min)
-    && (filters.price_max === undefined || land.price_per_rai != null && land.price_per_rai <= filters.price_max)
+    && matchesSizeCriteria(land, { min_size_rai: filters.size_min, max_size_rai: filters.size_max })
+    && (isUsableAreaOnly(land) || ((filters.price_min === undefined || land.price_per_rai != null && land.price_per_rai >= filters.price_min)
+      && (filters.price_max === undefined || land.price_per_rai != null && land.price_per_rai <= filters.price_max)))
     && (!filters.zoning || land.zoning === filters.zoning)
     && (filters.is_eec === undefined || land.is_eec === filters.is_eec);
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
-import { LAND_CATEGORY_TYPES, LAND_TYPE_LABELS } from "@/lib/utils";
+import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { THAI_PROVINCES } from "@/lib/constants/provinces";
 
 type LeadType = "buyer" | "partner" | "owner";
@@ -45,9 +45,9 @@ export default function LeadForm({
     const payload = {
       ...(defaultType === "buyer" && !compact ? {
         province: data.province || undefined,
-        land_type: data.land_type || undefined,
+        property_type: data.property_type || undefined,
         intended_use: data.intended_use || undefined,
-        ...Object.fromEntries(["size_min_rai", "size_max_rai", "budget_min", "budget_max"].map(key => [key, data[key] ? Number(data[key]) : undefined])),
+        ...Object.fromEntries(["size_min_rai", "size_max_rai", "budget_min", "budget_max", "min_usable_area_sqm", "max_usable_area_sqm"].map(key => [key, data[key] ? Number(data[key]) : undefined])),
       } : {}),
       lead_type: defaultType,
       name: data.name,
@@ -165,10 +165,10 @@ export default function LeadForm({
         <label className="label">จังหวัด
           <select name="province" className="input mt-1" disabled={isLoading}><option value="">ทุกจังหวัด</option>{THAI_PROVINCES.map(province => <option key={province} value={province}>{province}</option>)}</select>
         </label>
-        <label className="label">ประเภทที่ดิน
-          <select name="land_type" className="input mt-1" disabled={isLoading}><option value="">ทุกประเภท</option>{LAND_CATEGORY_TYPES.map((value) => <option key={value} value={value}>{LAND_TYPE_LABELS[value]}</option>)}</select>
+        <label className="label">ประเภททรัพย์
+          <select name="property_type" className="input mt-1" disabled={isLoading}><option value="">ทุกประเภท</option>{PROPERTY_TYPES.map((value) => <option key={value} value={value}>{PROPERTY_TYPE_LABELS[value]}</option>)}</select>
         </label>
-        {([["size_min_rai", "ขนาดขั้นต่ำ (ไร่)"], ["size_max_rai", "ขนาดสูงสุด (ไร่)"], ["budget_min", "งบประมาณรวมขั้นต่ำ (บาท)"], ["budget_max", "งบประมาณรวมสูงสุด (บาท)"]] as const).map(([name, label]) => <div key={name}>
+        {([["size_min_rai", "ขนาดขั้นต่ำ (ไร่)"], ["size_max_rai", "ขนาดสูงสุด (ไร่)"], ["min_usable_area_sqm", "พื้นที่ใช้สอยขั้นต่ำ (ตร.ม.)"], ["max_usable_area_sqm", "พื้นที่ใช้สอยสูงสุด (ตร.ม.)"], ["budget_min", "งบประมาณรวมขั้นต่ำ (บาท)"], ["budget_max", "งบประมาณรวมสูงสุด (บาท)"]] as const).map(([name, label]) => <div key={name}>
           <label className="label" htmlFor={`lead-${name}`}>{label}</label>
           <input id={`lead-${name}`} name={name} type="number" min="0" step="any" max="1000000000000" className="input" disabled={isLoading} aria-describedby={fieldErrors[name]?.length ? `err-${name}` : undefined} />
           <FieldError id={`err-${name}`} errors={fieldErrors[name]} />

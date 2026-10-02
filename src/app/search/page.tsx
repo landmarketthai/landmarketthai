@@ -4,8 +4,8 @@ import { getAllProvinces, getLocationOptions, searchProperties } from "@/lib/neo
 import { parsePropertySearchParams } from "@/lib/marketplace/search-filters";
 
 export const metadata: Metadata = {
-  title: "ค้นหาที่ดิน โรงงาน โกดัง",
-  description: "ค้นหาที่ดิน โรงงาน และโกดังจากข้อมูลจริง พร้อมแผนที่และตัวกรองทำเล ราคา และขนาด",
+  title: "ค้นหาอสังหาริมทรัพย์",
+  description: "ค้นหาอสังหาริมทรัพย์จากข้อมูลจริง พร้อมแผนที่และตัวกรองทำเล ราคา และขนาด",
   alternates: { canonical: "/search" },
 };
 
@@ -34,6 +34,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     max_price_per_rai: text(filters.max_price_per_rai),
     min_size_rai: text(filters.min_size_rai),
     max_size_rai: text(filters.max_size_rai),
+    min_usable_area_sqm: text(filters.min_usable_area_sqm),
+    max_usable_area_sqm: text(filters.max_usable_area_sqm),
     min_frontage_m: text(filters.min_frontage_m),
     min_depth_m: text(filters.min_depth_m),
     min_road_width_m: text(filters.min_road_width_m),

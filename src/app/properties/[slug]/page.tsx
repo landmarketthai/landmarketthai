@@ -55,7 +55,7 @@ function locationLabel(property: Land): string {
 }
 
 function propertyTypeLabel(property: Land): string {
-  return PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.land;
+  return PROPERTY_TYPE_LABELS[property.property_type] ?? PROPERTY_TYPE_LABELS.other;
 }
 
 function usableArea(property: Land): string | null {

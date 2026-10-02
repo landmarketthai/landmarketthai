@@ -9,7 +9,7 @@ import type { BuyerRequirementSubmissionResult, Province } from "@/lib/types/dat
 
 interface Props {
   provinces: Province[];
-  initial?: { property_type?: string; province?: string; min_size_rai?: string; max_size_rai?: string; max_price?: string; max_price_per_rai?: string; zoning?: string };
+  initial?: { property_type?: string; province?: string; min_size_rai?: string; max_size_rai?: string; min_usable_area_sqm?: string; max_usable_area_sqm?: string; max_price?: string; max_price_per_rai?: string; zoning?: string };
 }
 
 export default function BuyerRequirementForm({ provinces, initial = {} }: Props) {
@@ -17,6 +17,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
   const initialForm = {
     property_type: initial.property_type ?? "",
     province_ids: initialProvince ? [initialProvince] : [], preferred_locations: "", min_size_rai: initial.min_size_rai ?? "", max_size_rai: initial.max_size_rai ?? "",
+    min_usable_area_sqm: initial.min_usable_area_sqm ?? "", max_usable_area_sqm: initial.max_usable_area_sqm ?? "",
     max_price: initial.max_price ?? "", max_price_per_rai: initial.max_price_per_rai ?? "", zoning: initial.zoning ?? "", purpose: "",
     container_access: "", high_voltage: "", water_requirement: "", special_requirements: "", name: "", phone: "", line_id: "", consent_pdpa: false, consent_public: false,
   };
@@ -42,6 +43,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
         property_type: form.property_type || null, transaction_type: "sale",
         preferred_locations: form.preferred_locations.split(",").map((value) => value.trim()).filter(Boolean),
         province_ids: form.province_ids, min_size_rai: number(form.min_size_rai), max_size_rai: number(form.max_size_rai),
+        min_usable_area_sqm: number(form.min_usable_area_sqm), max_usable_area_sqm: number(form.max_usable_area_sqm),
         max_price: number(form.max_price), max_price_per_rai: number(form.max_price_per_rai), zoning: form.zoning || null,
         purpose: form.purpose || null, container_access: bool(form.container_access), high_voltage: bool(form.high_voltage),
         water_requirement: form.water_requirement || null, name: form.name, phone: form.phone, line_id: form.line_id || null,
@@ -49,7 +51,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
         consent_pdpa: form.consent_pdpa, consent_public: form.consent_public,
       });
       if (!parsed.success) {
-        const labels: Record<string, string> = { name: "ชื่อ (อย่างน้อย 2 ตัวอักษร)", phone: "โทรศัพท์ (เบอร์ไทยที่ถูกต้อง)", consent_pdpa: "ความยินยอม PDPA", max_size_rai: "ขนาดสูงสุด (ไม่น้อยกว่าขั้นต่ำ)", min_size_rai: "ขนาดขั้นต่ำ", max_price: "งบสูงสุด", max_price_per_rai: "ราคาสูงสุด/ไร่", preferred_locations: "ทำเล (ไม่เกิน 10 แห่ง แห่งละ 120 ตัวอักษร)", province_ids: "จังหวัด", property_type: "ประเภททรัพย์", zoning: "ผังเมือง" };
+        const labels: Record<string, string> = { name: "ชื่อ (อย่างน้อย 2 ตัวอักษร)", phone: "โทรศัพท์ (เบอร์ไทยที่ถูกต้อง)", consent_pdpa: "ความยินยอม PDPA", max_size_rai: "ขนาดสูงสุด (ไม่น้อยกว่าขั้นต่ำ)", min_size_rai: "ขนาดขั้นต่ำ", min_usable_area_sqm: "พื้นที่ใช้สอยขั้นต่ำ", max_usable_area_sqm: "พื้นที่ใช้สอยสูงสุด (ไม่น้อยกว่าขั้นต่ำ)", max_price: "งบสูงสุด", max_price_per_rai: "ราคาสูงสุด/ไร่", preferred_locations: "ทำเล (ไม่เกิน 10 แห่ง แห่งละ 120 ตัวอักษร)", province_ids: "จังหวัด", property_type: "ประเภททรัพย์", zoning: "ผังเมือง" };
         const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0])))];
         setInvalidFields(fields);
         setError(`กรุณาตรวจสอบ: ${fields.map((field) => labels[field] || field).join(" · ")}`);
@@ -91,6 +93,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
         <label><span className="label">ทำเลเพิ่มเติม</span><input name="preferred_locations" {...invalid("preferred_locations")} maxLength={1209} className="input" value={form.preferred_locations} onChange={(e) => set("preferred_locations", e.target.value)} placeholder="อำเภอ, ตำบล, นิคม (คั่นด้วย ,)" /></label>
         <label><span className="label">ขนาดขั้นต่ำ (ไร่)</span><input name="min_size_rai" {...invalid("min_size_rai")} type="number" min="0" max="999999999.99999" step="0.00001" className="input" value={form.min_size_rai} onChange={(e) => set("min_size_rai", e.target.value)} /></label>
         <label><span className="label">ขนาดสูงสุด (ไร่)</span><input name="max_size_rai" {...invalid("max_size_rai")} type="number" min="0" max="999999999.99999" step="0.00001" className="input" value={form.max_size_rai} onChange={(e) => set("max_size_rai", e.target.value)} /></label>
+        {([['min_usable_area_sqm', 'พื้นที่ใช้สอยขั้นต่ำ (ตร.ม.)'], ['max_usable_area_sqm', 'พื้นที่ใช้สอยสูงสุด (ตร.ม.)']] as const).map(([name, label]) => <label key={name}><span className="label">{label}</span><input name={name} {...invalid(name)} type="number" min="0" max="9999999999.99" step="0.01" className="input" value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
         <label><span className="label">งบสูงสุด (บาท)</span><input name="max_price" {...invalid("max_price")} type="number" min="0" max="99999999999999.99" step="0.01" className="input" value={form.max_price} onChange={(e) => set("max_price", e.target.value)} /></label>
         <label><span className="label">ราคาสูงสุด/ไร่ (บาท)</span><input name="max_price_per_rai" {...invalid("max_price_per_rai")} type="number" min="0" max="99999999999999.99" step="0.01" className="input" value={form.max_price_per_rai} onChange={(e) => set("max_price_per_rai", e.target.value)} /></label>
         <label><span className="label">ผังเมือง</span><select name="zoning" {...invalid("zoning")} className="input" value={form.zoning} onChange={(e) => set("zoning", e.target.value)}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>

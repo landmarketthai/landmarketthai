@@ -1,3 +1,5 @@
+import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
+import { sortPropertyResults } from "@/lib/marketplace/search-sort";
 import type { Land, ListingStatus } from "@/lib/types/database";
 
 export interface PropertySearchFilters {
@@ -10,6 +12,8 @@ export interface PropertySearchFilters {
   max_price?: string;
   min_size?: string;
   max_size?: string;
+  min_usable_area_sqm?: string;
+  max_usable_area_sqm?: string;
   history?: string;
   sort?: string;
 }
@@ -37,15 +41,15 @@ export function searchProperties(listings: Land[], filters: PropertySearchFilter
     if (filters.province && land.province?.slug !== filters.province) return false;
     if (type && land.land_type !== type && !(type === "eec" && land.is_eec)) return false;
     if (filters.property_type && land.property_type !== filters.property_type) return false;
-    if (minPrice !== null && (land.price_per_rai == null || land.price_per_rai < minPrice) || maxPrice !== null && (land.price_per_rai == null || land.price_per_rai > maxPrice)) return false;
-    if (minSize !== null && (land.size_rai == null || land.size_rai < minSize) || maxSize !== null && (land.size_rai == null || land.size_rai > maxSize)) return false;
+    if (!isUsableAreaOnly(land) && (minPrice !== null && (land.price_per_rai == null || land.price_per_rai < minPrice) || maxPrice !== null && (land.price_per_rai == null || land.price_per_rai > maxPrice))) return false;
+    if (!matchesSizeCriteria(land, { min_size_rai: minSize, max_size_rai: maxSize, min_usable_area_sqm: bound(filters.min_usable_area_sqm), max_usable_area_sqm: bound(filters.max_usable_area_sqm) })) return false;
     const searchable = [land.title_th, land.slug, land.district, land.province?.name_th,
       land.province?.name_en, land.province?.slug, ...(land.nearby_landmarks ?? [])].join(" ").toLocaleLowerCase("th-TH");
     return terms.every((term) => searchable.includes(term));
   });
+  if (filters.sort === "size_desc") return sortPropertyResults(results, "size_desc");
   return results.sort((a, b) => {
     if (filters.sort === "price_asc") return (a.price_per_rai ?? Infinity) - (b.price_per_rai ?? Infinity) || a.id.localeCompare(b.id);
-    if (filters.sort === "size_desc") return (b.size_rai ?? -Infinity) - (a.size_rai ?? -Infinity) || a.id.localeCompare(b.id);
     return b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id);
   });
 }

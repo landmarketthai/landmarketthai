@@ -19,6 +19,8 @@ export interface PropertySearchFilters {
   max_price_per_rai?: number;
   min_size_rai?: number;
   max_size_rai?: number;
+  min_usable_area_sqm?: number;
+  max_usable_area_sqm?: number;
   min_frontage_m?: number;
   min_depth_m?: number;
   min_road_width_m?: number;
@@ -62,6 +64,8 @@ export function parsePropertySearchParams(params: URLSearchParams): PropertySear
     max_price_per_rai: number("max_price_per_rai"),
     min_size_rai: number("min_size_rai"),
     max_size_rai: number("max_size_rai"),
+    min_usable_area_sqm: number("min_usable_area_sqm"),
+    max_usable_area_sqm: number("max_usable_area_sqm"),
     min_frontage_m: number("min_frontage_m"),
     min_depth_m: number("min_depth_m"),
     min_road_width_m: number("min_road_width_m"),
@@ -79,6 +83,31 @@ export function parsePropertySearchParams(params: URLSearchParams): PropertySear
 }
 
 const THAI = "th-TH";
+
+const positive = (value: number | null | undefined) => value != null && value > 0 ? value : null;
+
+/** Building-only assets report usable area (sq.m.) but no land area; zero rai counts as no land area. */
+export function isUsableAreaOnly(property: Pick<Land, "size_rai" | "usable_area_sqm">): boolean {
+  return positive(property.size_rai) == null && positive(property.usable_area_sqm) != null;
+}
+
+export interface SizeCriteria {
+  min_size_rai?: number | null;
+  max_size_rai?: number | null;
+  min_usable_area_sqm?: number | null;
+  max_usable_area_sqm?: number | null;
+}
+
+/**
+ * Rai and usable sq.m. are separate units and are never converted. Rai bounds do not apply to
+ * building-only assets; usable-area bounds require a reported usable area (missing data fails).
+ */
+export function matchesSizeCriteria(property: Pick<Land, "size_rai" | "usable_area_sqm">, criteria: SizeCriteria): boolean {
+  const within = (value: number | null | undefined, min?: number | null, max?: number | null) =>
+    (min == null || (value != null && value >= min)) && (max == null || (value != null && value <= max));
+  return (isUsableAreaOnly(property) || within(property.size_rai, criteria.min_size_rai, criteria.max_size_rai))
+    && within(property.usable_area_sqm, criteria.min_usable_area_sqm, criteria.max_usable_area_sqm);
+}
 
 /** Strips administrative prefixes so "อ.นิคมพัฒนา จ.ระยอง" and "นิคมพัฒนา" compare equal. */
 export function normalizeAreaName(value: string | null | undefined, provinceName?: string | null): string {
@@ -136,8 +165,8 @@ export function propertyMatchesSearchFilters(property: Land, filters: PropertySe
   const atLeast = (value: number | null, min?: number) => min == null || (value != null && value >= min);
   const atMost = (value: number | null, max?: number) => max == null || (value != null && value <= max);
   if (!atLeast(property.total_price, filters.min_price) || !atMost(property.total_price, filters.max_price)) return false;
-  if (!atLeast(property.price_per_rai, filters.min_price_per_rai) || !atMost(property.price_per_rai, filters.max_price_per_rai)) return false;
-  if (!atLeast(property.size_rai, filters.min_size_rai) || !atMost(property.size_rai, filters.max_size_rai)) return false;
+  if (!isUsableAreaOnly(property) && (!atLeast(property.price_per_rai, filters.min_price_per_rai) || !atMost(property.price_per_rai, filters.max_price_per_rai))) return false;
+  if (!matchesSizeCriteria(property, filters)) return false;
   if (!atLeast(property.frontage_m, filters.min_frontage_m)) return false;
   if (!atLeast(propertyDepth(property), filters.min_depth_m)) return false;
   if (!atLeast(property.road_width_m, filters.min_road_width_m)) return false;
@@ -221,10 +250,12 @@ export function propertySearchSqlClauses(
     clauses.push(`strpos(lower(${haystack}), lower(${add(q)})) > 0`);
   }
   if (filters.property_type) {
-    // Mirrors normalizeLand: a canonical property_type wins, else a canonical land_type, else legacy rows are land.
+    // Mirrors normalizeLand: explicit unknown types are other; only missing types use legacy land categories.
     const canonical = add([...PROPERTY_TYPES]);
     clauses.push(`(case when ${v2Text("property_type")} = any(${canonical}::text[]) then ${v2Text("property_type")}
-      when l.land_type::text = any(${canonical}::text[]) then l.land_type::text else 'land' end) = ${add(filters.property_type)}`);
+      when nullif(${v2Text("property_type")}, '') is not null then 'other'
+      when l.land_type::text = any(${canonical}::text[]) then l.land_type::text
+      when l.land_type is null or l.land_type::text in ('industrial','eec','logistics','data_center','investment') then 'land' else 'other' end) = ${add(filters.property_type)}`);
   }
   if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
   if (filters.province_ids?.length) clauses.push(`l.province_id = any(${add(filters.province_ids)}::uuid[])`);
@@ -244,8 +275,23 @@ export function propertySearchSqlClauses(
     if (max != null) clauses.push(`${column} <= ${add(max)}`);
   };
   range("l.total_price", filters.min_price, filters.max_price);
-  range("l.price_per_rai", filters.min_price_per_rai, filters.max_price_per_rai);
-  range("l.size_rai", filters.min_size_rai, filters.max_size_rai);
+  // Mirrors matchesSizeCriteria: rai bounds skip building-only rows; sq.m. bounds need a usable area.
+  const usableArea = v2Number("usable_area_sqm");
+  const perRaiBounds = [
+    filters.min_price_per_rai != null && `l.price_per_rai >= ${add(filters.min_price_per_rai)}`,
+    filters.max_price_per_rai != null && `l.price_per_rai <= ${add(filters.max_price_per_rai)}`,
+  ].filter(Boolean);
+  if (perRaiBounds.length) {
+    clauses.push(`((coalesce(l.size_rai, 0) <= 0 and coalesce(${usableArea}, 0) > 0) or (${perRaiBounds.join(" and ")}))`);
+  }
+  const raiBounds = [
+    filters.min_size_rai != null && `l.size_rai >= ${add(filters.min_size_rai)}`,
+    filters.max_size_rai != null && `l.size_rai <= ${add(filters.max_size_rai)}`,
+  ].filter(Boolean);
+  if (raiBounds.length) {
+    clauses.push(`((coalesce(l.size_rai, 0) <= 0 and coalesce(${usableArea}, 0) > 0) or (${raiBounds.join(" and ")}))`);
+  }
+  range(usableArea, filters.min_usable_area_sqm, filters.max_usable_area_sqm);
   range("l.frontage_m", filters.min_frontage_m);
   range(`coalesce(${v2Number("depth_max_m")}, ${v2Number("depth_min_m")})`, filters.min_depth_m);
   range(v2Number("road_width_m"), filters.min_road_width_m);

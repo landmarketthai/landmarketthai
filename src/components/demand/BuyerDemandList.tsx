@@ -12,11 +12,14 @@ export function demandProvinceLabel(demand: PublicBuyerDemand): string {
   return demand.province_names.length ? demand.province_names.join(" / ") : demand.province?.name_th ?? "ทุกพื้นที่";
 }
 
-export function demandSizeLabel(demand: Pick<PublicBuyerDemand, "size_min_rai" | "size_max_rai">): string {
-  if (demand.size_min_rai != null && demand.size_max_rai != null) return `${demand.size_min_rai}–${demand.size_max_rai} ไร่`;
-  if (demand.size_min_rai != null) return `${demand.size_min_rai}+ ไร่`;
-  if (demand.size_max_rai != null) return `ไม่เกิน ${demand.size_max_rai} ไร่`;
-  return "ทุกขนาด";
+export function demandSizeLabel(demand: Pick<PublicBuyerDemand, "size_min_rai" | "size_max_rai" | "min_usable_area_sqm" | "max_usable_area_sqm">): string {
+  const range = (min: number | null | undefined, max: number | null | undefined, unit: string) => {
+    if (min != null && max != null) return `${min}–${max} ${unit}`;
+    if (min != null) return `${min}+ ${unit}`;
+    if (max != null) return `ไม่เกิน ${max} ${unit}`;
+    return null;
+  };
+  return [range(demand.size_min_rai, demand.size_max_rai, "ไร่"), range(demand.min_usable_area_sqm, demand.max_usable_area_sqm, "ตร.ม. พื้นที่ใช้สอย")].filter(Boolean).join(" · ") || "ทุกขนาด";
 }
 
 /** Render only the typed public criteria; never buyer-submitted free text. */
@@ -58,7 +61,7 @@ export default function BuyerDemandList({ demands, emptyAction }: { demands: Pub
               <div className="min-w-0 flex-1">
                 <div className="mb-1 text-xs text-slate-500">
                   {demandProvinceLabel(demand)}
-                  {demand.land_type ? ` · ${LAND_TYPE_LABELS[demand.land_type]}` : " · ทุกประเภททรัพย์"}
+                  {demand.land_type ? ` · ${(LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other)}` : " · ทุกประเภททรัพย์"}
                 </div>
                 <div className="font-semibold text-slate-800 transition-colors group-hover:text-brand-600">
                   ต้องการ {demandSizeLabel(demand)}

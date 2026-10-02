@@ -323,7 +323,7 @@ export default async function HomePage() {
         </div>
       </section> : <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-5 sm:px-6 lg:px-8">
         <div className="container-xl flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">กำลังมองหาที่ดิน โรงงาน หรือโกดัง? ฝากเงื่อนไขให้ทีมงานช่วยจับคู่</p>
+          <p className="text-sm text-slate-600">กำลังมองหาอสังหาริมทรัพย์? ฝากเงื่อนไขให้ทีมงานช่วยจับคู่</p>
           <Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>
         </div>
       </section>}

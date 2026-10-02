@@ -25,6 +25,8 @@ export interface SearchValues {
   max_price_per_rai?: string;
   min_size_rai?: string;
   max_size_rai?: string;
+  min_usable_area_sqm?: string;
+  max_usable_area_sqm?: string;
   min_frontage_m?: string;
   min_depth_m?: string;
   min_road_width_m?: string;
@@ -138,6 +140,8 @@ export default function SearchExperience({ initialProperties, provinces, locatio
     if (values.max_price_per_rai) items.push({ key: "max_price_per_rai", label: `บาท/ไร่ ≤ ${numberLabel(values.max_price_per_rai)}` });
     if (values.min_size_rai) items.push({ key: "min_size_rai", label: `ขนาด ≥ ${numberLabel(values.min_size_rai)} ไร่` });
     if (values.max_size_rai) items.push({ key: "max_size_rai", label: `ขนาด ≤ ${numberLabel(values.max_size_rai)} ไร่` });
+    if (values.min_usable_area_sqm) items.push({ key: "min_usable_area_sqm", label: `พื้นที่ใช้สอย ≥ ${numberLabel(values.min_usable_area_sqm)} ตร.ม.` });
+    if (values.max_usable_area_sqm) items.push({ key: "max_usable_area_sqm", label: `พื้นที่ใช้สอย ≤ ${numberLabel(values.max_usable_area_sqm)} ตร.ม.` });
     if (values.min_frontage_m) items.push({ key: "min_frontage_m", label: `หน้ากว้าง ≥ ${numberLabel(values.min_frontage_m)} ม.` });
     if (values.min_depth_m) items.push({ key: "min_depth_m", label: `ความลึก ≥ ${numberLabel(values.min_depth_m)} ม.` });
     if (values.min_road_width_m) items.push({ key: "min_road_width_m", label: `ถนน ≥ ${numberLabel(values.min_road_width_m)} ม.` });
@@ -236,7 +240,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
           <div className="text-xs font-bold tracking-[0.16em] text-gold-400">PROPERTY SEARCH</div>
           <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-2xl font-black sm:text-3xl">ค้นหาที่ดิน โรงงาน และโกดัง</h1>
+              <h1 className="text-2xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
               <p className="mt-1 text-sm text-blue-100">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
             </div>
             <Link href="/buy-request" className="text-sm font-semibold text-white underline-offset-4 hover:underline">ยังไม่เจอทรัพย์? ฝากเงื่อนไข ›</Link>
@@ -261,7 +265,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
             <select
               className="input"
               value={values.property_type ?? ""}
-              onChange={(event) => setValues((current) => ({ ...current, property_type: (event.target.value || undefined) as SearchValues["property_type"] }))}
+              onChange={(event) => setValues((current) => ({ ...current, property_type: (event.target.value || undefined) as SearchValues["property_type"], ...(event.target.value === "land" ? { min_usable_area_sqm: undefined, max_usable_area_sqm: undefined } : {}) }))}
             >
               {propertyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
@@ -308,6 +312,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
                 <input className="input" inputMode="decimal" placeholder="บาท/ไร่ สูงสุด" value={values.max_price_per_rai ?? ""} onChange={(e) => setValues((v) => ({ ...v, max_price_per_rai: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ขนาดต่ำสุด (ไร่)" value={values.min_size_rai ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_size_rai: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ขนาดสูงสุด (ไร่)" value={values.max_size_rai ?? ""} onChange={(e) => setValues((v) => ({ ...v, max_size_rai: e.target.value || undefined }))} />
+                {(!values.property_type || values.property_type !== "land") && ([['min_usable_area_sqm', 'พื้นที่ใช้สอยต่ำสุด (ตร.ม.)'], ['max_usable_area_sqm', 'พื้นที่ใช้สอยสูงสุด (ตร.ม.)']] as const).map(([name, label]) => <input key={name} aria-label={label} type="number" min="0" step="0.01" className="input" placeholder={label} value={values[name] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [name]: e.target.value || undefined }))} />)}
                 <input className="input" inputMode="decimal" placeholder="หน้ากว้างอย่างน้อย (ม.)" value={values.min_frontage_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_frontage_m: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ความลึกอย่างน้อย (ม.)" value={values.min_depth_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_depth_m: e.target.value || undefined }))} />
                 <input className="input" inputMode="decimal" placeholder="ถนนกว้างอย่างน้อย (ม.)" value={values.min_road_width_m ?? ""} onChange={(e) => setValues((v) => ({ ...v, min_road_width_m: e.target.value || undefined }))} />

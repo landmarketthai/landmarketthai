@@ -31,7 +31,7 @@ export default function AdminSubmissionDetail({ id }: { id: string }) {
   if (loading || (!error && !item)) return <div className="p-12 text-center text-sm text-slate-500">กำลังโหลด...</div>;
   if (error || !item) return <div className="rounded-2xl bg-red-50 p-6 text-sm text-red-700">{error}</div>;
   const facts = [
-    ["ประเภท", item.property_type && item.transaction_type ? `${PROPERTY_TYPE_LABELS[item.property_type]} / ${TRANSACTION_TYPE_LABELS[item.transaction_type]}` : "-"],
+    ["ประเภท", item.property_type && item.transaction_type ? `${(PROPERTY_TYPE_LABELS[item.property_type] ?? PROPERTY_TYPE_LABELS.other)} / ${TRANSACTION_TYPE_LABELS[item.transaction_type]}` : "-"],
     ["ที่ตั้ง", [item.address, item.subdistrict, item.district, item.province?.name_th].filter(Boolean).join(" · ") || "-"],
     ["ขนาด", [
       item.total_rai != null && `${item.total_rai.toLocaleString("th-TH", { maximumFractionDigits: 5 })} ไร่`,

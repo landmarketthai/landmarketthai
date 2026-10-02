@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Buyer กำลังหาที่ดิน โรงงาน โกดัง – ตลาดย้อนกลับ LandmarketThai",
+  title: "Buyer กำลังหาอสังหาริมทรัพย์ – ตลาดย้อนกลับ LandmarketThai",
   description:
-    "รายการผู้ซื้อที่กำลังมองหาที่ดิน โรงงาน และโกดังทั่วประเทศไทย แนะนำทรัพย์ที่ตรงความต้องการได้ทันที",
+    "รายการผู้ซื้อที่กำลังมองหาอสังหาริมทรัพย์ทั่วประเทศไทย แนะนำทรัพย์ที่ตรงความต้องการได้ทันที",
   alternates: { canonical: "/buyer-demand" },
 };
 
@@ -47,7 +47,7 @@ export default async function BuyerDemandPage({ searchParams }: { searchParams: 
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold mb-3">ตลาดย้อนกลับ</h1>
           <p className="text-slate-400">
-            รายการผู้ซื้อที่ต้องการที่ดิน โรงงาน และโกดังทั่วประเทศไทย
+            รายการผู้ซื้อที่ต้องการอสังหาริมทรัพย์ทั่วประเทศไทย
             คุณรู้จักทรัพย์ที่ตรงกับความต้องการ? แนะนำเพื่อรับค่าคอม
           </p>
         </div>

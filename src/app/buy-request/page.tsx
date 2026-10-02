@@ -5,7 +5,7 @@ import { getPersistedProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากความต้องการซื้อทรัพย์",
-  description: "แจ้งเงื่อนไขซื้อที่ดิน โรงงาน และโกดัง เพื่อจับคู่กับทรัพย์จริงในระบบ LandmarketThai",
+  description: "แจ้งเงื่อนไขซื้ออสังหาริมทรัพย์ เพื่อจับคู่กับทรัพย์จริงในระบบ LandmarketThai",
   alternates: { canonical: "/buy-request" },
 };
 
@@ -56,6 +56,8 @@ export default async function BuyRequestPage({ searchParams }: { searchParams: P
               province: one(raw.province),
               min_size_rai: one(raw.min_size_rai),
               max_size_rai: one(raw.max_size_rai),
+              min_usable_area_sqm: one(raw.min_usable_area_sqm),
+              max_usable_area_sqm: one(raw.max_usable_area_sqm),
               max_price: one(raw.max_price),
               max_price_per_rai: one(raw.max_price_per_rai),
               zoning: one(raw.zoning),

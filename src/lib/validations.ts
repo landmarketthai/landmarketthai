@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { LAND_CATEGORY_TYPES, ZONING_LABELS } from "@/lib/utils";
+import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 import { LOCATION_ANCHORS } from "@/lib/location-intelligence";
 
 export const buyerRequirementsSchema = z.object({
   province: z.string().trim().min(1).max(80).optional(),
   land_type: z.enum(LAND_CATEGORY_TYPES).optional(),
+  property_type: z.enum(PROPERTY_TYPES).optional(),
+  min_usable_area_sqm: z.number().finite().nonnegative().max(9_999_999_999.99).multipleOf(0.01).optional(),
+  max_usable_area_sqm: z.number().finite().nonnegative().max(9_999_999_999.99).multipleOf(0.01).optional(),
   size_min_rai: z.number().nonnegative().max(1e12).optional(),
   size_max_rai: z.number().nonnegative().max(1e12).optional(),
   budget_min: z.number().nonnegative().max(1e12).optional(),
@@ -17,7 +21,7 @@ export const buyerRequirementsSchema = z.object({
   intended_use: z.string().trim().max(500).optional(),
   listing_id: z.string().trim().min(1).max(200).optional(),
 }).superRefine((value, context) => {
-  for (const [min, max] of [["size_min_rai", "size_max_rai"], ["budget_min", "budget_max"]] as const) {
+  for (const [min, max] of [["size_min_rai", "size_max_rai"], ["budget_min", "budget_max"], ["min_usable_area_sqm", "max_usable_area_sqm"]] as const) {
     if (value[min] !== undefined && value[max] !== undefined && value[min] > value[max]) {
       context.addIssue({ code: "custom", path: [max], message: "ค่าสูงสุดต้องไม่น้อยกว่าค่าต่ำสุด" });
     }

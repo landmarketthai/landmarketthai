@@ -56,9 +56,10 @@ export default function AdminBuyerRequirements({ requirements, provinces }: { re
       <p className="mt-3 break-words [overflow-wrap:anywhere] text-xs text-slate-500">ข้อมูลส่วนตัวสำหรับผู้ดูแลเท่านั้น · {item.id}</p>
       <dl className="my-5 grid gap-3 text-sm sm:grid-cols-2">
         {Object.entries({
-          "โทรศัพท์": item.phone, "LINE": item.line_id, "ประเภททรัพย์": item.property_type ? PROPERTY_TYPE_LABELS[item.property_type] : "ทุกประเภท", "ประเภทการซื้อขาย": TRANSACTION_TYPE_LABELS[item.transaction_type],
+          "โทรศัพท์": item.phone, "LINE": item.line_id, "ประเภททรัพย์": item.property_type ? (PROPERTY_TYPE_LABELS[item.property_type] ?? PROPERTY_TYPE_LABELS.other) : "ทุกประเภท", "ประเภทการซื้อขาย": TRANSACTION_TYPE_LABELS[item.transaction_type],
           "จังหวัด": item.province_ids.length ? item.province_ids.map((id) => provinceNames.get(id) ?? id).join(", ") : "ทุกจังหวัด", "ทำเลเพิ่มเติม (ส่วนตัว)": item.preferred_locations.join(", "),
           "ขั้นต่ำ (ไร่)": item.min_size_rai, "สูงสุด (ไร่)": item.max_size_rai,
+          "พื้นที่ใช้สอยขั้นต่ำ (ตร.ม.)": item.min_usable_area_sqm, "พื้นที่ใช้สอยสูงสุด (ตร.ม.)": item.max_usable_area_sqm,
           "งบสูงสุด (บาท)": item.max_price, "ราคาสูงสุด/ไร่": item.max_price_per_rai, "ผังเมือง": item.zoning,
           "รถคอนเทนเนอร์": item.container_access == null ? null : item.container_access ? "ต้องการ" : "ไม่จำเป็น",
           "ไฟฟ้าแรงสูง": item.high_voltage == null ? null : item.high_voltage ? "ต้องการ" : "ไม่จำเป็น",

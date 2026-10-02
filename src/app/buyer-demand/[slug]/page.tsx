@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const demand = await getDemandBySlug(slug);
   if (!demand || !isPublishedDemand(demand)) return {};
   return {
-    title: `Buyer ต้องการ${demand.land_type ? LAND_TYPE_LABELS[demand.land_type] : "ที่ดิน โรงงาน หรือโกดัง (ทุกประเภท)"} — ${demandProvinceLabel(demand)}`,
-    description: `ผู้ซื้อต้องการ${demand.land_type ? LAND_TYPE_LABELS[demand.land_type] : "ที่ดิน โรงงาน หรือโกดัง (ทุกประเภท)"} ${demandProvinceLabel(demand)} ขนาด ${demandSizeLabel(demand)}`,
+    title: `Buyer ต้องการ${demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"} — ${demandProvinceLabel(demand)}`,
+    description: `ผู้ซื้อต้องการ${demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"} ${demandProvinceLabel(demand)} ขนาด ${demandSizeLabel(demand)}`,
     alternates: { canonical: `/buyer-demand/${slug}` },
   };
 }
@@ -32,7 +32,7 @@ export default async function BuyerDemandDetailPage({ params }: { params: Promis
   const schema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: `Buyer ต้องการ${demand.land_type ? LAND_TYPE_LABELS[demand.land_type] : "ที่ดิน โรงงาน หรือโกดัง (ทุกประเภท)"} — ${demandProvinceLabel(demand)}`,
+    name: `Buyer ต้องการ${demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"} — ${demandProvinceLabel(demand)}`,
     description: `พื้นที่ต้องการ ${demandSizeLabel(demand)}`,
     url: `/buyer-demand/${slug}`,
   };
@@ -58,13 +58,13 @@ export default async function BuyerDemandDetailPage({ params }: { params: Promis
           )}
           {demand.land_type && (
             <span className="badge bg-slate-100 text-slate-700 px-3 py-1">
-              {LAND_TYPE_LABELS[demand.land_type]}
+              {(LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other)}
             </span>
           )}
         </div>
 
         <h1 className="break-words text-2xl font-bold text-slate-900 mb-2">
-          Buyer ต้องการ{demand.land_type ? LAND_TYPE_LABELS[demand.land_type] : "ที่ดิน โรงงาน หรือโกดัง (ทุกประเภท)"}
+          Buyer ต้องการ{demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"}
           {` — ${demandProvinceLabel(demand)}`}
         </h1>
 

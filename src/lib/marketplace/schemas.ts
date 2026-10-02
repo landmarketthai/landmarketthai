@@ -73,6 +73,8 @@ export const buyerRequirementSchema = z.object({
   ),
   min_size_rai: z.number().finite().nonnegative().max(999_999_999.99999).multipleOf(0.00001).nullable().optional(),
   max_size_rai: z.number().finite().nonnegative().max(999_999_999.99999).multipleOf(0.00001).nullable().optional(),
+  min_usable_area_sqm: z.number().finite().nonnegative().max(9_999_999_999.99).multipleOf(0.01).nullable().optional(),
+  max_usable_area_sqm: z.number().finite().nonnegative().max(9_999_999_999.99).multipleOf(0.01).nullable().optional(),
   max_price: z.number().finite().nonnegative().max(99_999_999_999_999.99).multipleOf(0.01).nullable().optional(),
   max_price_per_rai: z.number().finite().nonnegative().max(99_999_999_999_999.99).multipleOf(0.01).nullable().optional(),
   zoning: z.enum(["purple", "purple_light", "brown", "orange", "yellow", "green", "other"]).nullable().optional(),
@@ -89,6 +91,9 @@ export const buyerRequirementSchema = z.object({
 }).strict().refine((value) => value.max_size_rai == null || value.min_size_rai == null || value.min_size_rai <= value.max_size_rai, {
   message: "ช่วงขนาดไม่ถูกต้อง",
   path: ["max_size_rai"],
+}).refine((value) => value.max_usable_area_sqm == null || value.min_usable_area_sqm == null || value.min_usable_area_sqm <= value.max_usable_area_sqm, {
+  message: "ช่วงพื้นที่ใช้สอยไม่ถูกต้อง",
+  path: ["max_usable_area_sqm"],
 });
 
 export type BuyerRequirementInput = z.infer<typeof buyerRequirementSchema>;

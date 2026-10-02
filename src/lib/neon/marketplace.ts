@@ -437,7 +437,9 @@ export async function createBuyerRequirement(input: BuyerRequirementInput): Prom
      ) select id from req`,
     [
       input.name, input.phone, input.line_id ?? null,
-      JSON.stringify({ preferred_locations: input.preferred_locations, property_type: input.property_type, transaction_type: input.transaction_type }),
+      // ponytail: sqm criteria use existing lead JSON; move to requirement columns with lifecycle guards when schema changes are allowed.
+      JSON.stringify({ preferred_locations: input.preferred_locations, property_type: input.property_type, transaction_type: input.transaction_type,
+        min_usable_area_sqm: input.min_usable_area_sqm ?? null, max_usable_area_sqm: input.max_usable_area_sqm ?? null }),
       input.consent_pdpa, input.property_type ?? null, "sale", input.preferred_locations, input.province_ids,
       input.min_size_rai ?? null, input.max_size_rai ?? null, input.max_price ?? null, input.max_price_per_rai ?? null,
       input.zoning ?? null, input.purpose ?? null, input.container_access ?? null, input.high_voltage ?? null, input.water_requirement ?? null,
@@ -459,14 +461,17 @@ export class UnknownBuyerProvinceError extends Error {}
 function normalizeBuyerRequirement(row: Record<string, unknown>): BuyerRequirement {
   // Private admin response only. Public queries use a separate explicit projection.
   const normalized = { ...row };
-  for (const key of ["min_size_rai", "max_size_rai", "max_price", "max_price_per_rai"]) normalized[key] = num(row[key]);
+  for (const key of ["min_size_rai", "max_size_rai", "min_usable_area_sqm", "max_usable_area_sqm", "max_price", "max_price_per_rai"]) normalized[key] = num(row[key]);
   for (const key of ["created_at", "updated_at", "submitted_at", "reviewed_at", "published_at", "closed_at", "consent_pdpa_at", "consent_public_at"]) normalized[key] = str(row[key]);
   return normalized as unknown as BuyerRequirement;
 }
 
 export async function getBuyerRequirements(offset = 0, status = "", id = ""): Promise<BuyerRequirement[]> {
   // Preserve PostgreSQL microseconds for the displayed optimistic concurrency token.
-  const rows = await getSql().query(`select *, (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+  const rows = await getSql().query(`select *,
+    (select (l.details->>'min_usable_area_sqm')::numeric from leads l where l.id = buyer_requirements.lead_id) as min_usable_area_sqm,
+    (select (l.details->>'max_usable_area_sqm')::numeric from leads l where l.id = buyer_requirements.lead_id) as max_usable_area_sqm,
+    (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
     from buyer_requirements where ($2 = '' or status = $2) and ($3 = '' or id::text = $3)
     order by submitted_at desc, id limit 51 offset $1`,
     [Number.isSafeInteger(offset) && offset >= 0 ? offset : 0, status, id]);
@@ -474,7 +479,10 @@ export async function getBuyerRequirements(offset = 0, status = "", id = ""): Pr
 }
 
 export async function getBuyerRequirement(id: string): Promise<BuyerRequirement | null> {
-  const rows = await getSql().query(`select *, (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+  const rows = await getSql().query(`select *,
+    (select (l.details->>'min_usable_area_sqm')::numeric from leads l where l.id = buyer_requirements.lead_id) as min_usable_area_sqm,
+    (select (l.details->>'max_usable_area_sqm')::numeric from leads l where l.id = buyer_requirements.lead_id) as max_usable_area_sqm,
+    (consent_pdpa and (lead_id is null or exists (select 1 from leads l where l.id = buyer_requirements.lead_id and l.consent_pdpa and l.consent_at is not null))) as consent_pdpa, (select d.slug from buyer_demand d where d.buyer_requirement_id = buyer_requirements.id and d.is_public and d.status = 'published') as public_slug, to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
     from buyer_requirements where id = $1`, [id]);
   return rows[0] ? normalizeBuyerRequirement(rows[0]) : null;
 }

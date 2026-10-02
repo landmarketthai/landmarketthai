@@ -1,4 +1,5 @@
 import type { Land, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
+import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
 
 export interface BuyerMatchCriteria {
   property_type?: PropertyType | null;
@@ -7,6 +8,8 @@ export interface BuyerMatchCriteria {
   province_ids: string[];
   min_size_rai?: number | null;
   max_size_rai?: number | null;
+  min_usable_area_sqm?: number | null;
+  max_usable_area_sqm?: number | null;
   max_price?: number | null;
   max_price_per_rai?: number | null;
   zoning?: ZoningColor | null;
@@ -38,10 +41,9 @@ export function classifyBuyerMatch(property: Land, input: BuyerMatchCriteria): B
   // "Near" results may relax numeric/zoning constraints, but never the requested geography.
   if (!provinceOk || !preferredLocationOk) return null;
 
-  const sizeOk = (input.min_size_rai == null || (property.size_rai != null && property.size_rai >= input.min_size_rai))
-    && (input.max_size_rai == null || (property.size_rai != null && property.size_rai <= input.max_size_rai));
+  const sizeOk = matchesSizeCriteria(property, input);
   const budgetOk = input.max_price == null || (property.total_price != null && property.total_price <= input.max_price);
-  const perRaiOk = input.max_price_per_rai == null || (property.price_per_rai != null && property.price_per_rai <= input.max_price_per_rai);
+  const perRaiOk = isUsableAreaOnly(property) || input.max_price_per_rai == null || (property.price_per_rai != null && property.price_per_rai <= input.max_price_per_rai);
   const zoningOk = input.zoning == null || property.zoning === input.zoning;
 
   return sizeOk && budgetOk && perRaiOk && zoningOk ? "full" : "near";

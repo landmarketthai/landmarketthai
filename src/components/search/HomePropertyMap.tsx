@@ -25,7 +25,7 @@ export default function HomePropertyMap({ properties }: Props) {
       <div className="mb-5 flex flex-col gap-2 text-center sm:text-left lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-bold tracking-[0.14em] text-[#2f9e44]">ค้นหาทรัพย์บนแผนที่</p>
-          <h2 className="mt-1 text-xl font-bold text-[#0a2a63] sm:text-[28px]">ค้นหาที่ดิน โรงงาน และโกดัง</h2>
+          <h2 className="mt-1 text-xl font-bold text-[#0a2a63] sm:text-[28px]">ค้นหาอสังหาริมทรัพย์</h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">
             ค้นจากทรัพย์จริงในระบบ แล้วเลือกดูราคา ขนาด และตำแหน่งบนแผนที่ (แยกพิกัดแบบ Exact กับตำแหน่งโดยประมาณ)
           </p>

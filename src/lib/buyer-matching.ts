@@ -1,5 +1,6 @@
 ﻿import type { Land, Lead } from "@/lib/types/database";
 import { buyerRequirementsSchema, type BuyerRequirements } from "@/lib/validations";
+import { isUsableAreaOnly } from "@/lib/marketplace/search-filters";
 import { distanceToAnchorKm, LOCATION_ANCHORS } from "@/lib/location-intelligence";
 
 export interface MatchAssessment {
@@ -48,9 +49,14 @@ function assess(land: Land, request: BuyerRequirements): MatchAssessment | null 
     if (!land.province) missingData.push("ยังไม่มีข้อมูลจังหวัด");
     else criterion([land.province.name_th, land.province.name_en, land.province.slug].some((name) => name.toLowerCase() === province), 35, 20, "จังหวัดตรง");
   }
+  if (request.property_type) criterion(land.property_type === request.property_type, 25, 10, "ประเภททรัพย์ตรง");
   if (request.land_type) criterion(land.land_type === request.land_type || (request.land_type === "eec" && land.is_eec === true), 25, 10, "ประเภทที่ดินตรง");
-  range(land.size_rai, request.size_min_rai, true, 10, 15, "ขนาดถึงขั้นต่ำ", "ยังไม่มีข้อมูลขนาด");
-  range(land.size_rai, request.size_max_rai, false, 10, 15, "ขนาดไม่เกินที่ต้องการ", "ยังไม่มีข้อมูลขนาด");
+  if (!isUsableAreaOnly(land)) {
+    range(land.size_rai, request.size_min_rai, true, 10, 15, "ขนาดถึงขั้นต่ำ", "ยังไม่มีข้อมูลขนาด");
+    range(land.size_rai, request.size_max_rai, false, 10, 15, "ขนาดไม่เกินที่ต้องการ", "ยังไม่มีข้อมูลขนาด");
+  }
+  range(land.usable_area_sqm, request.min_usable_area_sqm, true, 10, 15, "พื้นที่ใช้สอยถึงขั้นต่ำ", "ยังไม่มีข้อมูลพื้นที่ใช้สอย", true);
+  range(land.usable_area_sqm, request.max_usable_area_sqm, false, 10, 15, "พื้นที่ใช้สอยไม่เกินที่ต้องการ", "ยังไม่มีข้อมูลพื้นที่ใช้สอย", true);
   range(land.total_price, request.budget_min, true, 10, 15, "ราคาไม่ต่ำกว่างบเริ่มต้น", "ยังไม่มีราคารวม");
   range(land.total_price, request.budget_max, false, 20, 25, "ราคาอยู่ในงบสูงสุด", "ยังไม่มีราคารวม");
   if (request.zoning) {

@@ -21,12 +21,90 @@ function loadSource<T>(path: string, modules: Record<string, unknown>, globals: 
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX } });
   runInNewContext(compiled.outputText, {
     exports, require: (name: string) => {
+      if (name === "@/lib/marketplace/presentation") return presentation;
       assert.ok(Object.hasOwn(modules, name), `Unmocked dependency: ${name}`);
       return modules[name];
     }, ...globals,
   });
   return exports as T;
 }
+
+test("sqm criteria persist in linked lead JSON and return as numeric admin and allowlisted public fields", async () => {
+  let details: Record<string, unknown> = {};
+  const marketplace = loadSource<typeof import("./neon/marketplace.ts")>("./neon/marketplace.ts", {
+    "@/lib/neon/server": { getSql: () => ({ query: async (sql: string, values: unknown[]) => {
+      if (sql.includes("insert into leads")) {
+        details = JSON.parse(String(values[3]));
+        return [{ id: "saved" }];
+      }
+      assert.match(sql, /l\.details->>'min_usable_area_sqm'/);
+      assert.match(sql, /l\.details->>'max_usable_area_sqm'/);
+      return [{ ...details, min_usable_area_sqm: "80.25", max_usable_area_sqm: "120", min_size_rai: "1", max_size_rai: "2" }];
+    } }) },
+    "@/lib/marketplace/buyer-demand-workflow": { BUYER_ACTIONS },
+    "@/lib/neon/queries": { searchProperties: async () => [] },
+    "@/lib/marketplace/matching": { findBuyerMatches },
+    "@/lib/marketplace/verification": {}, "@/lib/marketplace/listing-workflow": {},
+  });
+  await marketplace.createBuyerRequirement({ name: "Buyer", phone: "0812345678", consent_pdpa: true, consent_public: true,
+    transaction_type: "sale", property_type: "condo", province_ids: [], preferred_locations: [],
+    min_size_rai: 1, max_size_rai: 2, min_usable_area_sqm: 80.25, max_usable_area_sqm: 120 });
+  assert.equal(details.min_usable_area_sqm, 80.25);
+  assert.equal(details.max_usable_area_sqm, 120);
+  assert.equal(Object.hasOwn(details, "name"), false);
+  for (const admin of [await marketplace.getBuyerRequirement("saved"), ...(await marketplace.getBuyerRequirements())]) {
+    assert.equal(admin?.min_usable_area_sqm, 80.25);
+    assert.equal(admin?.max_usable_area_sqm, 120);
+    assert.equal(admin?.min_size_rai, 1);
+  }
+  const queries = loadSource<typeof import("./neon/queries.ts")>("./neon/queries.ts", {
+    "next/cache": { unstable_cache: (fn: unknown) => fn },
+    "@/lib/neon/server": { getSqlIfConfigured: () => ({ query: async (sql: string) => {
+      assert.match(sql, /r\.status = 'published' and r\.consent_pdpa and r\.consent_public/);
+      assert.match(sql, /l\.consent_pdpa and l\.consent_at is not null/);
+      assert.match(sql, /d\.reviewed_at is not null and d\.reviewed_by = 'reviewed'/);
+      return [{ ...details, min_usable_area_sqm: "80.25", max_usable_area_sqm: "120", size_min_rai: "1", size_max_rai: "2", name: "PRIVATE", details: { phone: "PRIVATE" } }];
+    } }) },
+    "@/lib/seed-listings": {}, "@/lib/marketplace/search-sort": {},
+    "@/lib/marketplace/verification": {}, "@/lib/marketplace/search-filters": {},
+  });
+  const demand = (await queries.getActiveDemands())[0];
+  assert.equal(demand.min_usable_area_sqm, 80.25);
+  assert.equal(demand.max_usable_area_sqm, 120);
+  assert.equal(demand.size_min_rai, 1);
+  assert.equal(Object.hasOwn(demand, "details"), false);
+  assert.equal(Object.hasOwn(demand, "name"), false);
+});
+
+test("public normalization preserves all canonical types and never calls unknown types land", async () => {
+  let row: Record<string, unknown> = {};
+  const queries = loadSource<typeof import("./neon/queries.ts")>("./neon/queries.ts", {
+    "next/cache": { unstable_cache: (fn: unknown) => fn },
+    "@/lib/neon/server": { getSqlIfConfigured: () => ({ query: async () => [row] }) },
+    "@/lib/seed-listings": {}, "@/lib/marketplace/search-sort": {},
+    "@/lib/marketplace/verification": { normalizeVerificationStatus }, "@/lib/marketplace/search-filters": {},
+  });
+  for (const property_type of presentation.PROPERTY_TYPES) {
+    row = { property_type, land_type: "industrial" };
+    assert.equal((await queries.getListingByRef(1))?.property_type, property_type);
+    row = { land_type: property_type };
+    assert.equal((await queries.getListingByRef(1))?.property_type, property_type);
+    assert.equal((await queries.getActiveDemands())[0].land_type, property_type);
+  }
+  for (const value of [{ property_type: "new_type", land_type: "land" }, { land_type: "new_type" }]) {
+    row = value;
+    assert.equal((await queries.getListingByRef(1))?.property_type, "other");
+  }
+  for (const land_type of [undefined, "industrial", "eec", "logistics", "data_center", "investment"]) {
+    row = { land_type };
+    assert.equal((await queries.getListingByRef(1))?.property_type, "land");
+  }
+  const demandUi = loadSource<typeof import("../components/demand/BuyerDemandList.tsx")>("../components/demand/BuyerDemandList.tsx", {
+    "react/jsx-runtime": {}, "next/link": {}, "lucide-react": {}, "@/lib/utils": {},
+  });
+  assert.equal(demandUi.demandSizeLabel({ size_min_rai: 1, size_max_rai: 2, min_usable_area_sqm: 80, max_usable_area_sqm: 120 }), "1–2 ไร่ · 80–120 ตร.ม. พื้นที่ใช้สอย");
+  assert.equal(demandUi.demandSizeLabel({ size_min_rai: null, size_max_rai: null, max_usable_area_sqm: 80 }), "ไม่เกิน 80 ตร.ม. พื้นที่ใช้สอย");
+});
 
 test("buyer actions require approval before publication and keep terminal states private", () => {
   const allowed: Record<BuyerRequirementStatus, string[]> = {
@@ -233,9 +311,9 @@ test("public pages distinguish outages from empty lists and real 404 without exp
 test("any property type is described honestly and homepage retains one bounded real-data map", () => {
   const detail = readFileSync(new URL("../app/buyer-demand/[slug]/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(detail, /: "ที่ดิน"/);
-  assert.equal((detail.match(/ที่ดิน โรงงาน หรือโกดัง \(ทุกประเภท\)/g) ?? []).length, 4);
+  assert.equal((detail.match(/อสังหาริมทรัพย์ทุกประเภท/g) ?? []).length, 4);
   const list = readFileSync(new URL("../app/buyer-demand/page.tsx", import.meta.url), "utf8");
-  assert.match(list, /ที่ดิน โรงงาน และโกดังทั่วประเทศไทย/);
+  assert.match(list, /อสังหาริมทรัพย์ทั่วประเทศไทย/);
   assert.doesNotMatch(list, /EEC/);
   const home = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.equal((home.match(/<HomePropertyMap\b/g) ?? []).length, 1);
@@ -447,7 +525,8 @@ test("public demand SELECT is an explicit allowlist and sitemap limits exceed 10
   let receivedOffset: unknown;
   const source = readFileSync(new URL("./neon/queries.ts", import.meta.url), "utf8");
   const select = source.split("const PUBLIC_DEMAND_SELECT = `")[1].split("`;", 1)[0];
-  assert.doesNotMatch(select, /\*|buyer_requirement_id|reviewed_by|review_note|name\b|phone|line_id|preferred_locations|purpose|water_requirement|special_requirements/);
+  const projected = select.replace(/\(select[\s\S]*?\) as (?:min|max)_usable_area_sqm/g, "sqm");
+  assert.doesNotMatch(projected, /\*|buyer_requirement_id|reviewed_by|review_note|name\b|phone|line_id|preferred_locations|purpose|water_requirement|special_requirements/);
   for (const field of ["max_price", "max_price_per_rai", "zoning", "container_access", "high_voltage"]) assert.ok(select.includes(`d.${field}`));
   const where = source.split("const PUBLIC_DEMAND_WHERE = `")[1].split("`;", 1)[0];
   assert.match(where, /d\.status = 'published' and d\.is_public = true/);
