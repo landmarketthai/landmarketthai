@@ -53,6 +53,7 @@ alter table buyer_requirements validate constraint buyer_requirements_property_t
 alter table buyer_demand drop constraint if exists buyer_demand_land_type_check;
 alter table buyer_demand add constraint buyer_demand_land_type_check
   check (not is_public or land_type is null or land_type in (
+    'industrial', 'eec', 'logistics', 'data_center', 'investment',
     'land', 'house', 'house_with_land', 'townhouse', 'condo', 'housing_project', 'commercial_building', 'office',
     'factory', 'warehouse', 'apartment', 'hotel_resort', 'retail', 'business_property', 'other')) not valid;
 alter table buyer_demand validate constraint buyer_demand_land_type_check;
