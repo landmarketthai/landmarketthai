@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2, FileCheck, Save, Shield } from "lucide-react";
 import SellWizard from "@/components/forms/SellWizard";
-import { getAllProvinces } from "@/lib/neon/queries";
+import { getPersistedProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากขายทรัพย์",
@@ -19,7 +19,8 @@ const notes = [
 export default async function SellPage({ searchParams }: { searchParams: Promise<{ buyer_demand?: string }> }) {
   const reference = (await searchParams).buyer_demand;
   const buyerDemandSlug = typeof reference === "string" && /^buyer-demand-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference) ? reference : undefined;
-  const provinces = await getAllProvinces().catch(() => []);
+  // property_submissions.province_id is a UUID FK, so only offer persisted provinces (never seed placeholders).
+  const provinces = await getPersistedProvinces().catch(() => []);
 
   return (
     <main className="bg-slate-50">

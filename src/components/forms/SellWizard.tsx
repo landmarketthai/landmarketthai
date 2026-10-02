@@ -1,11 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FileText, ImagePlus, MapPin, Save, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, FileText, ImagePlus, Info, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
-import LocationPicker from "./LocationPicker";
+import LocationPicker, { type MapFocus } from "./LocationPicker";
 
 interface Props { provinces: Province[]; buyerDemandSlug?: string }
+
+/** Approximate administrative center from /api/thai-admin (Open Admin Data, CC-BY-4.0). */
+type AreaOption = { name_th: string; lat: number | null; lng: number | null };
+type AreaResponse = { province: AreaOption | null; districts: AreaOption[]; subdistricts: AreaOption[] };
+
+async function fetchAreas(province: string, district?: string): Promise<AreaResponse | null> {
+  const params = new URLSearchParams({ province });
+  if (district) params.set("district", district);
+  try {
+    const response = await fetch(`/api/thai-admin?${params}`);
+    return response.ok ? (await response.json()) as AreaResponse : null;
+  } catch { return null; }
+}
+
+/** Keep a restored legacy free-text value selectable even when it is not in the dataset. */
+function withCurrent(options: AreaOption[], current: string): AreaOption[] {
+  return current && !options.some((option) => option.name_th === current) ? [{ name_th: current, lat: null, lng: null }, ...options] : options;
+}
+
+function focusOn(area: AreaOption | null | undefined, zoom: number) {
+  return (current: MapFocus | null): MapFocus | null => (
+    area?.lat != null && area.lng != null ? { lat: area.lat, lng: area.lng, zoom, key: (current?.key ?? 0) + 1 } : current
+  );
+}
 
 type DraftForm = {
   property_type: PropertyType | null;
@@ -104,6 +128,54 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [districtData, setDistrictData] = useState<{ province: string; items: AreaOption[] }>({ province: "", items: [] });
+  const [subdistrictData, setSubdistrictData] = useState<{ key: string; items: AreaOption[] }>({ key: "", items: [] });
+  const [mapFocus, setMapFocus] = useState<MapFocus | null>(null);
+  const focusProvinceOnLoad = useRef<string | null>(null);
+
+  const provinceName = provinces.find((province) => province.id === form.province_id)?.name_th ?? "";
+  const isBangkok = provinceName.replace(/^จังหวัด\s*/, "").startsWith("กรุงเทพ");
+  const districtLabel = isBangkok ? "เขต" : "อำเภอ";
+  const subdistrictLabel = isBangkok ? "แขวง" : "ตำบล";
+  const subdistrictKey = `${provinceName}|${form.district}`;
+  const districtOptions = withCurrent(districtData.province === provinceName ? districtData.items : [], form.district);
+  const subdistrictOptions = withCurrent(subdistrictData.key === subdistrictKey ? subdistrictData.items : [], form.subdistrict);
+
+  useEffect(() => {
+    if (!provinceName) return;
+    let cancelled = false;
+    void fetchAreas(provinceName).then((areas) => {
+      if (cancelled) return;
+      setDistrictData({ province: provinceName, items: areas?.districts ?? [] });
+      if (focusProvinceOnLoad.current === provinceName) { focusProvinceOnLoad.current = null; setMapFocus(focusOn(areas?.province, 9)); }
+    });
+    return () => { cancelled = true; };
+  }, [provinceName]);
+
+  useEffect(() => {
+    if (!provinceName || !form.district) return;
+    let cancelled = false;
+    const key = `${provinceName}|${form.district}`;
+    void fetchAreas(provinceName, form.district).then((areas) => {
+      if (!cancelled) setSubdistrictData({ key, items: areas?.subdistricts ?? [] });
+    });
+    return () => { cancelled = true; };
+  }, [provinceName, form.district]);
+
+  // Dropdowns only move the map to an approximate center; any previous exact pin is cleared so
+  // coordinates never silently disagree with the selected area. Exact lat/lng come from a map click only.
+  function selectProvince(provinceId: string) {
+    setForm((v) => ({ ...v, province_id: provinceId, district: "", subdistrict: "", lat: null, lng: null }));
+    focusProvinceOnLoad.current = provinces.find((province) => province.id === provinceId)?.name_th ?? null;
+  }
+  function selectDistrict(name: string) {
+    setForm((v) => ({ ...v, district: name, subdistrict: "", lat: null, lng: null }));
+    setMapFocus(focusOn(districtOptions.find((option) => option.name_th === name), 12));
+  }
+  function selectSubdistrict(name: string) {
+    setForm((v) => ({ ...v, subdistrict: name, lat: null, lng: null }));
+    setMapFocus(focusOn(subdistrictOptions.find((option) => option.name_th === name), 13));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -262,13 +334,20 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             <h2 className="text-xl font-black text-slate-900">ตำแหน่งทรัพย์</h2>
             <p className="mt-1 text-sm text-slate-500">ปักหมุดเฉพาะตำแหน่งจริง หากไม่แน่ใจสามารถเว้นพิกัดไว้ให้ทีมงานตรวจสอบได้</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label><span className="label">จังหวัด *</span><select className="input" value={form.province_id} onChange={(e) => setForm((v) => ({ ...v, province_id: e.target.value }))}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select></label>
-              <label><span className="label">อำเภอ</span><input className="input" value={form.district} onChange={(e) => setForm((v) => ({ ...v, district: e.target.value }))} /></label>
-              <label><span className="label">ตำบล</span><input className="input" value={form.subdistrict} onChange={(e) => setForm((v) => ({ ...v, subdistrict: e.target.value }))} /></label>
+              <label><span className="label">จังหวัด *</span><select className="input" value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select></label>
+              <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
+              <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
               <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" value={form.address} onChange={(e) => setForm((v) => ({ ...v, address: e.target.value }))} /></label>
             </div>
-            <div className="mt-5"><LocationPicker lat={form.lat} lng={form.lng} onChange={(lat,lng) => setForm((v) => ({ ...v, lat, lng }))} /></div>
-            {form.lat != null && form.lng != null && <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13}/>{form.lat.toFixed(7)}, {form.lng.toFixed(7)}</div>}
+            <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Info size={16} className="mt-0.5 shrink-0" />
+              <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น กรุณา<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์ (การเปลี่ยนพื้นที่จะล้างหมุดเดิม)</span>
+            </div>
+            <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} onChange={(lat,lng) => setForm((v) => ({ ...v, lat, lng }))} /></div>
+            {form.lat != null && form.lng != null
+              ? <div className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><MapPin size={13}/>ปักหมุดแล้ว: {form.lat.toFixed(7)}, {form.lng.toFixed(7)}</div>
+              : <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13}/>ยังไม่ได้ปักหมุดตำแหน่งจริง</div>}
+            <p className="mt-2 text-[11px] text-slate-400">ข้อมูลเขตการปกครอง: <a className="underline" href="https://openadmindata.org/th/" target="_blank" rel="noopener noreferrer">Open Admin Data</a> (CC-BY-4.0)</p>
           </div>
         )}
 

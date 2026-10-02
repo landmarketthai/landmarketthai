@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
     // ESLint runs in CI; skip during next build to avoid config serialization issue
     ignoreDuringBuilds: true,
   },
+  // src/lib/thai-admin.ts reads these with fs at runtime; make sure they ship with the route.
+  outputFileTracingIncludes: {
+    "/api/thai-admin": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
+  },
   images: {
     remotePatterns: [
       {
