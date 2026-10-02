@@ -61,9 +61,10 @@ test("canonical property types are accepted consistently by labels, schemas, sea
     return values.map((value) => value.slice(1, -1)).sort();
   };
   const expected = [...PROPERTY_TYPES].sort();
-  for (const constraint of ["property_submissions_property_type_check", "lands_property_type_check", "buyer_requirements_property_type_check", "buyer_demand_land_type_check"]) {
+  for (const constraint of ["property_submissions_property_type_check", "lands_property_type_check", "buyer_requirements_property_type_check"]) {
     assert.deepEqual(listed(constraint), expected, constraint);
   }
+  assert.deepEqual(listed("buyer_demand_land_type_check"), [...expected, ...LEGACY].sort());
   assert.deepEqual(listed("lands_land_type_check"), [...expected, ...LEGACY].sort());
   assert.match(sql, /add column if not exists usable_area_sqm numeric\(14,2\);[\s\S]*add column if not exists usable_area_sqm/);
   for (const [, table, constraint] of sql.matchAll(/alter table (\w+) add constraint (\w+)/g)) {
