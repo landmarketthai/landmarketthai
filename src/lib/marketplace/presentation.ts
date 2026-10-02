@@ -10,7 +10,7 @@ export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   expired: "เก็บถาวร",
 };
 
-/** Canonical property types in display order. Keep in sync with db/migrations/20261003_property_types_usable_area.sql. */
+/** Canonical property types in display order. Keep in sync with db/migrations/20261002_property_types_usable_area.sql. */
 export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   land: "ที่ดิน",
   house: "บ้านเดี่ยว",

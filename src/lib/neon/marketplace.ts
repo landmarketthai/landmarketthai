@@ -328,7 +328,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
 
   const propertyType = String(source.property_type) as PropertyType;
   const transactionType: TransactionType = "sale";
-  // lands_land_type_check accepts every canonical property type (20261003 migration), so land_type mirrors it.
+  // lands_land_type_check accepts every canonical property type (20261002 property-types migration), so land_type mirrors it.
   const landType = propertyType;
   const slug = slugify(String(source.title), String(source.id));
   const rows = await sql.query(

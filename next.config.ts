@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [{ source: "/land-insights", destination: "/land", permanent: true }];
+  },
   eslint: {
     // ESLint runs in CI; skip during next build to avoid config serialization issue
     ignoreDuringBuilds: true,

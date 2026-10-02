@@ -36,6 +36,15 @@ test("curated fallback uses every server criterion with inclusive decimal bounds
   assert.ok(matchesLandFilters(SEED_37_RAI_LAND, { land_type: "eec" }));
 });
 
+test("legacy category filters match only that land category", () => {
+  const industrial = { ...SEED_37_RAI_LAND, land_type: "industrial" as const, is_eec: false };
+  const eec = { ...SEED_37_RAI_LAND, land_type: "eec" as const, is_eec: true };
+  assert.ok(matchesLandFilters(industrial, parseLandSearchParams({ type: "industrial" })));
+  assert.equal(matchesLandFilters(industrial, parseLandSearchParams({ type: "logistics" })), false);
+  assert.ok(matchesLandFilters(eec, parseLandSearchParams({ type: "eec" })));
+  assert.equal(matchesLandFilters(eec, parseLandSearchParams({ type: "industrial" })), false);
+});
+
 test("advanced listing filters preserve active-only inventory before pagination", () => {
   const filters = parseLandSearchParams({ province: "rayong", type: "eec", q: "EEC", min_size: "36.91825", max_size: "36.91825", min_price: "2300000", max_price: "2300000", zoning: "purple", eec: "true" });
   const rows = ["reserved", "sold", "draft", "archived", "active"].map(status => ({

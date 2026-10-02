@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS, isPropertyType, propertySizeLabel } from "./marketplace/presentation.ts";
 import { buyerRequirementSchema, draftSchema } from "./marketplace/schemas.ts";
 import { parsePropertySearchParams, propertyMatchesSearchFilters } from "./marketplace/search-filters.ts";
@@ -54,7 +54,7 @@ test("canonical property types are accepted consistently by labels, schemas, sea
   assert.equal(slugToLandType("condo"), null);
   assert.equal(slugToLandType("data-center"), "data_center");
 
-  const sql = read("../../db/migrations/20261003_property_types_usable_area.sql");
+  const sql = read("../../db/migrations/20261002_property_types_usable_area.sql");
   const listed = (constraint: string) => {
     const body = sql.slice(sql.indexOf(`add constraint ${constraint}`));
     const values = body.slice(0, body.indexOf(";")).match(/'([a-z_]+)'/g) ?? [];
@@ -68,7 +68,10 @@ test("canonical property types are accepted consistently by labels, schemas, sea
   assert.match(sql, /add column if not exists usable_area_sqm numeric\(14,2\);[\s\S]*add column if not exists usable_area_sqm/);
   for (const [, table, constraint] of sql.matchAll(/alter table (\w+) add constraint (\w+)/g)) {
     assert.ok(sql.includes(`alter table ${table} drop constraint if exists ${constraint};`), `idempotent ${constraint}`);
+    assert.match(sql, new RegExp(`add constraint ${constraint}[\\s\\S]*?not valid;\\s*alter table ${table} validate constraint ${constraint};`), `validated without blocking the add scan: ${constraint}`);
   }
+  assert.match(sql, /add column if not exists usable_area_sqm/);
+  assert.doesNotMatch(sql, /drop column|delete from|update\s+\w+\s+set/i);
 });
 
 test("search filters by every canonical type and keeps legacy land categories as land", () => {
@@ -106,11 +109,21 @@ test("readiness accepts land area or usable area, and requires at least one", ()
   assert.equal(hasPositiveArea({ total_rai: 10 }), true, "existing land rows without usable area stay valid");
   assert.equal(propertySizeLabel({ size_rai: null, usable_area_sqm: 120 }), "120 ตร.ม.");
   assert.equal(propertySizeLabel({ size_rai: 2.5, usable_area_sqm: 120 }), "2.5 ไร่");
+  assert.equal(propertySizeLabel({ size_rai: 0, usable_area_sqm: 120 }), "120 ตร.ม.");
 
   const marketplace = read("./neon/marketplace.ts");
   assert.match(marketplace, /and \(total_rai > 0 or usable_area_sqm > 0\)/, "submit SQL mirrors the area fallback");
   assert.match(marketplace, /usable_area_sqm = \$28/);
   assert.match(marketplace, /published_at, usable_area_sqm\r?\n/);
+});
+
+test("blank coordinates normalize to null and Maps pin coordinates outrank viewport centers", () => {
+  const parsed = draftSchema.parse({ token: "00000000-0000-4000-8000-000000000000", lat: "", lng: "" });
+  assert.equal(parsed.lat, null);
+  assert.equal(parsed.lng, null);
+  const maps = "https://www.google.com/maps/place/Foo/@13.1,100.1,15z/data=!3d13.2345678!4d100.8765432";
+  assert.deepEqual(coordinatesFromMapsUrl(new URL(maps)), { lat: 13.2345678, lng: 100.8765432 });
+  assert.deepEqual(coordinatesFromMapsUrl(new URL("https://www.google.com/maps/@13.1,100.1,15z")), { lat: 13.1, lng: 100.1 });
 });
 
 test("Google Maps input parses coordinates from raw pairs and Google URLs only", () => {
@@ -223,16 +236,11 @@ test("sell form is one page: section headings, one submit, autosave, no stepper"
   assert.doesNotMatch(wizard, /"rent"|เช่า/, "sale only");
 });
 
-test("Land Insights is removed from navigation, sitemap and routing", () => {
+test("Land Insights redirects to land and stays out of navigation and sitemap", () => {
   assert.doesNotMatch(read("../components/layout/Navbar.tsx"), /land-insights|ราคาตั้งขาย/);
   assert.doesNotMatch(read("../app/sitemap.ts"), /land-insights/);
   assert.doesNotMatch(read("../components/intelligence/index.ts"), /InventoryAnalytics/);
-  const page = new URL("../app/land-insights/page.tsx", import.meta.url);
-  if (existsSync(page)) {
-    const source = readFileSync(page, "utf8");
-    assert.match(source, /notFound\(\)/);
-    assert.doesNotMatch(source, /InventoryAnalytics/);
-  }
+  assert.match(read("../../next.config.ts"), /source: "\/land-insights", destination: "\/land", permanent: true/);
   // Property detail intelligence stays.
   assert.match(read("../components/intelligence/index.ts"), /PropertyIntelligence/);
 });
