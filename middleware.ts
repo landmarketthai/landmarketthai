@@ -5,6 +5,9 @@ const authMiddleware = auth.middleware({ loginUrl: "/login" });
 
 export default function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  if (pathname === "/land-insights") {
+    return NextResponse.redirect(new URL("/search", request.url), 308);
+  }
   const hasOAuthVerifier = request.nextUrl.searchParams.has("neon_auth_session_verifier");
   const isProtectedAdminRoute =
     pathname === "/admin" || pathname.startsWith("/admin/");

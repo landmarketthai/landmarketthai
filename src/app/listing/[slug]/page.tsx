@@ -16,7 +16,8 @@ import ShareButton from "@/components/listings/ShareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import LeadForm from "@/components/forms/LeadForm";
 import { getListingByRef } from "@/lib/neon/queries";
-import { LAND_TYPE_LABELS, ZONING_LABELS, formatRai, formatMoney, formatMoneyFull, listingHref } from "@/lib/utils";
+import { LAND_TYPE_LABELS, ZONING_LABELS, formatMoney, formatMoneyFull, listingHref } from "@/lib/utils";
+import { propertySizeLabel } from "@/lib/marketplace/presentation";
 
 export const revalidate = 3600;
 
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     title: land.seo_title ?? land.title_th,
     description:
       land.seo_description ??
-      `${LAND_TYPE_LABELS[land.land_type]} ${land.province?.name_th ?? ""}${land.size_rai != null ? ` ${formatRai(land.size_rai)}` : ""}${land.price_per_rai != null ? ` ราคา ${formatMoney(land.price_per_rai)} บาท/ไร่` : ""}`,
+      `${LAND_TYPE_LABELS[land.land_type]} ${land.province?.name_th ?? ""}${propertySizeLabel(land) ? ` ${propertySizeLabel(land)}` : ""}${land.price_per_rai != null && land.size_rai != null ? ` ราคา ${formatMoney(land.price_per_rai)} บาท/ไร่` : ""}`,
     alternates: { canonical: listingHref(land.public_ref, land.slug) },
     openGraph: {
       images: land.images?.[0]?.url_or_cdn_path ? [land.images[0].url_or_cdn_path] : [],
@@ -174,10 +175,9 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
             type Fact = { icon: React.ReactNode; label: string; value: string };
             const facts: Fact[] = [
               { icon: <MapPin size={16} />, label: "จังหวัด", value: land.province?.name_th ?? "–" },
-              ...(land.size_rai != null ? [{ icon: <Ruler size={16} />, label: "พื้นที่", value: formatRai(land.size_rai) }] : []),
-              ...(land.usable_area_sqm != null ? [{ icon: <Ruler size={16} />, label: "พื้นที่ใช้สอย", value: `${land.usable_area_sqm.toLocaleString("th-TH")} ตร.ม.` }] : []),
-              ...(land.price_per_rai != null ? [{ icon: <Tag size={16} />, label: "ราคา/ไร่", value: `${formatMoney(land.price_per_rai)} ฿` }] : []),
-              ...(land.frontage_m ? [{ icon: <Ruler size={16} />, label: "หน้ากว้าง", value: `${land.frontage_m} ม.` }] : []),
+              ...(propertySizeLabel(land) ? [{ icon: <Ruler size={16} />, label: land.size_rai != null ? "พื้นที่ดิน" : "พื้นที่ใช้สอย", value: propertySizeLabel(land)! }] : []),
+              ...(land.price_per_rai != null && land.size_rai != null ? [{ icon: <Tag size={16} />, label: "ราคา/ไร่", value: `${formatMoney(land.price_per_rai)} ฿` }] : []),
+              ...(land.size_rai != null && land.frontage_m ? [{ icon: <Ruler size={16} />, label: "หน้ากว้าง", value: `${land.frontage_m} ม.` }] : []),
               ...(land.zoning ? [{ icon: <Tag size={16} />, label: "ผังสีเมือง", value: ZONING_LABELS[land.zoning] }] : []),
               ...(land.total_price ? [{ icon: <Tag size={16} />, label: "ราคารวม", value: `${formatMoney(land.total_price)} ฿` }] : []),
             ];
@@ -246,7 +246,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<Pa
         <div className="lg:col-span-1">
           <div className="sticky top-24 flex flex-col gap-4">
             <div className="card p-6">
-              {land.price_per_rai != null && <div className="text-2xl font-bold text-brand-600 mb-1">
+              {land.price_per_rai != null && land.size_rai != null && <div className="text-2xl font-bold text-brand-600 mb-1">
                 {formatMoney(land.price_per_rai)} ฿/ไร่
               </div>}
               {land.total_price && (

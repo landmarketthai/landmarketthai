@@ -5,7 +5,7 @@ import { getPersistedProvinces } from "@/lib/neon/queries";
 
 export const metadata: Metadata = {
   title: "ฝากขายทรัพย์",
-  description: "ฝากขายที่ดิน บ้าน คอนโด อาคารพาณิชย์ โรงงาน โกดัง และอสังหาริมทรัพย์อื่น ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
+  description: "ฝากขายอสังหาริมทรัพย์ทุกประเภท ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
   alternates: { canonical: "/sell" },
 };
 

@@ -36,6 +36,7 @@ export default async function ListingGrid({ provinceSlug, landType, filters, pag
   const inventory = await getPublicInventory().catch(() => null);
   if (!inventory) return <p role="alert" className="rounded-xl bg-amber-50 p-6">โหลดรายการไม่ได้ชั่วคราว กรุณาลองใหม่อีกครั้ง</p>;
   const matches = inventory.filter((land) => land.status === "active" && !land.deleted_at &&
+    (!type || (type === "eec" ? land.is_eec || land.land_type === "eec" : land.land_type === type)) &&
     matchesLandFilters(land, { ...filters, province_slug: provinceSlug ?? filters?.province_slug, land_type: type ?? filters?.land_type }));
   const listings = matches.slice(offset, offset + PAGE_SIZE);
   const hasNext = matches.length > offset + PAGE_SIZE;
