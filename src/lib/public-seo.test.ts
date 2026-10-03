@@ -202,6 +202,8 @@ test("public source cannot reintroduce duplicate listing hrefs, prohibited claim
     assert.doesNotMatch(source, /ใหญ่ที่สุด|น่าเชื่อถือที่สุด|พาร์ทเนอร์กว่า 200\+? ราย|ทีม LandmarketThai ที่มีใบอนุญาต|EEC ทั่วไทย/, url.pathname);
   }
   assert.doesNotMatch(read("../app/layout.tsx"), /keywords:/);
+  assert.doesNotMatch(read("../app/how-it-works/page.tsx"), /รับเงินทันที|สูงสุดหลายล้านบาทต่อดีล|โดยทั่วไป 1–3%/);
+  assert.match(read("../components/properties/PropertyGallery.tsx"), /filter\(\(\{ index \}\) => index !== selectedIndex\)/);
   assert.doesNotMatch(read("../app/layout.tsx"), /canonical:|url: SITE_URL/, "root fallbacks must not give 404 pages homepage URLs");
   assert.match(read("../app/page.tsx"), /alternates: \{ canonical: SITE_URL \}/);
   assert.match(read("../app/page.tsx"), /openGraph: \{ url: SITE_URL \}/);

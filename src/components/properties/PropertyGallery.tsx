@@ -204,28 +204,25 @@ export default function PropertyGallery({ images: sourceImages, title }: Props) 
 
         {images.length > 1 && (
           <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
-            {images.map((image, index) => (
-              <button
-                key={`${image.src}-${index}`}
-                type="button"
-                onClick={() => openLightbox(index)}
-                aria-label={`ดูรูปที่ ${index + 1}: ${image.alt}`}
-                aria-pressed={selectedIndex === index}
-                className={`relative aspect-4/3 overflow-hidden rounded-lg bg-slate-100 transition ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a3a8f] ${
-                  selectedIndex === index
-                    ? "ring-2 ring-[#1a3a8f]"
-                    : "opacity-80 hover:opacity-100"
-                }`}
-              >
-                <Image
-                  src={image.src}
-                  alt={image.alt}
-                  fill
-                  sizes="(max-width: 640px) 50vw, 25vw"
-                  className="object-cover"
-                />
-              </button>
-            ))}
+            {images.map((image, index) => ({ image, index }))
+              .filter(({ index }) => index !== selectedIndex)
+              .map(({ image, index }) => (
+                <button
+                  key={`${image.src}-${index}`}
+                  type="button"
+                  onClick={() => openLightbox(index)}
+                  aria-label={`ดูรูปที่ ${index + 1}: ${image.alt}`}
+                  className="relative aspect-4/3 overflow-hidden rounded-lg bg-slate-100 opacity-80 transition ring-offset-2 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a3a8f]"
+                >
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    fill
+                    sizes="(max-width: 640px) 50vw, 25vw"
+                    className="object-cover"
+                  />
+                </button>
+              ))}
           </div>
         )}
       </section>
