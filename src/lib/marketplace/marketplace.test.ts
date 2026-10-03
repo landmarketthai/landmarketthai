@@ -440,18 +440,24 @@ test("buyer province filtering is parameterized and agrees with the in-memory re
   assert.equal(propertyMatchesSearchFilters(rayong, { location_terms: ["nowhere"] }), false);
 });
 
-test("homepage is buyer-first on mobile and sends map use to /search", () => {
+test("homepage gives buyer, seller and referrer distinct primary entry paths", () => {
   const home = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
   const sticky = readFileSync(new URL("../../components/ui/MobileStickyCta.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(home, /HomePropertyMap/);
-  assert.match(home, /ค้นหาอสังหาริมทรัพย์ที่ตรงความต้องการ/);
+  assert.match(home, /ซื้อ ขาย และแนะนำอสังหาริมทรัพย์ในที่เดียว/);
+  assert.match(home, /คนซื้อ · ค้นหาทรัพย์/);
+  assert.match(home, /คนขาย · ฝากขายทรัพย์/);
+  assert.match(home, /ผู้แนะนำ · ส่งต่อดีล/);
   assert.match(home, /ทรัพย์แนะนำที่เปิดขาย/);
   assert.match(home, /ผลงานปิดการขาย/);
   assert.match(home, /publicBuyerMode/);
   assert.doesNotMatch(home, /มีคอนเนกชันนักลงทุนหรือเจ้าของโรงงาน\?/);
-  assert.match(sticky, /href="\/buy-request"/);
-  assert.match(sticky, /ฝากความต้องการซื้อ/);
-  assert.doesNotMatch(sticky, /สมัครผู้แนะนำ/);
+  assert.match(sticky, /href="\/search"/);
+  assert.match(sticky, /href="\/sell"/);
+  assert.match(sticky, /href="\/become-partner"/);
+  assert.match(sticky, />\s*ซื้อ\s*</);
+  assert.match(sticky, />\s*ขาย\s*</);
+  assert.match(sticky, />\s*แนะนำ\s*</);
 });
 
 test("mobile property detail keeps buyer actions sticky and referral rewards secondary", () => {

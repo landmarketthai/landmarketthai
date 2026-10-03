@@ -14,8 +14,8 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   alternates: { canonical: SITE_URL },
   openGraph: { url: SITE_URL },
-  title: { absolute: "LandmarketThai – ค้นหาและฝากขายอสังหาริมทรัพย์" },
-  description: "ค้นหาที่ดิน โรงงาน โกดัง อาคาร และอสังหาริมทรัพย์เพื่อการลงทุน พร้อมสถานะการตรวจสอบข้อมูล ฝากซื้อและฝากขายกับ LandmarketThai",
+  title: { absolute: "LandmarketThai – ซื้อ ขาย และแนะนำอสังหาริมทรัพย์" },
+  description: "ตลาดอสังหาริมทรัพย์สำหรับผู้ซื้อ เจ้าของทรัพย์ และผู้แนะนำ ค้นหาทรัพย์ ฝากซื้อ ฝากขาย และเชื่อมต่อดีลกับ LandmarketThai",
 };
 const shortcuts = [
   ["ที่ดิน", "/search?property_type=land"], ["โรงงาน", "/search?property_type=factory"],
@@ -38,12 +38,22 @@ export default async function HomePage() {
     <JsonLd data={[orgSchema]} />
     <section className="bg-brand-50 px-4 py-5 sm:py-10">
       <div className="container-xl">
-        <h1 className="max-w-2xl text-2xl font-black leading-tight text-brand-900 sm:text-4xl">ค้นหาอสังหาริมทรัพย์ที่ตรงความต้องการ</h1>
-        <p className="mt-2 text-base text-slate-700">ที่ดิน โรงงาน โกดัง อาคาร และทรัพย์เพื่อการลงทุน</p>
+        <h1 className="max-w-3xl text-2xl font-black leading-tight text-brand-900 sm:text-4xl">ซื้อ ขาย และแนะนำอสังหาริมทรัพย์ในที่เดียว</h1>
+        <p className="mt-2 max-w-2xl text-base text-slate-700">LandmarketThai เชื่อมผู้ซื้อ เจ้าของทรัพย์ และผู้แนะนำ ให้เริ่มต้นดีลได้จากทางที่ตรงกับคุณ</p>
         <p className="mt-2 text-sm text-slate-600">ทุกประกาศบอกชัดว่าข้อมูลส่วนไหนผ่านการตรวจสอบแล้ว</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/search" className="btn-green min-h-11">ค้นหาทรัพย์</Link>
-          <Link href="/buy-request" className="btn-outline min-h-11">ฝากความต้องการซื้อ</Link>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <Link href="/search" className="min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-emerald-700">
+            คนซื้อ · ค้นหาทรัพย์
+          </Link>
+          <Link href="/sell" className="min-h-11 rounded-xl border border-brand-200 bg-white px-4 py-3 text-center text-sm font-bold text-brand-900 hover:bg-brand-50">
+            คนขาย · ฝากขายทรัพย์
+          </Link>
+          <Link href="/become-partner" className="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-900 hover:bg-amber-100">
+            ผู้แนะนำ · ส่งต่อดีล
+          </Link>
+        </div>
+        <div className="mt-2 text-center sm:text-left">
+          <Link href="/buy-request" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700">ยังไม่เจอทรัพย์ที่ใช่? ฝากความต้องการซื้อ →</Link>
         </div>
       </div>
     </section>
@@ -98,9 +108,25 @@ export default async function HomePage() {
         <Link href="/buyer-demand" className="mt-3 inline-flex min-h-11 items-center text-sm text-brand-700">ดูความต้องการซื้อทั้งหมด →</Link>
       </section>
     )}
-    <section className="container-xl grid gap-3 px-4 py-6 sm:grid-cols-2">
-      <Link href="/sell" className="rounded-2xl border border-slate-200 p-5"><h2 className="text-lg font-bold">เจ้าของทรัพย์ → ฝากขาย</h2><p className="mt-2 text-base text-slate-600">ส่งข้อมูลทรัพย์ให้ทีมงานพิจารณาประกาศ</p></Link>
-      <Link href="/become-partner" className="rounded-2xl border border-slate-200 p-5"><h2 className="text-lg font-bold">มีคอนเนกชัน → สมัครผู้แนะนำ</h2><p className="mt-2 text-base text-slate-600">แนะนำผู้สนใจ รับค่าตอบแทนตามเงื่อนไขเมื่อธุรกรรมสำเร็จ</p></Link>
+    <section className="container-xl px-4 py-6">
+      <h2 className="text-xl font-bold">เริ่มดีลจากบทบาทของคุณ</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Link href="/search" className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+          <div className="text-sm font-semibold text-emerald-700">สำหรับผู้ซื้อ</div>
+          <h3 className="mt-1 text-lg font-bold">ค้นหาทรัพย์หรือฝากซื้อ</h3>
+          <p className="mt-2 text-base text-slate-600">ดูทรัพย์ที่เปิดขาย หรือฝากเงื่อนไขให้ทีมช่วยจับคู่</p>
+        </Link>
+        <Link href="/sell" className="rounded-2xl border border-brand-200 bg-brand-50/50 p-5">
+          <div className="text-sm font-semibold text-brand-700">สำหรับเจ้าของทรัพย์</div>
+          <h3 className="mt-1 text-lg font-bold">ฝากขายกับ LandmarketThai</h3>
+          <p className="mt-2 text-base text-slate-600">ส่งข้อมูลทรัพย์เพื่อเข้าสู่ขั้นตอนตรวจสอบและประกาศขาย</p>
+        </Link>
+        <Link href="/become-partner" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+          <div className="text-sm font-semibold text-amber-800">สำหรับผู้แนะนำ / นายหน้า</div>
+          <h3 className="mt-1 text-lg font-bold">แนะนำคนซื้อหรือเจ้าของทรัพย์</h3>
+          <p className="mt-2 text-base text-slate-600">ส่งต่อโอกาสทางการขายและรับค่าตอบแทนตามเงื่อนไขเมื่อดีลสำเร็จ</p>
+        </Link>
+      </div>
     </section>
     <MobileStickyCta />
   </>;

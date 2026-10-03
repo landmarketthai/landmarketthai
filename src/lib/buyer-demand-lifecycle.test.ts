@@ -312,7 +312,7 @@ test("public pages distinguish outages from empty lists and real 404 without exp
   assert.doesNotMatch(errorUi, /error\.message|error\.stack/);
 });
 
-test("any property type is described honestly and homepage is buyer-first without an embedded map", () => {
+test("any property type is described honestly and homepage stays marketplace-first without an embedded map", () => {
   const detail = readFileSync(new URL("../app/buyer-demand/[slug]/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(detail, /: "ที่ดิน"/);
   assert.equal((detail.match(/อสังหาริมทรัพย์ทุกประเภท/g) ?? []).length, 4);
