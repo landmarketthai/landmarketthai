@@ -48,6 +48,7 @@ export type DocType = "title_deed" | "map" | "brochure" | "other";
 export type DemandStatus = "published" | "unpublished" | "matched" | "closed" | "expired";
 export type BuyerRequirementStatus = "pending_review" | "approved" | "published" | "rejected" | "matched" | "closed" | "expired";
 export type DealStatus = "in_progress" | "closed" | "cancelled";
+export type DealStage = "qualified" | "property_sent" | "site_visit" | "negotiation" | "offer" | "deposit" | "won" | "lost";
 export type PartnerStatus = "pending" | "active" | "inactive";
 export type PostStatus = "draft" | "published";
 export type EntityType = "buyer" | "owner";
@@ -215,6 +216,7 @@ export interface Lead {
   referral_code: string | null;
   status: LeadStatus;
   assigned_to: string | null;
+  next_action_at: string | null;
   details: Record<string, unknown>;
   consent_pdpa: boolean;
   consent_at: string | null;
@@ -252,16 +254,22 @@ export interface Partner {
 
 export interface Deal {
   id: string;
-  land_id: string;
+  land_id: string | null;
+  listing_ref: string | null;
+  title: string | null;
   buyer_lead_id: string | null;
   partner_id: string | null;
   referral_code: string | null;
-  deal_value: number;
+  deal_value: number | null;
   commission_paid: number | null;
+  expected_commission: number | null;
   status: DealStatus;
+  stage: DealStage;
+  assigned_to: string | null;
   closed_at: string | null;
   notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ReferralAttribution {
