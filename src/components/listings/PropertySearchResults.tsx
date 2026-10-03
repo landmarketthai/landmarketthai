@@ -34,7 +34,7 @@ export default function PropertySearchResults({ listings }: { listings: Land[] }
                   onClick={() => setSelectedId(land.id)} className="min-h-11 rounded px-3 font-semibold text-blue-700 hover:bg-blue-50">เลือกบนแผนที่</button>
                   : <span className="text-slate-500">ยังไม่มีพิกัด</span>}
               </div>
-              <ListingCard land={land} {...resolveListingPresentation(land)} />
+              <ListingCard land={land} {...resolveListingPresentation(land)} publicBuyerMode />
             </div>
           ))}
         </div>

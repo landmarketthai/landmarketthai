@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  BadgeDollarSign,
   CalendarDays,
   CheckCircle,
   ExternalLink,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import LeadForm from "@/components/forms/LeadForm";
 import PropertyGallery from "@/components/properties/PropertyGallery";
+import PropertyMobileActions from "@/components/properties/PropertyMobileActions";
 import PropertyMap from "@/components/search/PropertyMap";
 import LineButton from "@/components/ui/LineButton";
 import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
@@ -24,6 +24,8 @@ import ListingCard from "@/components/listings/ListingCard";
 import { rankSimilarProperties } from "@/lib/similar-properties";
 import { resolveListingPresentation } from "@/lib/seed-listings";
 import VerificationChecklist from "@/components/listings/VerificationChecklist";
+import ListingTrust from "@/components/listings/ListingTrust";
+import VerificationBadges from "@/components/listings/VerificationBadges";
 
 function legalArea(property: Land): string | null {
   if (property.area_rai != null || property.area_ngan != null || property.area_sqwa != null) {
@@ -66,6 +68,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
     src: image.url_or_cdn_path,
     alt: image.alt_th ?? property.title_th,
   }));
+  const mobileGallery = gallery.filter((image) => image.src !== cover?.url_or_cdn_path);
 
   const facts = [
     area ? ["ขนาด", area] : null,
@@ -97,8 +100,8 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
   ].filter(Boolean) as string[];
 
   return (
-    <main className="bg-white">
-      <section className="relative overflow-hidden bg-[#071d4a] text-white">
+    <main className="bg-white pb-20 md:pb-0">
+      <section className="relative hidden overflow-hidden bg-[#071d4a] text-white md:block">
         {cover && (
           <Image
             src={cover.url_or_cdn_path}
@@ -177,14 +180,10 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                     <div className="mt-1 text-xl font-black sm:text-2xl">{formatMoneyFull(price)}</div>
                   </div>
                 )}
-                {!isSoldOut && property.referral_reward_max != null && (
-                  <div className="rounded-2xl border border-gold-400/60 bg-[#071d4a]/92 px-4 py-4 shadow-lg sm:px-5">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-blue-100">
-                      <BadgeDollarSign size={16} className="text-gold-400" /> ค่าแนะนำสูงสุด
-                    </div>
-                    <div className="mt-1 text-xl font-black text-gold-400 sm:text-2xl">
-                      {formatMoneyFull(property.referral_reward_max)}
-                    </div>
+                {property.price_per_rai != null && (
+                  <div className="rounded-2xl bg-white/95 px-4 py-4 text-[#071d4a] shadow-lg sm:px-5">
+                    <div className="text-xs font-semibold text-slate-500">ราคา / ไร่</div>
+                    <div className="mt-1 text-xl font-black sm:text-2xl">{formatMoneyFull(property.price_per_rai)}</div>
                   </div>
                 )}
               </div>
@@ -193,16 +192,72 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
         </div>
       </section>
 
-      <section className="bg-slate-50 px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <section className="bg-white px-4 pb-5 pt-3 md:hidden">
+        <div className="mx-auto max-w-lg">
+          {cover ? (
+            <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-100">
+              <Image src={cover.url_or_cdn_path} alt={cover.alt_th ?? property.title_th} fill priority sizes="100vw" className="object-cover" />
+            </div>
+          ) : null}
+          <div className="pt-4">
+            <div className="flex flex-wrap gap-2">
+              {property.province?.name_th && <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">{property.province.name_th}</span>}
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">{propertyTypeLabel(property)}</span>
+              {isSoldOut && <span className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-bold text-red-700">ขายแล้ว</span>}
+            </div>
+            <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title_th}</h1>
+            {location && <p className="mt-2 flex items-start gap-2 text-sm text-slate-600"><MapPin size={17} className="mt-0.5 shrink-0" />{location}</p>}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {(area || usable) && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <div className="text-sm text-slate-500">{area ? "ขนาด" : "พื้นที่ใช้สอย"}</div>
+                  <div className="mt-1 text-sm font-bold leading-snug text-slate-900">{area ?? usable}</div>
+                </div>
+              )}
+              {property.price_per_rai != null && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <div className="text-sm text-slate-500">ราคา / ไร่</div>
+                  <div className="mt-1 text-sm font-bold text-brand-900">{formatMoneyFull(property.price_per_rai)}</div>
+                </div>
+              )}
+              {price != null && (
+                <div className="col-span-2 rounded-xl bg-brand-50 p-3">
+                  <div className="text-sm text-slate-500">{isSoldOut ? "ราคารวมเดิม" : "ราคารวม"}</div>
+                  <div className="mt-1 text-xl font-black text-brand-900">{formatMoneyFull(price)}</div>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 space-y-3">
+              <ListingTrust land={property} />
+              <VerificationBadges land={property} />
+              <VerificationChecklist dimensions={landVerification(property)} />
+            </div>
+            <div className="mt-4">
+              <PropertyMobileActions listingId={property.id} listingRef={property.public_ref} listingTitle={property.title_th} soldOut={isSoldOut} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
         <div className="container-xl grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-8">
             {gallery.length > 0 && (
               <section>
                 <div className="mb-5 flex items-center gap-2">
                   <MapPin size={20} className="text-brand-600" />
-                  <h2 className="text-xl font-bold text-slate-900">รูปภาพและทำเล</h2>
+                  <h2 className="text-xl font-bold text-slate-900">รูปภาพเพิ่มเติม</h2>
                 </div>
-                <PropertyGallery images={gallery} title={property.title_th} />
+                <div className="md:hidden">
+                  {mobileGallery.length > 0 ? (
+                    <PropertyGallery images={mobileGallery} title={property.title_th} />
+                  ) : (
+                    <p className="text-sm text-slate-500">ไม่มีรูปเพิ่มเติม</p>
+                  )}
+                </div>
+                <div className="hidden md:block">
+                  <PropertyGallery images={gallery} title={property.title_th} />
+                </div>
               </section>
             )}
 
@@ -212,10 +267,10 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                   <Ruler size={20} className="text-brand-600" />
                   <h2 className="text-xl font-bold text-slate-900">ข้อมูลทรัพย์</h2>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                   {facts.map(([label, value]) => (
                     <div key={label} className="min-w-0 rounded-xl bg-slate-50 p-4">
-                      <div className="text-xs font-semibold text-slate-400">{label}</div>
+                      <div className="text-sm font-semibold text-slate-500">{label}</div>
                       <div className="wrap-break-word mt-1 font-bold text-slate-800">{value}</div>
                     </div>
                   ))}
@@ -278,7 +333,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
             )}
           </div>
 
-          <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <aside className="hidden min-w-0 md:block lg:sticky lg:top-24 lg:self-start">
             <div className="card overflow-hidden">
               {isSoldOut ? (
                 <>
@@ -327,9 +382,19 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
         </div>
       </section>
 
+      {!isSoldOut && property.referral_reward_max != null && (
+        <section className="container-xl px-4 py-5">
+          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">สำหรับพาร์ทเนอร์ผู้แนะนำ</div>
+            <p className="mt-1">ค่าตอบแทนผู้แนะนำสูงสุด {formatMoneyFull(property.referral_reward_max)} ตามเงื่อนไขของดีล</p>
+            <Link href="/become-partner" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">ดูรายละเอียดการเป็นผู้แนะนำ →</Link>
+          </div>
+        </section>
+      )}
+
       {similar.length > 0 && <section className="container-xl section">
         <h2 className="mb-6 text-xl font-bold">ทรัพย์ใกล้เคียงที่ยังเปิดขาย</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} />)}</div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} publicBuyerMode />)}</div>
       </section>}
 
       <section className="px-4 py-10 sm:px-6 sm:py-12 lg:px-8">

@@ -312,7 +312,7 @@ test("public pages distinguish outages from empty lists and real 404 without exp
   assert.doesNotMatch(errorUi, /error\.message|error\.stack/);
 });
 
-test("any property type is described honestly and homepage retains one bounded real-data map", () => {
+test("any property type is described honestly and homepage is buyer-first without an embedded map", () => {
   const detail = readFileSync(new URL("../app/buyer-demand/[slug]/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(detail, /: "ที่ดิน"/);
   assert.equal((detail.match(/อสังหาริมทรัพย์ทุกประเภท/g) ?? []).length, 4);
@@ -320,12 +320,10 @@ test("any property type is described honestly and homepage retains one bounded r
   assert.match(list, /อสังหาริมทรัพย์ทั่วประเทศไทย/);
   assert.doesNotMatch(list, /EEC/);
   const home = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.equal((home.match(/<HomePropertyMap\b/g) ?? []).length, 1);
+  assert.equal((home.match(/<HomePropertyMap\b/g) ?? []).length, 0);
   assert.doesNotMatch(home, /PropertyMapPreview/);
+  assert.match(home, /href="\/search\?view=map"/);
   assert.match(home, /buyerDemands === null[\s\S]*role="alert"/);
-  const map = readFileSync(new URL("../components/search/HomePropertyMap.tsx", import.meta.url), "utf8");
-  assert.match(map, /max-h-/);
-  assert.match(map, /overflow-y-auto/);
   const marketplace = readFileSync(new URL("./neon/marketplace.ts", import.meta.url), "utf8");
   assert.doesNotMatch(marketplace.split('from "@/lib/types/database"')[0], /\bLand,/);
 });

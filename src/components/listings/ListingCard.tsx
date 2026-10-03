@@ -26,6 +26,7 @@ interface Props {
   metaTagLabel?: string;
   rewardLabel?: string;
   pricePerRaiLabel?: string;
+  publicBuyerMode?: boolean;
 }
 
 function exactAreaLabel(land: Land): string | null {
@@ -63,6 +64,7 @@ export default function ListingCard({
   metaTagLabel,
   rewardLabel,
   pricePerRaiLabel,
+  publicBuyerMode = false,
 }: Props) {
   const isSoldOut = soldOut ?? land.status === "sold";
   const coverImage = land.images?.find((img) => img.is_cover) ?? land.images?.[0];
@@ -104,17 +106,17 @@ export default function ListingCard({
 
           <div className="absolute left-3 top-3 z-10 flex max-w-[72%] flex-wrap gap-1.5">
             {land.province?.name_th && (
-              <span className="rounded-md bg-[#00A859] px-3 py-1 text-xs font-bold text-white shadow-sm">
+              <span className="rounded-md bg-[#00A859] px-3 py-1 text-sm font-bold text-white shadow-sm">
                 {land.province.name_th}
               </span>
             )}
-            <span className="rounded-md bg-[#071d4a]/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-sm">
+            <span className="rounded-md bg-[#071d4a]/90 px-2.5 py-1 text-sm font-bold text-white shadow-sm backdrop-blur-sm">
               {typeLabel} · ขาย
             </span>
           </div>
 
-          {featured && !isSoldOut && (
-            <span className="absolute right-3 top-3 z-10 rounded-md bg-gold-400 px-2.5 py-1 text-[11px] font-black text-[#001B48] shadow-sm">
+          {!publicBuyerMode && featured && !isSoldOut && (
+            <span className="absolute right-3 top-3 z-10 rounded-md bg-gold-400 px-2.5 py-1 text-sm font-black text-[#001B48] shadow-sm">
               เปิดรับแนะนำ
             </span>
           )}
@@ -128,9 +130,9 @@ export default function ListingCard({
           )}
 
 
-          {!isSoldOut && land.referral_reward_max != null && (
+          {!publicBuyerMode && !isSoldOut && land.referral_reward_max != null && (
             <div className="absolute inset-x-0 bottom-0 z-10 bg-[#001B48]/92 px-4 py-2.5">
-              <div className="text-[11px] font-medium text-white/85">
+              <div className="text-sm font-medium text-white/85">
                 {rewardLabel ?? "ค่าตอบแทนผู้แนะนำสูงสุด"}
               </div>
               <div className="text-lg font-black leading-tight text-gold-400 sm:text-xl">
@@ -149,7 +151,7 @@ export default function ListingCard({
             {land.title_th}
           </h3>
 
-          <div className="mt-3 grid gap-2 border-y border-slate-100 py-3 text-xs text-slate-600">
+          <div className="mt-3 grid gap-2 border-y border-slate-100 py-3 text-sm text-slate-600">
             {area && (
               <div className="flex min-w-0 items-start gap-1.5">
                 <Ruler size={13} className="mt-0.5 shrink-0 text-brand-600" />
@@ -175,7 +177,7 @@ export default function ListingCard({
                 </span>
               )}
               {land.is_eec && (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">EEC</span>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-bold text-emerald-700">EEC</span>
               )}
               {land.frontage_m != null && (
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -185,7 +187,7 @@ export default function ListingCard({
               )}
             </div>
             {land.verification_status === "pending" && (
-              <span className="w-fit rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+              <span className="w-fit rounded-full bg-amber-50 px-2 py-1 text-sm font-semibold text-amber-700">
                 ข้อมูลกำลังตรวจสอบ
               </span>
             )}
@@ -195,7 +197,7 @@ export default function ListingCard({
         <div className="mt-3 grid grid-cols-2 gap-2">
           {(pricePerRaiLabel || land.price_per_rai != null) && (
             <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-              <div className="text-[11px] text-slate-400">ราคา / ไร่</div>
+              <div className="text-sm text-slate-400">ราคา / ไร่</div>
               <div className="mt-0.5 truncate text-sm font-black text-[#0a2a63]">
                 {pricePerRaiLabel ?? `${formatMoney(land.price_per_rai as number)} ฿`}
               </div>
@@ -203,7 +205,7 @@ export default function ListingCard({
           )}
           {totalPrice != null && (
             <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-              <div className="text-[11px] text-slate-400">{totalPriceLabel}</div>
+              <div className="text-sm text-slate-400">{totalPriceLabel}</div>
               <div className="mt-0.5 truncate text-sm font-black text-[#0a2a63]" title={formatMoneyFull(totalPrice)}>
                 {formatMoney(totalPrice)} ฿
               </div>
@@ -212,14 +214,14 @@ export default function ListingCard({
         </div>
 
         {totalPrice != null && (
-          <div className="mt-1 text-right text-[10px] text-slate-400">
+          <div className="mt-1 text-right text-sm text-slate-400">
             {totalPriceLabel}: {formatMoneyFull(totalPrice)}
           </div>
         )}
 
         <Link
           href={href}
-          className={`mt-3 w-full justify-center px-3 py-2.5 text-xs ${isSoldOut ? "btn-outline" : "btn-green"}`}
+          className={`mt-3 min-h-11 w-full justify-center px-3 py-2.5 text-sm ${isSoldOut ? "btn-outline" : "btn-green"}`}
         >
           {ctaLabel}
         </Link>

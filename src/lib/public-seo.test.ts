@@ -62,8 +62,9 @@ test("canonical route renders future inventory, rejects unknown slugs and redire
     "@/lib/seed-listings": { SEED_PUBLIC_LISTINGS }, "@/lib/similar-properties": { rankSimilarProperties: () => [] },
     "@/lib/neon/queries": { getListingBySlug: async (slug: string) => [dynamic, ...SEED_PUBLIC_LISTINGS].find(row => row.slug === slug) ?? null },
     "@/lib/property-detail-data": { getPropertyDetail, propertyDetails: [] }, "@/lib/marketplace/verification": {},
+    "@/lib/utils": await import("./utils.ts"),
   };
-  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyVideos", "ui/LineButton",
+  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyMobileActions", "properties/PropertyVideos", "ui/LineButton",
     "listings/ListingCard", "listings/ListingTrust", "listings/VerificationChecklist", "listings/VerificationBadges",
     "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
   const page = load<{ default: (props: unknown) => Promise<{ type: unknown; props: { property: Land } }>; generateMetadata: (props: unknown) => Promise<Metadata> }>("../app/property/[slug]/page.tsx", modules);
@@ -245,8 +246,9 @@ test("flagship canonical page and metadata survive inventory outage", async () =
     "@/lib/neon/queries": { getListingBySlug: async (slug: string) => SEED_PUBLIC_LISTINGS.find(row => row.slug === slug) ?? null },
     "@/lib/seed-listings": { SEED_PUBLIC_LISTINGS }, "@/lib/similar-properties": { rankSimilarProperties: () => [] },
     "@/lib/property-detail-data": { getPropertyDetail, propertyDetails: [] }, "@/lib/marketplace/verification": { landVerification: () => [] },
+    "@/lib/utils": await import("./utils.ts"),
   };
-  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyVideos", "ui/LineButton", "listings/ListingCard", "listings/ListingTrust", "listings/VerificationChecklist", "listings/VerificationBadges", "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
+  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyMobileActions", "properties/PropertyVideos", "ui/LineButton", "listings/ListingCard", "listings/ListingTrust", "listings/VerificationChecklist", "listings/VerificationBadges", "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
   const page = load<{ default: (props: unknown) => Promise<unknown>; generateMetadata: (props: unknown) => Promise<Metadata> }>("../app/property/[slug]/page.tsx", modules);
   for (const land of SEED_PUBLIC_LISTINGS) {
     const props = { params: Promise.resolve({ slug: land.slug }) };

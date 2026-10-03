@@ -14,16 +14,16 @@ export default function MobileStickyCta() {
             href={LINE_OA}
             target="_blank"
             rel="noopener"
-            className="btn-line min-h-10 flex-1 justify-center px-3 py-2.5 text-sm"
+            className="btn-line min-h-11 flex-1 justify-center px-3 py-2.5 text-sm"
           >
             <LineIcon size={17} />
             ทัก LINE
           </Link>
           <Link
-            href="/become-partner"
-            className="btn-green min-h-10 flex-1 justify-center px-3 py-2.5 text-sm"
+            href="/buy-request"
+            className="btn-green min-h-11 flex-1 justify-center px-3 py-2.5 text-sm"
           >
-            สมัครผู้แนะนำ
+            ฝากความต้องการซื้อ
           </Link>
         </div>
       </div>

@@ -70,6 +70,7 @@ export default async function ListingGrid({ provinceSlug, landType, filters, pag
             land={land}
             {...resolveListingPresentation(land)}
             ctaLabel="ดูรายละเอียดทรัพย์"
+            publicBuyerMode
           />
         ))}
       </div>

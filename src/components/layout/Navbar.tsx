@@ -12,10 +12,11 @@ import { authClient } from "@/lib/auth/client";
 
 const navLinks = [
   { label: "หน้าแรก", href: "/" },
-  { label: "ที่ดินทั้งหมด", href: "/land" },
-  { label: "แผนที่", href: "/search" },
+  { label: "ค้นหาทรัพย์", href: "/search?view=list" },
+  { label: "แผนที่", href: "/search?view=map" },
   { label: "ฝากซื้อ", href: "/buy-request" },
   { label: "ฝากขาย", href: "/sell" },
+  { label: "สมัครผู้แนะนำ", href: "/become-partner" },
   { label: "วิธีรับค่าตอบแทน", href: "/how-it-works" },
   { label: "ข่าวสาร", href: "/blog" },
   { label: "เกี่ยวกับเรา", href: "/about" },

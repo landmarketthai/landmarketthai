@@ -7,7 +7,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
-  BadgeDollarSign,
   CalendarDays,
   CheckCircle,
   ExternalLink,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import LeadForm from "@/components/forms/LeadForm";
 import PropertyGallery from "@/components/properties/PropertyGallery";
+import PropertyMobileActions from "@/components/properties/PropertyMobileActions";
 import PropertyVideos from "@/components/properties/PropertyVideos";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
@@ -34,6 +34,7 @@ import { getPublicInventory } from "@/lib/public-inventory";
 import { getListingBySlug } from "@/lib/neon/queries";
 import { SEED_PUBLIC_LISTINGS, resolveListingPresentation } from "@/lib/seed-listings";
 import { rankSimilarProperties } from "@/lib/similar-properties";
+import { formatMoneyFull } from "@/lib/utils";
 import {
   getPropertyDetail,
   propertyDetails,
@@ -78,10 +79,13 @@ export default async function PropertyDetailPage({
   if (!property) return <DynamicPropertyDetail property={land} inventory={inventory} />;
   const isSoldOut = land.status === "sold";
   const similar = land ? rankSimilarProperties(land, inventory ?? []) : [];
+  const mobileGallery = property.gallery.filter((image) => image.src !== property.heroImage.src);
+  const totalPriceLabel = property.facts.find((fact) => fact.label === "ราคารวม")?.value
+    ?? (land.total_price != null ? formatMoneyFull(land.total_price) : null);
 
   return (
-    <main className="bg-white">
-      <section className="relative overflow-hidden bg-slate-950 text-white">
+    <main className="bg-white pb-20 md:pb-0">
+      <section className="relative hidden overflow-hidden bg-slate-950 text-white md:block">
         <div className="absolute inset-0">
           <Image
             src={property.heroImage.src}
@@ -137,15 +141,10 @@ export default async function PropertyDetailPage({
                 <div className="text-xs font-semibold text-slate-500">ราคา/ไร่</div>
                 <div className="mt-1 text-xl font-black sm:text-2xl">{property.pricePerRai}</div>
               </div>
-              {!isSoldOut && property.referralReward && (
-                <div className="rounded-2xl border border-gold-400/60 bg-[#071d4a]/92 px-4 py-4 shadow-lg sm:px-5">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-100">
-                    <BadgeDollarSign size={16} className="text-gold-400" />
-                    ค่าแนะนำ
-                  </div>
-                  <div className="mt-1 text-xl font-black text-gold-400 sm:text-2xl">
-                    {property.referralReward}
-                  </div>
+              {totalPriceLabel && (
+                <div className="rounded-2xl bg-white/95 px-4 py-4 text-[#071d4a] shadow-lg sm:px-5">
+                  <div className="text-xs font-semibold text-slate-500">ราคารวม</div>
+                  <div className="mt-1 text-xl font-black sm:text-2xl">{totalPriceLabel}</div>
                 </div>
               )}
             </div>
@@ -153,7 +152,59 @@ export default async function PropertyDetailPage({
         </div>
       </section>
 
-      <section className="bg-slate-50 px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+      <section className="bg-white px-4 pb-5 pt-3 md:hidden">
+        <div className="mx-auto max-w-lg">
+          <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-100">
+            <Image
+              src={property.heroImage.src}
+              alt={property.heroImage.alt}
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
+            />
+          </div>
+          <div className="pt-4">
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">{property.location}</span>
+              <span className="rounded-full bg-purple-50 px-3 py-1.5 text-sm font-bold text-purple-700">{property.zoning}</span>
+              {isSoldOut && <span className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-bold text-red-700">ขายแล้ว</span>}
+            </div>
+            <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title}</h1>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <div className="text-sm text-slate-500">ขนาด</div>
+                <div className="mt-1 text-sm font-bold leading-snug text-slate-900">{property.size}</div>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <div className="text-sm text-slate-500">ราคา / ไร่</div>
+                <div className="mt-1 text-sm font-bold leading-snug text-brand-900">{property.pricePerRai}</div>
+              </div>
+              {totalPriceLabel && (
+                <div className="col-span-2 rounded-xl bg-brand-50 p-3">
+                  <div className="text-sm text-slate-500">{isSoldOut ? "ราคารวมเดิม" : "ราคารวม"}</div>
+                  <div className="mt-1 text-xl font-black text-brand-900">{totalPriceLabel}</div>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 space-y-3">
+              <ListingTrust land={land} />
+              <VerificationBadges land={land} />
+              <VerificationChecklist dimensions={landVerification(land)} />
+            </div>
+            <div className="mt-4">
+              <PropertyMobileActions
+                listingId={land.id}
+                listingRef={land.public_ref}
+                listingTitle={property.title}
+                soldOut={isSoldOut}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
         <div className="container-xl grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-8">
             <section className="card p-4 sm:p-6">
@@ -161,10 +212,10 @@ export default async function PropertyDetailPage({
                 <Ruler size={20} className="text-brand-600" />
                 <h2 className="text-xl font-bold text-slate-900">ข้อมูลที่ดิน</h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                 {property.facts.map((fact) => (
                   <div key={fact.label} className="min-w-0 rounded-xl bg-slate-50 p-4">
-                    <div className="text-xs font-semibold text-slate-400">{fact.label}</div>
+                    <div className="text-sm font-semibold text-slate-500">{fact.label}</div>
                     <div className="wrap-break-word mt-1 font-bold text-slate-800">{fact.value}</div>
                   </div>
                 ))}
@@ -238,9 +289,18 @@ export default async function PropertyDetailPage({
             <section>
               <div className="mb-5 flex items-center gap-2">
                 <MapPin size={20} className="text-brand-600" />
-                <h2 className="text-xl font-bold text-slate-900">รูปภาพและทำเล</h2>
+                <h2 className="text-xl font-bold text-slate-900">รูปภาพเพิ่มเติม</h2>
               </div>
-              <PropertyGallery images={property.gallery} title={property.title} />
+              <div className="md:hidden">
+                {mobileGallery.length > 0 ? (
+                  <PropertyGallery images={mobileGallery} title={property.title} />
+                ) : (
+                  <p className="text-sm text-slate-500">ไม่มีรูปเพิ่มเติม</p>
+                )}
+              </div>
+              <div className="hidden md:block">
+                <PropertyGallery images={property.gallery} title={property.title} />
+              </div>
             </section>
 
             {property.videos && property.videos.length > 0 && (
@@ -254,7 +314,7 @@ export default async function PropertyDetailPage({
             )}
           </div>
 
-          <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <aside className="hidden min-w-0 md:block lg:sticky lg:top-24 lg:self-start">
             <div className="card overflow-hidden">
               {isSoldOut ? (
                 <>
@@ -329,9 +389,19 @@ export default async function PropertyDetailPage({
         </div>
       </section>
 
+      {!isSoldOut && property.referralReward && (
+        <section className="container-xl px-4 py-5">
+          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">สำหรับพาร์ทเนอร์ผู้แนะนำ</div>
+            <p className="mt-1">{property.referralReward} ตามเงื่อนไขของดีล</p>
+            <Link href="/become-partner" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">ดูรายละเอียดการเป็นผู้แนะนำ →</Link>
+          </div>
+        </section>
+      )}
+
       {similar.length > 0 && <section className="container-xl section">
         <h2 className="mb-6 text-xl font-bold">ที่ดินใกล้เคียงที่ยังเปิดขาย</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} />)}</div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} publicBuyerMode />)}</div>
       </section>}
 
       <section className="px-4 py-10 sm:px-6 sm:py-12 lg:px-8">

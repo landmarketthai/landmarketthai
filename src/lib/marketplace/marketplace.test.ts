@@ -326,17 +326,15 @@ test("BuyerDemandList empty state is based on published public linkable demands"
   assert.match(source, /visible\.map\(/);
 });
 
-test("homepage keeps one map, featured inventory and a compact demand fallback", () => {
+test("homepage keeps one open-listing set, no embedded map, and a compact demand fallback", () => {
   const source = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
-  assert.equal((source.match(/<HomePropertyMap\b/g) ?? []).length, 1);
+  assert.equal((source.match(/<HomePropertyMap\b/g) ?? []).length, 0);
   assert.doesNotMatch(source, /PropertyMapPreview/);
-  assert.match(source, /getFeaturedListings\(6\)/);
-  assert.match(source, /sortedListings\.map\(/);
-  assert.match(source, /buyerDemands\.length > 0 \? <section/);
-  const fallback = source.split("</section> : <section")[1]?.split("</section>}")[0];
-  assert.ok(fallback);
-  assert.match(fallback, /href="\/buy-request"/);
-  assert.doesNotMatch(fallback, /href="\/buyer-demand"|BuyerDemandList|py-12|py-14/);
+  assert.match(source, /getFeaturedListings\(12\)/);
+  assert.match(source, /openListings\.map\(/);
+  assert.match(source, /buyerDemands === null/);
+  assert.match(source, /href="\/buy-request"/);
+  assert.match(source, /href="\/search\?view=map"/);
 });
 
 test("public demand cards and detail metadata only render allowlisted typed criteria", () => {
@@ -442,13 +440,43 @@ test("buyer province filtering is parameterized and agrees with the in-memory re
   assert.equal(propertyMatchesSearchFilters(rayong, { location_terms: ["nowhere"] }), false);
 });
 
-test("home list scrolls on mobile and the benefit strip only overlaps above the mobile hero breakpoint", () => {
-  const map = readFileSync(new URL("../../components/search/HomePropertyMap.tsx", import.meta.url), "utf8");
-  assert.match(map, /<ul className="[^"\n]*max-h-\[480px\][^"\n]*overflow-y-auto[^"\n]*overscroll-contain/);
+test("homepage is buyer-first on mobile and sends map use to /search", () => {
   const home = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
-  assert.match(home, /bottom-0[^"\n]*md:hidden/);
-  assert.doesNotMatch(home, /sm:-mt-/);
-  assert.match(home, /mt-4[^"\n]*md:-mt-36/);
+  const sticky = readFileSync(new URL("../../components/ui/MobileStickyCta.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(home, /HomePropertyMap/);
+  assert.match(home, /ค้นหาอสังหาริมทรัพย์ที่ตรงความต้องการ/);
+  assert.match(home, /ทรัพย์แนะนำที่เปิดขาย/);
+  assert.match(home, /ผลงานปิดการขาย/);
+  assert.match(home, /publicBuyerMode/);
+  assert.doesNotMatch(home, /มีคอนเนกชันนักลงทุนหรือเจ้าของโรงงาน\?/);
+  assert.match(sticky, /href="\/buy-request"/);
+  assert.match(sticky, /ฝากความต้องการซื้อ/);
+  assert.doesNotMatch(sticky, /สมัครผู้แนะนำ/);
+});
+
+test("mobile property detail keeps buyer actions sticky and referral rewards secondary", () => {
+  const actions = readFileSync(new URL("../../components/properties/PropertyMobileActions.tsx", import.meta.url), "utf8");
+  assert.match(actions, /fixed inset-x-0 bottom-0[\s\S]*md:hidden/);
+  assert.match(actions, /href="tel:0860555595"/);
+  assert.match(actions, /ทัก LINE/);
+  assert.match(actions, /onClick=\{\(\) => setOpen\(true\)\}[\s\S]*ขอข้อมูล/);
+  assert.match(actions, /<LeadForm[\s\S]*listingId=\{listingId\}/);
+
+  const card = readFileSync(new URL("../../components/listings/ListingCard.tsx", import.meta.url), "utf8");
+  assert.match(card, /publicBuyerMode = false/);
+  assert.match(card, /!publicBuyerMode && !isSoldOut && land\.referral_reward_max != null/);
+
+  for (const rel of [
+    "../../components/listings/ListingGrid.tsx",
+    "../../components/listings/PropertySearchResults.tsx",
+    "../../components/forms/BuyerRequirementForm.tsx",
+  ]) {
+    assert.match(readFileSync(new URL(rel, import.meta.url), "utf8"), /publicBuyerMode/);
+  }
+
+  const flagship = readFileSync(new URL("../../app/property/[slug]/page.tsx", import.meta.url), "utf8");
+  assert.match(flagship, /md:hidden[\s\S]*aspect-video[\s\S]*<h1[\s\S]*ราคารวม[\s\S]*VerificationChecklist[\s\S]*PropertyMobileActions/);
+  assert.match(flagship, /สำหรับพาร์ทเนอร์ผู้แนะนำ/);
 });
 
 test("location choices are a strict hierarchy from listing data", () => {

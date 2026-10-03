@@ -8,14 +8,14 @@ const STATE_STYLE = {
 
 export default function VerificationChecklist({ dimensions }: { dimensions: VerificationDimension[] }) {
   return (
-    <ul className="grid gap-2 sm:grid-cols-2">
+    <ul className="grid grid-cols-2 gap-2">
       {dimensions.map((dimension) => {
         const style = STATE_STYLE[dimension.state];
         return (
           <li key={dimension.key} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${style.className}`}>
             <span aria-hidden="true" className="mt-0.5 w-4 shrink-0 text-center font-black">{style.icon}</span>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold opacity-70">{dimension.title}</div>
+              <div className="text-sm font-semibold opacity-70">{dimension.title}</div>
               <div className="text-sm font-semibold leading-snug">{dimension.label}</div>
             </div>
           </li>

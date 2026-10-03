@@ -26,6 +26,16 @@ export interface VerificationInput {
   title_deed_on_file: boolean;
 }
 
+export const VERIFICATION_TITLES: Record<VerificationKey, string> = {
+  review: "ทีมงานตรวจสอบประกาศ",
+  owner: "ตัวตนเจ้าของ / ผู้ส่งข้อมูล",
+  document: "เอกสารสิทธิ์",
+  location: "ตำแหน่งแปลง",
+  zoning: "ผังเมือง",
+  price: "ราคา",
+  recency: "ความใหม่ของข้อมูลประกาศ",
+};
+
 export const RECENT_UPDATE_DAYS = 30;
 
 /** Only a literal stored review result counts; null/missing/unknown values are never treated as verified. */
@@ -43,7 +53,7 @@ export function verificationDimensions(input: VerificationInput, now: Date = new
   return [
     {
       key: "review",
-      title: "ทีมงานตรวจสอบประกาศ",
+      title: VERIFICATION_TITLES.review,
       state: reviewed ? "ok" : "missing",
       label: reviewed
         ? "ทีมงานตรวจสอบประกาศแล้ว (ไม่ใช่การรับรองทุกข้อมูล)"
@@ -51,20 +61,20 @@ export function verificationDimensions(input: VerificationInput, now: Date = new
     },
     {
       key: "owner",
-      title: "ตัวตนเจ้าของ / ผู้ส่งข้อมูล",
+      title: VERIFICATION_TITLES.owner,
       state: "missing",
       label: "ยังไม่มีการยืนยันตัวตนเจ้าของในระบบ",
     },
     {
       key: "document",
-      title: "เอกสารสิทธิ์",
+      title: VERIFICATION_TITLES.document,
       // A stored title-deed copy is not a document check; no document-verification field exists yet.
       state: input.title_deed_on_file ? "partial" : "missing",
       label: input.title_deed_on_file ? "มีสำเนาโฉนดในระบบ — ยังไม่ได้บันทึกผลตรวจเอกสาร" : "ยังไม่มีสำเนาโฉนดในระบบ",
     },
     {
       key: "location",
-      title: "ตำแหน่งแปลง",
+      title: VERIFICATION_TITLES.location,
       // "exact" is coordinate precision, not a location check; no location-verification field exists yet.
       state: hasCoords ? "partial" : "missing",
       label: !hasCoords
@@ -73,20 +83,20 @@ export function verificationDimensions(input: VerificationInput, now: Date = new
     },
     {
       key: "zoning",
-      title: "ผังเมือง",
+      title: VERIFICATION_TITLES.zoning,
       state: input.zoning ? "partial" : "missing",
       label: input.zoning ? `${ZONING_LABELS[input.zoning]} (ตามข้อมูลประกาศ ยังไม่ได้ตรวจกับผังเมือง)` : "ยังไม่ระบุผังเมือง",
     },
     {
       key: "price",
-      title: "ราคา",
+      title: VERIFICATION_TITLES.price,
       // Price presence only; there is no price_updated_at, so nothing is claimed about price recency.
       state: input.price == null ? "missing" : "partial",
       label: input.price == null ? "ยังไม่ระบุราคา" : "มีราคาในประกาศ — ไม่มีบันทึกวันที่ปรับราคา",
     },
     {
       key: "recency",
-      title: "ความใหม่ของข้อมูลประกาศ",
+      title: VERIFICATION_TITLES.recency,
       state: ageDays == null ? "missing" : ageDays <= RECENT_UPDATE_DAYS ? "ok" : "partial",
       label: updatedLabel ? `ข้อมูลประกาศอัปเดต ${updatedLabel}` : "ไม่ทราบวันที่อัปเดตข้อมูลประกาศ",
     },
