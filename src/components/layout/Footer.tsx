@@ -47,6 +47,10 @@ export default function Footer({ showBlog = true, showBuyerDemand = true }: { sh
               แพลตฟอร์มค้นหาและฝากขายอสังหาริมทรัพย์
               ตรวจสอบข้อมูลก่อนทุกครั้ง
             </p>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              ดำเนินการโดย ภัทรนาวินท์ กิจการนนท์<br />
+              โทร <a href="tel:0860555595" className="hover:text-slate-300">086-055-5595</a>
+            </p>
             <Link
               href={LINE_OA}
               target="_blank"

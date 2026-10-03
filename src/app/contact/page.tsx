@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Phone, MessageCircle, MapPin } from "lucide-react";
+import { Phone, MessageCircle, MapPin, UserRound } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import LeadForm from "@/components/forms/LeadForm";
 
@@ -20,11 +20,25 @@ const contactItems = [
     primary: true,
   },
   {
-    icon: <Phone size={20} />,
-    label: "โทรศัพท์ (ตามการนัดหมาย)",
-    value: "นัดหมายผ่าน LINE OA ก่อนโทร",
+    icon: <UserRound size={20} />,
+    label: "ผู้ดำเนินการ LandmarketThai",
+    value: "ภัทรนาวินท์ กิจการนนท์",
     href: null,
-    note: "สำหรับผู้ที่ได้รับการติดต่อจากทีมงานแล้ว หรือต้องการนัดหมายโดยตรง",
+    note: "เจ้าของและผู้ดำเนินการแพลตฟอร์ม LandmarketThai ในฐานะบุคคลธรรมดา",
+  },
+  {
+    icon: <Phone size={20} />,
+    label: "โทรศัพท์",
+    value: "086-055-5595",
+    href: "tel:0860555595",
+    note: "ติดต่อสอบถามเรื่องประกาศ ฝากขาย ฝากซื้อ และการนัดหมาย",
+  },
+  {
+    icon: <MapPin size={20} />,
+    label: "ที่อยู่ติดต่อ",
+    value: "9/19 ซอยทุ่งเศรษฐี 7 แขวงดอกไม้ เขตประเวศ กรุงเทพมหานคร 10250",
+    href: null,
+    note: "ที่อยู่สำหรับการติดต่อผู้ดำเนินการ LandmarketThai",
   },
   {
     icon: <MapPin size={20} />,

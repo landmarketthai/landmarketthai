@@ -201,6 +201,15 @@ test("public source cannot reintroduce duplicate listing hrefs, prohibited claim
     assert.doesNotMatch(source, /["'`]\/properties\//, url.pathname);
     assert.doesNotMatch(source, /ใหญ่ที่สุด|น่าเชื่อถือที่สุด|พาร์ทเนอร์กว่า 200\+? ราย|ทีม LandmarketThai ที่มีใบอนุญาต|EEC ทั่วไทย/, url.pathname);
   }
+  for (const route of ["about", "contact"]) {
+    const source = read(`../app/${route}/page.tsx`);
+    assert.match(source, /ภัทรนาวินท์ กิจการนนท์/);
+    assert.match(source, /086-055-5595|0860555595/);
+  }
+  assert.match(read("../app/about/page.tsx"), /9\/19 ซอยทุ่งเศรษฐี 7 แขวงดอกไม้ เขตประเวศ กรุงเทพมหานคร 10250/);
+  assert.match(read("../app/contact/page.tsx"), /9\/19 ซอยทุ่งเศรษฐี 7 แขวงดอกไม้ เขตประเวศ กรุงเทพมหานคร 10250/);
+  assert.doesNotMatch(read("../app/about/page.tsx"), /บริษัท .*จำกัด|เลขทะเบียนนิติบุคคล/);
+  assert.doesNotMatch(read("../app/contact/page.tsx"), /บริษัท .*จำกัด|เลขทะเบียนนิติบุคคล/);
   assert.doesNotMatch(read("../app/layout.tsx"), /keywords:/);
   assert.doesNotMatch(read("../app/how-it-works/page.tsx"), /รับเงินทันที|สูงสุดหลายล้านบาทต่อดีล|โดยทั่วไป 1–3%/);
   assert.match(read("../components/properties/PropertyGallery.tsx"), /filter\(\(\{ index \}\) => index !== selectedIndex\)/);
