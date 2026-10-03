@@ -27,7 +27,7 @@ export default async function AdminDealDetailPage({ params }: { params: Promise<
     ["สถานะลีดผู้ซื้อ", deal.buyer_status ? LEAD_STATUS_LABELS[deal.buyer_status] ?? deal.buyer_status : "-"],
     ["โทรศัพท์ผู้ซื้อ", deal.buyer_phone ? <a href={`tel:${deal.buyer_phone}`} className="text-brand-600">{deal.buyer_phone}</a> : "-"],
     ["LINE ผู้ซื้อ", deal.buyer_line_id ?? "-"],
-    ["ทรัพย์", deal.land_slug ? <Link href={`/properties/${deal.land_slug}`} className="text-brand-600">{deal.land_title ?? deal.land_slug}</Link> : deal.title ?? "-"],
+    ["ทรัพย์", deal.land_slug ? <Link href={`/properties/${deal.land_slug}`} className="text-brand-600">{deal.land_title ?? deal.land_slug}</Link> : deal.listing_title ?? "-"],
     ["รหัสประกาศ", deal.listing_ref ?? "-"],
     ["land_id", deal.land_id ?? "-"],
     ["พาร์ทเนอร์ผู้แนะนำ", deal.partner_name ?? "-"],
@@ -44,7 +44,7 @@ export default async function AdminDealDetailPage({ params }: { params: Promise<
   return <main className="container-xl section space-y-6">
     <Link href="/admin/deals" className="text-sm text-brand-600">← ไปป์ไลน์ดีล</Link>
     <header>
-      <h1 className="break-words text-3xl font-bold">{deal.title ?? deal.listing_ref ?? "ดีล"}</h1>
+      <h1 className="break-words text-3xl font-bold">{deal.listing_title ?? deal.listing_ref ?? "ดีล"}</h1>
       <p className="mt-1 break-words text-xs text-slate-500">ข้อมูลภายในสำหรับผู้ดูแลเท่านั้น · {deal.id}</p>
     </header>
     <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">

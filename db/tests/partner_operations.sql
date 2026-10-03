@@ -24,7 +24,7 @@ begin
     insert into partners(lead_id,name,phone,referral_code) values(l,'Duplicate','0812345678','duplicate');
     raise exception 'Duplicate lead accepted';
   exception when unique_violation then null; end;
-  insert into deals(id,partner_id,stage,expected_commission,commission_paid) values(d,p.id,'won',100,0),(d2,p.id,'new',200,5);
+  insert into deals(id,partner_id,stage,expected_commission,commission_paid) values(d,p.id,'won',100,0),(d2,p.id,'qualified',200,5);
   begin
     update deals set commission_paid = -1 where id = d;
     raise exception 'Direct negative payment accepted';
@@ -73,5 +73,18 @@ begin
   perform operations_partner_status(p.id,'inactive','staff');
   perform operations_partner_status(p.id,'inactive','staff');
   assert (select count(*) = 1 from events where event_type = 'partner_status_changed' and entity_id = p.id), 'Status retry duplicated event';
+  update partners set status = null where id = p.id;
+  perform operations_partner_status(p.id,'active','staff');
+  assert (select status = 'active' from partners where id = p.id), 'Nullable text status was not updated';
+  assert exists(select 1 from events where entity_id = p.id and event_type = 'partner_status_changed'
+    and meta->'previous' = 'null'::jsonb and meta->>'status' = 'active'), 'Null previous status audit missing';
+  begin
+    perform operations_partner_status(p.id,null,'staff');
+    raise exception 'Null partner status accepted';
+  exception when invalid_parameter_value then null; end;
+  begin
+    perform operations_deal_commission(d2,200,null,false,'staff');
+    raise exception 'Null paid commission accepted';
+  exception when invalid_parameter_value then null; end;
 end $$;
 rollback;

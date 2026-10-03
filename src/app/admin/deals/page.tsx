@@ -43,7 +43,7 @@ export default async function AdminDealsPage({ searchParams }: { searchParams: P
             <p className="text-xs text-slate-500">มูลค่า {baht(bucket.value)} · คอมฯ คาด {baht(bucket.commission)}</p>
             <ul className="mt-3 space-y-2">
               {bucket.deals.map((deal) => <li key={deal.id}><Link href={`/admin/deals/${deal.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-brand-500">
-                <span className="block break-words font-semibold">{deal.title ?? deal.listing_ref ?? deal.id.slice(0, 8)}</span>
+                <span className="block break-words font-semibold">{deal.listing_title ?? deal.listing_ref ?? deal.id.slice(0, 8)}</span>
                 <span className="block break-words text-slate-600">{deal.buyer_name ?? "ไม่มีลีดผู้ซื้อ"}{deal.partner_name ? ` · แนะนำโดย ${deal.partner_name}` : ""}</span>
                 <span className="block text-slate-500">{deal.deal_value != null ? `${baht(deal.deal_value)} บาท` : "ยังไม่ระบุมูลค่า"} · {deal.assigned_to ?? "ยังไม่มีผู้รับผิดชอบ"}</span>
               </Link></li>)}

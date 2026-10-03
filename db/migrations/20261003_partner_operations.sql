@@ -1,7 +1,7 @@
 -- Staff operations only. Apply to a reviewed non-production database first.
 begin;
 alter table deals add column if not exists expected_commission numeric(18,2);
-alter table deals add column if not exists stage text not null default 'new';
+alter table deals add column if not exists stage text not null default 'qualified';
 alter table deals add column if not exists updated_at timestamptz not null default now();
 alter table referral_attributions add column if not exists deal_id uuid references deals(id);
 do $$ begin
@@ -29,7 +29,7 @@ declare l leads; p partners; attempt integer := 0;
 begin
   select * into l from leads where id = p_lead for update;
   if not found then raise exception 'Partner lead not found' using errcode = 'P0002'; end if;
-  if l.lead_type <> 'partner' then raise exception 'Not a partner lead' using errcode = '22023'; end if;
+  if l.lead_type::text is distinct from 'partner' then raise exception 'Not a partner lead' using errcode = '22023'; end if;
   select * into p from partners where lead_id = p_lead;
   if found then return p; end if;
   loop
@@ -57,9 +57,9 @@ begin
   end if;
   select * into p from partners where id = p_id for update;
   if not found then raise exception 'Partner not found' using errcode = 'P0002'; end if;
-  previous := p.status::text;
+  previous := p.status;
   if previous = p_status then return p; end if;
-  update partners set status = p_status::partner_status_enum, updated_at = now() where id = p_id returning * into p;
+  update partners set status = p_status, updated_at = now() where id = p_id returning * into p;
   insert into events(event_type, entity_type, entity_id, meta)
   values('partner_status_changed', 'partner', p.id,
     jsonb_build_object('actor_id', p_actor, 'previous', previous, 'status', p_status));

@@ -86,14 +86,14 @@ export function LeadCrmForm({ lead, assignees }: { lead: Pick<Lead, "id" | "stat
 
 export function DealCreateForm({ buyerLeadId, assignees }: { buyerLeadId: string; assignees: string[] }) {
   const { busy, error, message, send, router } = useSubmit();
-  const [form, setForm] = useState({ land_id: "", listing_ref: "", title: "", deal_value: "", expected_commission: "", assigned_to: "", notes: "" });
+  const [form, setForm] = useState({ land_id: "", listing_ref: "", listing_title: "", deal_value: "", expected_commission: "", assigned_to: "", notes: "" });
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const field = (key: keyof typeof form) => ({ value: form[key], disabled: busy, className: "input", onChange: (event: { target: { value: string } }) => setForm((current) => ({ ...current, [key]: event.target.value })) });
   async function submit(event: FormEvent) {
     event.preventDefault();
     setDuplicateId(null);
     const body: Record<string, unknown> = { buyer_lead_id: buyerLeadId };
-    for (const key of ["land_id", "listing_ref", "title", "assigned_to", "notes"] as const) if (form[key].trim()) body[key] = form[key].trim();
+    for (const key of ["land_id", "listing_ref", "listing_title", "assigned_to", "notes"] as const) if (form[key].trim()) body[key] = form[key].trim();
     for (const key of ["deal_value", "expected_commission"] as const) if (form[key].trim()) body[key] = money(form[key]);
     const result = await send("/api/admin/deals", "POST", body);
     if (result?.ok) router.push(`/admin/deals/${result.data.id}`);
@@ -105,7 +105,7 @@ export function DealCreateForm({ buyerLeadId, assignees }: { buyerLeadId: string
     <div className="grid gap-3 sm:grid-cols-3">
       <label className="min-w-0"><span className="label">land_id (UUID)</span><input {...field("land_id")} autoComplete="off" spellCheck={false} /></label>
       <label className="min-w-0"><span className="label">รหัสประกาศ</span><input {...field("listing_ref")} maxLength={80} /></label>
-      <label className="min-w-0"><span className="label">ชื่อทรัพย์</span><input {...field("title")} maxLength={200} /></label>
+      <label className="min-w-0"><span className="label">ชื่อทรัพย์</span><input {...field("listing_title")} maxLength={200} /></label>
       <label className="min-w-0"><span className="label">มูลค่าดีล (บาท)</span><input {...field("deal_value")} type="number" min={0} step="any" inputMode="decimal" /></label>
       <label className="min-w-0"><span className="label">ค่าคอมฯ ที่คาด (บาท)</span><input {...field("expected_commission")} type="number" min={0} step="any" inputMode="decimal" /></label>
       <label className="min-w-0"><span className="label">ผู้รับผิดชอบ</span><input {...field("assigned_to")} list="deal-create-assignees" maxLength={120} /><Assignees id="deal-create-assignees" values={assignees} /></label>

@@ -28,11 +28,11 @@ export async function getPartners(): Promise<PartnerRow[]> {
       from referral_attributions a left join deals linked on linked.id = a.deal_id
       where a.partner_id = p.id or (a.partner_id is null and a.referral_code = p.referral_code)) a
     cross join lateral (select
-      count(*) filter(where stage::text not in ('won','lost','cancelled') and status::text = 'in_progress') open_count,
+      count(*) filter(where stage::text not in ('won','lost') and status::text = 'in_progress') open_count,
       count(*) filter(where stage::text = 'won') won_count,
       coalesce(sum(expected_commission),0) expected, coalesce(sum(commission_paid),0) paid,
       coalesce(sum(greatest(coalesce(expected_commission,0) - coalesce(commission_paid,0),0)) filter(where stage::text = 'won'),0) payable,
-      coalesce(sum(expected_commission) filter(where stage::text not in ('won','lost','cancelled') and status::text = 'in_progress'),0) projected
+      coalesce(sum(expected_commission) filter(where stage::text not in ('won','lost') and status::text = 'in_progress'),0) projected
       from deals where partner_id = p.id) d
     order by p.created_at desc, p.id`);
   return rows as PartnerRow[];

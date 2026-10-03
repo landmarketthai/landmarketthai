@@ -131,9 +131,11 @@ test("deal create requires a buyer lead and property reference and maps duplicat
   await check(deals.POST, { buyer_lead_id: id }, 400);
   await check(deals.POST, { land_id: id }, 400);
   await check(deals.POST, { buyer_lead_id: id, land_id: "x" }, 400);
-  await check(deals.POST, { buyer_lead_id: id, title: "T", deal_value: -1 }, 400);
-  await check(deals.POST, { buyer_lead_id: id, title: "T", stage: "won" }, 400);
+  await check(deals.POST, { buyer_lead_id: id, listing_title: "T", deal_value: -1 }, 400);
+  await check(deals.POST, { buyer_lead_id: id, listing_title: "T", stage: "won" }, 400);
+  await check(deals.POST, { buyer_lead_id: id, title: "Old field" }, 400);
   assert.equal(state.dbCalls, 0);
+  await check(deals.POST, { buyer_lead_id: id, listing_title: "Title only" }, 201);
   assert.equal((await check(deals.POST, { buyer_lead_id: id, land_id: id, deal_value: 1_000_000 }, 201)).body.id, id);
   assert.equal(state.events.at(-1)!.eventType, "crm_deal_created");
   await check(deals.POST, { buyer_lead_id: id, listing_ref: "LMT-1" }, 201);

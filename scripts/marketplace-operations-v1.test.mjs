@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const MIGRATION_PATH = "../db/migrations/20261003_marketplace_operations_v1.sql";
-const migration = () => readFileSync(new URL(MIGRATION_PATH, import.meta.url), "utf8");
+const migration = () => readFileSync(new URL(MIGRATION_PATH, import.meta.url), "utf8").replaceAll("\r\n", "\n");
 
 test("leads gains the reminder-scheduling columns with claim indexes", () => {
   const sql = migration();
@@ -28,8 +28,9 @@ test("deals pipeline columns exist, land_id/deal_value are relaxed via guarded D
   assert.ok(createDeals, "deals base table definition found");
   assert.doesNotMatch(createDeals, /land_id\s+uuid\s+not null/);
   assert.doesNotMatch(createDeals, /deal_value\s+numeric\(18,2\)\s+not null/);
-  // status enum values are declared once, exactly matching the existing contract.
-  assert.match(sql, /create type deal_status_enum as enum \('in_progress', 'closed', 'cancelled'\);/);
+  assert.match(createDeals, /status\s+text\s+not null default 'in_progress'/);
+  assert.doesNotMatch(sql, /deal_status_enum/);
+  assert.match(sql, /alter table deals alter column stage set default 'qualified';/);
 
   // Guarded relaxation: must check is_nullable = 'NO' before dropping not null, for both columns.
   const guardBlock = sql.match(/do \$\$\nbegin\n(?:(?!^end \$\$;)[\s\S])*alter table deals alter column land_id drop not null;[\s\S]*?end \$\$;/m)?.[0];

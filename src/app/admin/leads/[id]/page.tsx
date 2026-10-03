@@ -61,7 +61,7 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
         <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="text-lg font-semibold">ดีลของลีดนี้</h2>
           {!lead.deals.length ? <p className="mt-2 text-sm text-slate-500">ยังไม่มีดีล</p>
-            : <ul className="mt-2 space-y-2 text-sm">{lead.deals.map((deal) => <li key={deal.id}><Link href={`/admin/deals/${deal.id}`} className="text-brand-600">{deal.title ?? deal.id.slice(0, 8)}</Link> · {DEAL_STAGE_LABELS[deal.stage] ?? deal.stage}</li>)}</ul>}
+            : <ul className="mt-2 space-y-2 text-sm">{lead.deals.map((deal) => <li key={deal.id}><Link href={`/admin/deals/${deal.id}`} className="text-brand-600">{deal.listing_title ?? deal.id.slice(0, 8)}</Link> · {DEAL_STAGE_LABELS[deal.stage] ?? deal.stage}</li>)}</ul>}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="text-lg font-semibold">ประวัติการติดตาม</h2>

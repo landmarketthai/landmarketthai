@@ -256,7 +256,7 @@ export interface Deal {
   id: string;
   land_id: string | null;
   listing_ref: string | null;
-  title: string | null;
+  listing_title: string | null;
   buyer_lead_id: string | null;
   partner_id: string | null;
   referral_code: string | null;

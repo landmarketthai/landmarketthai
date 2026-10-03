@@ -44,12 +44,12 @@ export const dealCreateSchema = z.object({
   buyer_lead_id: uuidSchema,
   land_id: uuidSchema.optional(),
   listing_ref: z.string().trim().min(1).max(80).optional(),
-  title: z.string().trim().min(1).max(200).optional(),
+  listing_title: z.string().trim().min(1).max(200).optional(),
   deal_value: money.optional(),
   expected_commission: money.optional(),
   assigned_to: owner.optional(),
   notes: z.string().trim().max(4000).optional(),
-}).strict().refine((value) => Boolean(value.land_id || value.listing_ref || value.title), {
+}).strict().refine((value) => Boolean(value.land_id || value.listing_ref || value.listing_title), {
   path: ["land_id"], message: "ระบุทรัพย์ (land_id) หรือรหัส/ชื่อประกาศ",
 });
 export type DealCreateInput = z.infer<typeof dealCreateSchema>;

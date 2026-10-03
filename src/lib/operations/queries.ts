@@ -27,7 +27,7 @@ export type CrmLogEntry = { at: string; by: string; type: "status" | "note" | "a
 export type LeadListItem = Omit<Lead, "details" | "consent_pdpa" | "consent_at">;
 export interface LeadDetail extends Lead {
   referrals: { id: string; referral_code: string; partner_id: string | null; partner_name: string | null; converted: boolean; deal_id: string | null; first_touch_at: string }[];
-  deals: { id: string; stage: DealStage; status: DealStatus; title: string | null }[];
+  deals: { id: string; stage: DealStage; status: DealStatus; listing_title: string | null }[];
 }
 export interface LeadSummary { total: number; byStatus: Record<string, number>; overdue: number; unassigned: number }
 
@@ -112,7 +112,7 @@ export async function getLead(id: string): Promise<LeadDetail | null> {
           order by ra.first_touch_at), '[]'::jsonb)
         from referral_attributions ra left join partners p on p.id = ra.partner_id where ra.lead_id = l.id) as referrals,
        (select coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'stage', d.stage, 'status', d.status,
-          'title', coalesce(d.title, la.title_th, d.listing_ref)) order by d.created_at desc), '[]'::jsonb)
+          'listing_title', coalesce(d.listing_title, la.title_th, d.listing_ref)) order by d.created_at desc), '[]'::jsonb)
         from deals d left join lands la on la.id = d.land_id where d.buyer_lead_id = l.id) as deals
      from leads l where l.id = $1`,
     [id],
@@ -134,7 +134,7 @@ export async function updateLead(id: string, input: LeadUpdateInput, log: CrmLog
        assigned_to = case when $3 then $4 else assigned_to end,
        next_action_at = case when $5 then $6::timestamptz else next_action_at end,
        details = case when jsonb_array_length($7::jsonb) = 0 then details
-         else jsonb_set(coalesce(details, '{}'::jsonb), '{crm_log}', coalesce(details->'crm_log', '[]'::jsonb) || $7::jsonb) end,
+         else jsonb_set(coalesce(details, '{}'::jsonb), '{crm_log}', case when jsonb_typeof(details->'crm_log') = 'array' then details->'crm_log' else '[]'::jsonb end || $7::jsonb) end,
        updated_at = now()
      where id = $1 and updated_at = $8::timestamptz
      returning id`,
@@ -144,7 +144,7 @@ export async function updateLead(id: string, input: LeadUpdateInput, log: CrmLog
   return rows.length > 0;
 }
 
-export type DealListItem = Pick<Deal, "id" | "stage" | "status" | "deal_value" | "expected_commission" | "assigned_to" | "land_id" | "listing_ref" | "title" | "buyer_lead_id" | "referral_code" | "closed_at" | "created_at" | "updated_at"> & {
+export type DealListItem = Pick<Deal, "id" | "stage" | "status" | "deal_value" | "expected_commission" | "assigned_to" | "land_id" | "listing_ref" | "listing_title" | "buyer_lead_id" | "referral_code" | "closed_at" | "created_at" | "updated_at"> & {
   buyer_name: string | null; partner_name: string | null;
 };
 export interface DealDetail extends Deal {
@@ -153,7 +153,7 @@ export interface DealDetail extends Deal {
   referrals: { id: string; referral_code: string; converted: boolean; lead_id: string }[];
 }
 
-const dealSelect = (extra = "") => `select d.id, d.land_id, d.listing_ref, coalesce(d.title, la.title_th) as title, d.buyer_lead_id,
+const dealSelect = (extra = "") => `select d.id, d.land_id, d.listing_ref, coalesce(d.listing_title, la.title_th) as listing_title, d.buyer_lead_id,
   d.partner_id, d.referral_code, d.deal_value, d.commission_paid, d.expected_commission, d.status, d.stage, d.assigned_to,
   d.closed_at, d.notes, d.created_at, ${version("d")}, la.title_th as land_title, la.slug as land_slug,
   bl.name as buyer_name, bl.phone as buyer_phone, bl.line_id as buyer_line_id, bl.status::text as buyer_status, p.name as partner_name${extra}
@@ -164,7 +164,7 @@ function normalizeDeal(row: Record<string, unknown>): DealDetail {
     id: String(row.id),
     land_id: str(row.land_id),
     listing_ref: str(row.listing_ref),
-    title: str(row.title),
+    listing_title: str(row.listing_title),
     buyer_lead_id: str(row.buyer_lead_id),
     partner_id: str(row.partner_id),
     referral_code: str(row.referral_code),
@@ -234,10 +234,10 @@ export async function createDeal(input: DealCreateInput): Promise<CreateDealResu
      ), existing as (
        select d.id from deals d where d.buyer_lead_id = $1 and (
          ($2::uuid is not null and d.land_id = $2::uuid)
-         or ($2::uuid is null and d.land_id is null and lower(coalesce(d.listing_ref, d.title, '')) = lower(coalesce($3, $4, ''))))
+         or ($2::uuid is null and d.land_id is null and lower(coalesce(d.listing_ref, d.listing_title, '')) = lower(coalesce($3, $4, ''))))
        limit 1
      ), inserted as (
-       insert into deals (land_id, listing_ref, title, buyer_lead_id, partner_id, referral_code,
+       insert into deals (land_id, listing_ref, listing_title, buyer_lead_id, partner_id, referral_code,
          deal_value, expected_commission, status, stage, assigned_to, notes)
        select $2::uuid, $3::text, $4::text, lead.id,
          coalesce((select partner_id from attribution), (select p.id from partners p where p.referral_code = lead.referral_code limit 1)),
@@ -248,12 +248,12 @@ export async function createDeal(input: DealCreateInput): Promise<CreateDealResu
        returning id
      ), linked as (
        update referral_attributions ra set deal_id = inserted.id
-       from inserted, attribution where ra.id = attribution.id and attribution.deal_id is null
+       from inserted, attribution where ra.id = attribution.id and attribution.deal_id is null and ra.deal_id is null
        returning ra.id
      )
      select (select id from inserted) as id, (select id from existing) as existing_id,
        exists (select 1 from lead) as lead_ok, (select id from linked) as attribution_id`,
-    [input.buyer_lead_id, input.land_id ?? null, input.listing_ref ?? null, input.title ?? null,
+    [input.buyer_lead_id, input.land_id ?? null, input.listing_ref ?? null, input.listing_title ?? null,
       input.deal_value ?? null, input.expected_commission ?? null, input.assigned_to ?? null, input.notes || null],
   );
   const row = rows[0] ?? {};
@@ -288,13 +288,13 @@ export async function updateDeal(
        returning id, buyer_lead_id, referral_code
      ), won_lead as (
        update leads l set status = 'won', updated_at = now(),
-         details = jsonb_set(coalesce(l.details, '{}'::jsonb), '{crm_log}', coalesce(l.details->'crm_log', '[]'::jsonb) || $15::jsonb)
-       from updated u where $14 = 'won' and l.id = u.buyer_lead_id and l.status::text <> 'won'
+         details = jsonb_set(coalesce(l.details, '{}'::jsonb), '{crm_log}', case when jsonb_typeof(l.details->'crm_log') = 'array' then l.details->'crm_log' else '[]'::jsonb end || $15::jsonb)
+       from updated u where $14 = 'won' and l.id = u.buyer_lead_id and l.status::text is distinct from 'won'
        returning l.id
      ), converted as (
        update referral_attributions ra set converted = ($14 = 'won'), deal_id = u.id
        from updated u
-       where ($14 = 'won' and (ra.deal_id = u.id or (ra.lead_id = u.buyer_lead_id and ra.referral_code = u.referral_code and not ra.converted)))
+       where ($14 = 'won' and (ra.deal_id = u.id or (ra.lead_id = u.buyer_lead_id and ra.referral_code = u.referral_code and ra.deal_id is null and not coalesce(ra.converted, false))))
           or ($14 = 'unwon' and ra.deal_id = u.id)
        returning ra.id
      )

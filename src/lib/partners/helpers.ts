@@ -33,7 +33,7 @@ export function commissionSummary(deals: CommissionDeal[]) {
     const payment = moneyCents(deal.commission_paid ?? '0');
     expected += estimate; paid += payment;
     if (deal.stage === 'won') payable += estimate > payment ? estimate - payment : BigInt(0);
-    else if (deal.status === 'in_progress' && !['lost', 'cancelled'].includes(deal.stage)) projected += estimate;
+    else if (deal.status === 'in_progress' && deal.stage !== 'lost') projected += estimate;
   }
   return { expected: moneyText(expected), paid: moneyText(paid), payable: moneyText(payable), projected: moneyText(projected) };
 }

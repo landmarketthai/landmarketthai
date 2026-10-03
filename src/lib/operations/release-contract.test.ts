@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { DEAL_STAGES, LEAD_STATUSES, LEAD_TRANSITIONS, dealClosureContract } from "./contracts.ts";
 
 const root = new URL("../../../", import.meta.url);
@@ -18,10 +17,11 @@ test("operations admin pages and APIs use the existing server-side admin guard",
   for (const section of ["leads", "deals", "partners"]) {
     for (const path of [`src/app/admin/${section}/page.tsx`, `src/app/admin/${section}/[id]/page.tsx`, `src/app/api/admin/${section}/route.ts`, `src/app/api/admin/${section}/[id]/route.ts`]) {
       const text = source(path);
-      assert.match(text, /getAdminUser\s*\(/, `${path} must call getAdminUser()`);
-      if (/(?:POST|PATCH|PUT|DELETE)\s*=/.test(text)) {
-        assert.match(text, /if\s*\(!?\s*admin\s*\)/, `${path} must reject non-admin mutations`);
-      }
+      const guard = path.includes('/api/admin/partners') ? source('src/lib/partners/api.ts') : text;
+      assert.match(guard, /await getSessionUser\(\)/, path);
+      assert.match(guard, /if \(!isAdminUserAllowed\((?:user|admin)\)\)/, path);
+      if (path.includes('/api/admin/partners')) assert.match(text, /await partnerAdmin\(\)/, path);
+      if (path.includes('/api/')) assert.match(guard, /private, no-store/, path);
     }
   }
 });
@@ -30,27 +30,26 @@ test("lead states and explicit terminal reopen semantics are fixed", () => {
   assert.deepEqual([...LEAD_STATUSES], ["new", "contacting", "qualified", "won", "lost"]);
   assert.deepEqual(LEAD_TRANSITIONS, {
     new: ["contacting", "qualified", "lost"], contacting: ["qualified", "lost"],
-    qualified: ["won", "lost"], won: ["contacting"], lost: ["contacting"],
+    qualified: ["won", "lost", "contacting"], won: ["contacting"], lost: ["contacting"],
   });
 });
 
 test("deal closure and referral conversion follow stage; reopen clears closure", () => {
-  assert.deepEqual([...DEAL_STAGES], ["open", "won", "lost"]);
+  assert.deepEqual([...DEAL_STAGES], ["qualified", "property_sent", "site_visit", "negotiation", "offer", "deposit", "won", "lost"]);
   assert.deepEqual(dealClosureContract("won", "2026-10-03T00:00:00Z"), { stage: "won", status: "closed", closed_at: "2026-10-03T00:00:00Z", referral_converted: true });
   assert.deepEqual(dealClosureContract("lost", "2026-10-03T00:00:00Z"), { stage: "lost", status: "cancelled", closed_at: "2026-10-03T00:00:00Z", referral_converted: false });
-  assert.deepEqual(dealClosureContract("open", "2026-10-03T00:00:00Z"), { stage: "open", status: "open", closed_at: null, referral_converted: false });
+  assert.deepEqual(dealClosureContract("qualified", "2026-10-03T00:00:00Z"), { stage: "qualified", status: "in_progress", closed_at: null, referral_converted: false });
 });
 
 test("partner conversion, referral codes, commissions, and privacy have enforcement points", () => {
-  const modules = ["src/lib/neon/operations.ts", "src/app/api/admin/leads/[id]/route.ts", "src/app/api/admin/deals/[id]/route.ts", "src/app/api/admin/partners/[id]/route.ts"];
-  const present = modules.filter((path) => existsSync(file(path)));
-  assert.ok(present.length, "operations integration must provide a source module");
-  const joined = present.map(source).join("\n");
+  const joined = ["src/lib/partners/server.ts", "src/lib/partners/helpers.ts", "src/lib/partners/api.ts", "db/migrations/20261003_partner_operations.sql"].map(source).join("\n");
   assert.match(joined, /ON\s+CONFLICT|idempot|already converted/i, "lead conversion must be idempotent");
   assert.match(joined, /UNIQUE|unique|collision/i, "referral codes must be unique and collision-safe");
   assert.match(joined, /commission_paid[\s\S]*SUM|SUM[\s\S]*commission_paid/i, "total_paid must be recomputed from paid commissions");
   assert.match(joined, /override[\s\S]*(?:flag|event)|(?:flag|event)[\s\S]*override/i, "above-expected override needs explicit flag/event");
-  assert.match(joined, /commission[\s\S]*(?:idempot|recomput|ON\s+CONFLICT)/i, "commission update must be idempotent/recomputed");
+  assert.match(joined, /is not distinct from p_expected[\s\S]*is not distinct from p_paid/, "commission retries must skip mutation and event");
+  assert.doesNotMatch(joined, /partner_status_enum|default 'new'/);
+  assert.match(joined, /set status = p_status,/);
 });
 
 test("public buyer demand routes do not serialize contact details", () => {

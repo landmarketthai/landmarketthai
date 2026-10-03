@@ -3,6 +3,8 @@
 -- fresh older base through a DB that already carries these columns.
 -- No table is dropped and no row is deleted by this migration.
 
+begin;
+
 -- ── Leads: reminder scheduling ──────────────────────────────────────────────
 alter table leads
   add column if not exists next_action_at timestamptz,
@@ -17,13 +19,6 @@ create index if not exists idx_leads_reminder_claim
   on leads (reminder_claim_token) where reminder_claim_token is not null;
 
 -- ── Deals: pipeline table, created if a fresh DB does not have it yet ──────
-do $$
-begin
-  if not exists (select 1 from pg_type where typname = 'deal_status_enum') then
-    create type deal_status_enum as enum ('in_progress', 'closed', 'cancelled');
-  end if;
-end $$;
-
 create table if not exists deals (
   id              uuid primary key default gen_random_uuid(),
   land_id         uuid references lands(id),
@@ -32,7 +27,7 @@ create table if not exists deals (
   referral_code   text,
   deal_value      numeric(18,2),
   commission_paid numeric(18,2),
-  status          deal_status_enum not null default 'in_progress',
+  status          text not null default 'in_progress',
   closed_at       timestamptz,
   notes           text,
   created_at      timestamptz not null default now()
@@ -65,6 +60,8 @@ alter table deals
   add column if not exists assigned_to text,
   add column if not exists updated_at timestamptz not null default now();
 
+alter table deals alter column stage set default 'qualified';
+
 -- Backfill only the column this migration just introduced; never touch existing status.
 update deals set stage = 'qualified' where stage is null;
 
@@ -95,3 +92,5 @@ create index if not exists idx_referral_attributions_partner
 -- No updated_at trigger: the repo has no shared set_updated_at()/moddatetime
 -- helper (checked across db/migrations and supabase/migrations), so none is
 -- added here rather than inventing a new global function.
+
+commit;

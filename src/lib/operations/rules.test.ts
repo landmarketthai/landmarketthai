@@ -70,10 +70,11 @@ test("Bangkok datetime-local round trips", () => {
 
 test("deal totals use real values only", () => {
   const summary = summarizeDeals([
-    { stage: "offer", deal_value: 100, expected_commission: 3 },
-    { stage: "offer", deal_value: null, expected_commission: null },
-    { stage: "won", deal_value: 50, expected_commission: 2 },
-    { stage: "lost", deal_value: 999, expected_commission: 9 },
+    { stage: "offer", status: "in_progress", deal_value: 100, expected_commission: 3 },
+    { stage: "offer", status: "in_progress", deal_value: null, expected_commission: null },
+    { stage: "won", status: "closed", deal_value: 50, expected_commission: 2 },
+    { stage: "lost", status: "cancelled", deal_value: 999, expected_commission: 9 },
+    { stage: "qualified", status: "cancelled", deal_value: 999, expected_commission: 9 },
   ]);
   assert.equal(summary.byStage.offer.count, 2);
   assert.equal(summary.byStage.offer.value, 100);

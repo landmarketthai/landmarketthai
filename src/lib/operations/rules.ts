@@ -36,7 +36,7 @@ export const LEAD_TYPES = Object.keys(LEAD_TYPE_LABELS) as LeadType[];
 export const DEAL_STAGES = Object.keys(DEAL_STAGE_LABELS) as DealStage[];
 export const DEAL_STATUSES = Object.keys(DEAL_STATUS_LABELS) as DealStatus[];
 
-const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
+export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
   new: ["contacting", "qualified", "lost"],
   contacting: ["qualified", "lost"],
   qualified: ["won", "lost", "contacting"],
@@ -84,7 +84,7 @@ export function isDealEnded(deal: { stage: DealStage; status: DealStatus }): boo
 export interface StageTotals { count: number; value: number; commission: number }
 
 /** Per-stage counts and sums; null values count as 0, never estimated. */
-export function summarizeDeals<T extends { stage: DealStage; deal_value: number | null; expected_commission: number | null }>(deals: T[]) {
+export function summarizeDeals<T extends { stage: DealStage; status: DealStatus; deal_value: number | null; expected_commission: number | null }>(deals: T[]) {
   const byStage = Object.fromEntries(DEAL_STAGES.map((stage) => [stage, { count: 0, value: 0, commission: 0, deals: [] as T[] }])) as Record<DealStage, StageTotals & { deals: T[] }>;
   for (const deal of deals) {
     const bucket = byStage[deal.stage];
@@ -94,11 +94,12 @@ export function summarizeDeals<T extends { stage: DealStage; deal_value: number 
     bucket.commission += deal.expected_commission ?? 0;
     bucket.deals.push(deal);
   }
-  const open = DEAL_STAGES.filter((stage) => stage !== "won" && stage !== "lost");
-  const sum = (stages: DealStage[], key: keyof StageTotals) => stages.reduce((total, stage) => total + byStage[stage][key], 0);
+  const open = deals.filter((deal) => !isDealEnded(deal)).reduce((total, deal) => ({
+    count: total.count + 1, value: total.value + (deal.deal_value ?? 0), commission: total.commission + (deal.expected_commission ?? 0),
+  }), { count: 0, value: 0, commission: 0 });
   return {
     byStage,
-    open: { count: sum(open, "count"), value: sum(open, "value"), commission: sum(open, "commission") },
+    open,
     won: { count: byStage.won.count, value: byStage.won.value, commission: byStage.won.commission },
   };
 }
