@@ -56,20 +56,31 @@ alter table deals
   add column if not exists listing_ref text,
   add column if not exists listing_title text,
   add column if not exists expected_commission numeric(18,2),
-  add column if not exists stage text default 'qualified',
+  add column if not exists stage text,
   add column if not exists assigned_to text,
   add column if not exists updated_at timestamptz not null default now();
 
 alter table deals alter column stage set default 'qualified';
 
--- Backfill only the column this migration just introduced; never touch existing status.
-update deals set stage = 'qualified' where stage is null;
+-- Preserve reviewed stages; only missing stages are derived from legacy status.
+update deals set stage = case status when 'closed' then 'won' when 'cancelled' then 'lost' else 'qualified' end
+where stage is null;
+alter table deals alter column stage set not null;
 
 alter table deals drop constraint if exists deals_stage_check;
 alter table deals add constraint deals_stage_check
   check (stage in ('qualified', 'property_sent', 'site_visit', 'negotiation', 'offer', 'deposit', 'won', 'lost'))
   not valid;
 alter table deals validate constraint deals_stage_check;
+
+alter table deals drop constraint if exists deals_stage_status_check;
+alter table deals add constraint deals_stage_status_check
+  check (status is not null and (
+    (stage = 'won' and status = 'closed') or
+    (stage = 'lost' and status = 'cancelled') or
+    (stage not in ('won', 'lost') and status = 'in_progress')))
+  not valid;
+alter table deals validate constraint deals_stage_status_check;
 
 create index if not exists idx_deals_stage on deals (stage);
 create index if not exists idx_deals_buyer_lead
@@ -79,9 +90,13 @@ create index if not exists idx_deals_listing_ref
 create unique index if not exists idx_deals_buyer_lead_land_unique
   on deals (buyer_lead_id, land_id)
   where buyer_lead_id is not null and land_id is not null;
+drop index if exists idx_deals_buyer_lead_listing_ref_unique;
 create unique index if not exists idx_deals_buyer_lead_listing_ref_unique
-  on deals (buyer_lead_id, listing_ref)
-  where buyer_lead_id is not null and listing_ref is not null;
+  on deals (buyer_lead_id, lower(listing_ref))
+  where buyer_lead_id is not null and land_id is null and listing_ref is not null;
+create unique index if not exists idx_deals_buyer_lead_listing_title_unique
+  on deals (buyer_lead_id, lower(listing_title))
+  where buyer_lead_id is not null and land_id is null and listing_ref is null and listing_title is not null;
 
 -- ── Partners / referral_attributions: schema untouched, indexes only ──────
 create index if not exists idx_partners_status on partners (status);

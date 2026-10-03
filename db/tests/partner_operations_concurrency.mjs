@@ -17,13 +17,13 @@ await Promise.all([
 assert.equal(await run(`select count(*) from partners where lead_id='${lead}'`), '1');
 const partner = await run(`select id from partners where lead_id='${lead}'`);
 assert.equal(await run(`select count(*) from events where entity_id='${partner}' and event_type='partner_converted'`), '1');
-await run(`insert into deals(id,partner_id,stage,expected_commission,commission_paid) values('${d1}','${partner}','won',100,0),('${d2}','${partner}','qualified',200,0)`);
+await run(`insert into deals(id,partner_id,stage,status,expected_commission,commission_paid) values('${d1}','${partner}','won','closed',100,0),('${d2}','${partner}','qualified','in_progress',200,0)`);
 await Promise.all([
-  run(`begin; select id from operations_deal_commission('${d1}',100,25,false,'staff-a'); select pg_sleep(0.2); commit`),
-  run(`select id from operations_deal_commission('${d2}',200,35,false,'staff-b')`),
+  run(`begin; select id from operations_deal_commission('${d1}',100,25,false,'staff-a',(select updated_at from deals where id = '${d1}')); select pg_sleep(0.2); commit`),
+  run(`select id from operations_deal_commission('${d2}',200,35,false,'staff-b',(select updated_at from deals where id = '${d2}'))`),
 ]);
 assert.equal(await run(`select total_paid from partners where id='${partner}'`), '60.00');
-await Promise.all([run(`select id from operations_deal_commission('${d1}',100,25,false,'staff-a')`), run(`select id from operations_deal_commission('${d1}',100,25,false,'staff-b')`)]);
+await Promise.all([run(`select id from operations_deal_commission('${d1}',100,25,false,'staff-a',(select updated_at from deals where id = '${d1}'))`), run(`select id from operations_deal_commission('${d1}',100,25,false,'staff-b',(select updated_at from deals where id = '${d1}'))`)]);
 assert.equal(await run(`select count(*) from events where entity_id='${d1}' and event_type='deal_commission_changed'`), '1');
 
 // Check the exact production list query, including two attributions with the same lead (no fanout).

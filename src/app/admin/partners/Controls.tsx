@@ -44,7 +44,7 @@ export function CommissionForm({ deal }: { deal: PartnerDeal }) {
     try {
       const response = await fetch(`/api/admin/partners/deals/${deal.id}/commission`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expected_commission: String(data.get('expected')).trim() || null,
+        body: JSON.stringify({ expected_updated_at: deal.updated_at, expected_commission: String(data.get('expected')).trim() || null,
           commission_paid: String(data.get('paid')).trim(), override: data.get('override') === 'on' }),
       });
       const result = await response.json();

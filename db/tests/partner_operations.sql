@@ -24,38 +24,38 @@ begin
     insert into partners(lead_id,name,phone,referral_code) values(l,'Duplicate','0812345678','duplicate');
     raise exception 'Duplicate lead accepted';
   exception when unique_violation then null; end;
-  insert into deals(id,partner_id,stage,expected_commission,commission_paid) values(d,p.id,'won',100,0),(d2,p.id,'qualified',200,5);
+  insert into deals(id,partner_id,stage,status,expected_commission,commission_paid) values(d,p.id,'won','closed',100,0),(d2,p.id,'qualified','in_progress',200,5);
   begin
     update deals set commission_paid = -1 where id = d;
     raise exception 'Direct negative payment accepted';
   exception when check_violation then null; end;
-  perform operations_deal_commission(d,100,25,false,'staff');
+  perform operations_deal_commission(d,100,25,false,'staff',(select updated_at from deals where id = d));
   assert (select total_paid = 30 from partners where id = p.id), 'Total is not sum of cumulative payments';
   select count(*) into count_before from events;
-  perform operations_deal_commission(d,100,25,false,'staff');
+  perform operations_deal_commission(d,100,25,false,'staff',(select updated_at from deals where id = d));
   assert (select total_paid = 30 from partners where id = p.id), 'Retry double counted';
   assert (select count(*) = count_before from events), 'Retry duplicated event';
   begin
-    perform operations_deal_commission(d,100,101,false,'staff');
+    perform operations_deal_commission(d,100,101,false,'staff',(select updated_at from deals where id = d));
     raise exception 'Excess payment accepted without override';
   exception when invalid_parameter_value then null; end;
   begin
-    perform operations_deal_commission(d,-1,0,false,'staff');
+    perform operations_deal_commission(d,-1,0,false,'staff',(select updated_at from deals where id = d));
     raise exception 'Negative expected accepted';
   exception when invalid_parameter_value then null; end;
   begin
-    perform operations_deal_commission(d,100,-1,false,'staff');
+    perform operations_deal_commission(d,100,-1,false,'staff',(select updated_at from deals where id = d));
     raise exception 'Negative paid accepted';
   exception when invalid_parameter_value then null; end;
   begin
-    perform operations_deal_commission(d,100,1.001,false,'staff');
+    perform operations_deal_commission(d,100,1.001,false,'staff',(select updated_at from deals where id = d));
     raise exception 'Fractional cents accepted';
   exception when invalid_parameter_value then null; end;
-  perform operations_deal_commission(d,100,101,true,'staff');
+  perform operations_deal_commission(d,100,101,true,'staff',(select updated_at from deals where id = d));
   assert (select total_paid = 106 from partners where id = p.id), 'Override total incorrect';
   assert exists(select 1 from events where entity_id = d and meta->>'override' = 'true'
     and meta->>'exceeded_expected' = 'true' and meta->>'actor_id' = 'staff'), 'Override audit missing';
-  perform operations_deal_commission(d,null,101,false,'staff');
+  perform operations_deal_commission(d,null,101,false,'staff',(select updated_at from deals where id = d));
   update deals set partner_id = other where id = d;
   assert (select total_paid = 5 from partners where id = p.id), 'Old partner total after reassignment incorrect';
   assert (select total_paid = 101 from partners where id = other), 'New partner total after reassignment incorrect';
@@ -64,7 +64,7 @@ begin
   -- Audit failure must roll back both payment and trigger-derived total.
   alter table events add constraint operations_test_event_failure check(event_type <> 'deal_commission_changed') not valid;
   begin
-    perform operations_deal_commission(d2,200,10,false,'staff');
+    perform operations_deal_commission(d2,200,10,false,'staff',(select updated_at from deals where id = d2));
     raise exception 'Audit failure did not abort commission mutation';
   exception when check_violation then null; end;
   assert (select commission_paid = 5 from deals where id = d2), 'Payment survived audit failure';
@@ -83,7 +83,7 @@ begin
     raise exception 'Null partner status accepted';
   exception when invalid_parameter_value then null; end;
   begin
-    perform operations_deal_commission(d2,200,null,false,'staff');
+    perform operations_deal_commission(d2,200,null,false,'staff',(select updated_at from deals where id = d2));
     raise exception 'Null paid commission accepted';
   exception when invalid_parameter_value then null; end;
 end $$;

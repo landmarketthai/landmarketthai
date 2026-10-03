@@ -5,6 +5,17 @@ import { readFileSync } from "node:fs";
 const MIGRATION_PATH = "../db/migrations/20261003_marketplace_operations_v1.sql";
 const migration = () => readFileSync(new URL(MIGRATION_PATH, import.meta.url), "utf8").replaceAll("\r\n", "\n");
 
+test('stage backfill derives only null stages and validates status consistency atomically', () => {
+  const sql = migration();
+  assert.match(sql, /add column if not exists stage text,/);
+  assert.match(sql, /case status when 'closed' then 'won' when 'cancelled' then 'lost' else 'qualified' end\s+where stage is null;/);
+  assert.match(sql, /alter column stage set not null/);
+  assert.match(sql, /add constraint deals_stage_status_check[\s\S]*status is not null[\s\S]*stage = 'won' and status = 'closed'[\s\S]*stage = 'lost' and status = 'cancelled'[\s\S]*stage not in \('won', 'lost'\) and status = 'in_progress'[\s\S]*not valid;\s*alter table deals validate constraint deals_stage_status_check;/);
+  assert.match(sql, /begin;[\s\S]*commit;/);
+  assert.match(sql, /drop index if exists idx_deals_buyer_lead_listing_ref_unique;/);
+  assert.match(sql, /on deals \(buyer_lead_id, lower\(listing_title\)\)\s+where buyer_lead_id is not null and land_id is null and listing_ref is null and listing_title is not null;/);
+});
+
 test("leads gains the reminder-scheduling columns with claim indexes", () => {
   const sql = migration();
   for (const column of [
@@ -43,7 +54,7 @@ test("deals pipeline columns exist, land_id/deal_value are relaxed via guarded D
     "listing_ref text",
     "listing_title text",
     "expected_commission numeric\\(18,2\\)",
-    "stage text default 'qualified'",
+    "stage text",
     "assigned_to text",
     "updated_at timestamptz not null default now\\(\\)",
   ]) {
@@ -83,7 +94,7 @@ test("deals partial indexes cover stage, buyer_lead_id, listing_ref, and the two
   );
   assert.match(
     sql,
-    /create unique index if not exists idx_deals_buyer_lead_listing_ref_unique\s+on deals \(buyer_lead_id, listing_ref\)\s+where buyer_lead_id is not null and listing_ref is not null;/
+    /create unique index if not exists idx_deals_buyer_lead_listing_ref_unique\s+on deals \(buyer_lead_id, lower\(listing_ref\)\)\s+where buyer_lead_id is not null and land_id is null and listing_ref is not null;/
   );
 });
 
@@ -106,7 +117,7 @@ test("migration never drops a table and never deletes or truncates existing rows
   // The only UPDATE in this file must be the self-authored stage backfill, not a data rewrite.
   const updates = sql.match(/update\s+\w+\s+set[^;]*;/g) ?? [];
   assert.equal(updates.length, 1);
-  assert.match(updates[0], /update deals set stage = 'qualified' where stage is null;/);
+  assert.match(updates[0], /update deals set stage = case status[\s\S]*where stage is null;/);
 });
 
 test("every structural statement is rerun-safe: CREATE TABLE/INDEX/TYPE use IF NOT EXISTS guards and every ADD CONSTRAINT is preceded by a DROP CONSTRAINT IF EXISTS", () => {

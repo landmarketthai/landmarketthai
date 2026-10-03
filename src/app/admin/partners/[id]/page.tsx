@@ -40,7 +40,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
     <ul className="my-4 space-y-4">{deals.map(deal => <li key={deal.id} id={`deal-${deal.id}`} className="rounded-xl border p-4">
       <h3 className="break-all font-bold">Deal {deal.id}</h3>
       <p>{deal.stage} · {deal.status} · {deal.stage === 'won' ? 'Payable' : deal.status === 'in_progress' && !['lost', 'cancelled'].includes(deal.stage) ? 'Projected only' : 'Closed without payable commission'}</p>
-      <CommissionForm key={`${deal.id}:${deal.expected_commission}:${deal.commission_paid}`} deal={deal} />
+      <CommissionForm key={`${deal.id}:${deal.updated_at}`} deal={deal} />
     </li>)}</ul>
   </main>;
 }

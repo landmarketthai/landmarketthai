@@ -1,5 +1,5 @@
 import { getSql } from '@/lib/neon/server';
-import type { CommissionDeal } from './helpers';
+import type { CommissionDeal, CommissionInput } from './helpers';
 
 export interface Partner {
   id: string; lead_id: string | null; name: string; phone: string; line_id: string | null;
@@ -11,7 +11,7 @@ export interface PartnerRow extends Partner {
   expected: string; paid: string; payable: string; projected: string;
 }
 export interface PartnerLead { id: string; name: string; phone: string; line_id: string | null; status: string; details: Record<string, unknown> }
-export interface PartnerDeal extends CommissionDeal { id: string; referral_code: string | null }
+export interface PartnerDeal extends CommissionDeal { id: string; referral_code: string | null; updated_at: string }
 export interface Attribution {
   id: string; lead_id: string; name: string; entity_type: string; first_touch_at: string;
   converted: boolean; deal_id: string | null; stage: string | null; won: boolean;
@@ -52,7 +52,8 @@ export async function getPartnerDetail(id: string) {
       from referral_attributions a join leads l on l.id = a.lead_id left join deals d on d.id = a.deal_id
       where a.partner_id = $1 or (a.partner_id is null and a.referral_code = $2)
       order by a.first_touch_at desc, a.id`, [id, partner.referral_code]),
-    sql.query(`select id, stage, status, referral_code, expected_commission::text, commission_paid::text
+    sql.query(`select id, stage, status, referral_code, expected_commission::text, commission_paid::text,
+      to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
       from deals where partner_id = $1 order by created_at desc, id`, [id]),
   ]);
   return { partner, attributions: attributions as Attribution[], deals: deals as PartnerDeal[] };
@@ -65,8 +66,8 @@ export async function changePartnerStatus(id: string, status: string, actorId: s
   const rows = await getSql().query('select * from operations_partner_status($1::uuid,$2::text,$3::text)', [id, status, actorId]);
   return rows[0] as Partner;
 }
-export async function setCommission(id: string, input: { expected_commission: string | null; commission_paid: string; override: boolean }, actorId: string) {
-  const rows = await getSql().query('select * from operations_deal_commission($1::uuid,$2::numeric,$3::numeric,$4::boolean,$5::text)',
-    [id, input.expected_commission, input.commission_paid, input.override, actorId]);
+export async function setCommission(id: string, input: CommissionInput, actorId: string) {
+  const rows = await getSql().query('select * from operations_deal_commission($1::uuid,$2::numeric,$3::numeric,$4::boolean,$5::text,$6::timestamptz)',
+    [id, input.expected_commission, input.commission_paid, input.override, actorId, input.expected_updated_at]);
   return rows[0];
 }

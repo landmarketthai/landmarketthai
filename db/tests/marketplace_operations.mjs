@@ -58,8 +58,29 @@ const refOnly = await queries.createDeal({ buyer_lead_id: buyer, listing_ref: 'E
 assert.equal(refOnly.kind, 'created');
 assert.equal((await queries.getDeal(refOnly.id)).listing_title, 'External title');
 assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_ref: 'EXT-1' })).kind, 'duplicate');
+assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_ref: 'ext-1' })).kind, 'duplicate');
+assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_title: 'EXT-1' })).kind, 'created');
+assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_ref: 'Another-ref', listing_title: 'EXT-1' })).kind, 'created');
 assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_title: 'Title only' })).kind, 'created');
 assert.equal((await queries.createDeal({ buyer_lead_id: buyer, listing_title: 'title ONLY' })).kind, 'duplicate');
+
+// Selected attribution owns credit even when its partner_id is missing and the lead disagrees.
+const creditedLead = randomUUID(), creditedBuyer = randomUUID(), fallbackBuyer = randomUUID();
+await run(`insert into leads(id,lead_type,name,phone,referral_code) values
+  ('${creditedLead}','partner','Credit partner','0',null),
+  ('${creditedBuyer}','buyer','Credit buyer','0','${partner.referral_code}'),
+  ('${fallbackBuyer}','buyer','Fallback buyer','0','${partner.referral_code}');`);
+const creditedPartner = (await sql.query(`select id,referral_code from operations_convert_partner('${creditedLead}','staff')`))[0];
+await run(`insert into referral_attributions(lead_id,referral_code,partner_id) values('${creditedBuyer}','${creditedPartner.referral_code}',null)`);
+const creditedDeal = await queries.createDeal({ buyer_lead_id: creditedBuyer, listing_title: 'Selected attribution' });
+assert.equal((await queries.getDeal(creditedDeal.id)).partner_id, creditedPartner.id);
+assert.equal((await queries.getDeal(creditedDeal.id)).referral_code, creditedPartner.referral_code);
+const fallbackDeal = await queries.createDeal({ buyer_lead_id: fallbackBuyer, listing_title: 'Lead fallback' });
+assert.equal((await queries.getDeal(fallbackDeal.id)).partner_id, partner.id);
+await run(`update referral_attributions set referral_code='UNRESOLVED' where lead_id='${creditedBuyer}'`);
+const unresolvedDeal = await queries.createDeal({ buyer_lead_id: creditedBuyer, listing_title: 'Unresolved attribution' });
+assert.equal((await queries.getDeal(unresolvedDeal.id)).partner_id, null);
+assert.equal((await queries.getDeal(unresolvedDeal.id)).referral_code, 'UNRESOLVED');
 
 let lead = await queries.getLead(buyer);
 assert.equal(await queries.updateLead(buyer, { expected_updated_at: lead.updated_at }, [{ type: 'note', at: new Date().toISOString(), by: 'staff', text: 'CRM note' }]), true);

@@ -32,6 +32,9 @@ begin
   if l.lead_type::text is distinct from 'partner' then raise exception 'Not a partner lead' using errcode = '22023'; end if;
   select * into p from partners where lead_id = p_lead;
   if found then return p; end if;
+  if l.status::text in ('won','lost') then
+    raise exception 'Cannot convert a closed partner lead' using errcode = '22023';
+  end if;
   loop
     insert into partners(lead_id, name, phone, line_id, referral_code, working_area, experience, network_size, status)
     values(l.id, l.name, l.phone, l.line_id, operations_partner_code(l.id, attempt),
@@ -41,6 +44,8 @@ begin
     attempt := attempt + 1;
   end loop;
   -- Approval qualifies a partner lead; won remains a deal outcome.
+  update referral_attributions set partner_id = p.id
+    where referral_code = p.referral_code and partner_id is null;
   update leads set status = 'qualified', updated_at = now() where id = l.id;
   insert into events(event_type, entity_type, entity_id, meta)
   values('partner_converted', 'partner', p.id,
@@ -67,6 +72,14 @@ begin
 end $$;
 
 -- Recompute, never increment. Covers pipeline reassignment/deletion as well as staff payments.
+-- Do not discard legacy payments that have not been reconciled to linked deals.
+lock table partners, deals in share row exclusive mode;
+do $$ begin
+  if exists (select 1 from partners p where p.total_paid is distinct from
+    coalesce((select sum(d.commission_paid) from deals d where d.partner_id = p.id), 0)) then
+    raise exception 'Partner total_paid differs from linked deal payments; reconcile before migration' using errcode = '23514';
+  end if;
+end $$;
 create or replace function operations_sync_partner_paid() returns trigger language plpgsql as $$
 declare old_partner uuid; new_partner uuid;
 begin
@@ -83,7 +96,8 @@ create trigger operations_sync_partner_paid after insert or update of commission
 for each row execute function operations_sync_partner_paid();
 update partners p set total_paid = coalesce((select sum(d.commission_paid) from deals d where d.partner_id = p.id), 0);
 
-create or replace function operations_deal_commission(p_id uuid, p_expected numeric, p_paid numeric, p_override boolean, p_actor text)
+drop function if exists operations_deal_commission(uuid,numeric,numeric,boolean,text);
+create or replace function operations_deal_commission(p_id uuid, p_expected numeric, p_paid numeric, p_override boolean, p_actor text, p_expected_updated_at timestamptz)
 returns deals language plpgsql as $$
 declare d deals; previous_expected numeric; previous_paid numeric; exceeded boolean;
 begin
@@ -102,6 +116,9 @@ begin
   previous_expected := d.expected_commission; previous_paid := d.commission_paid;
   -- A retry is a no-op (including its event). Null paid and zero paid remain distinct.
   if d.expected_commission is not distinct from p_expected and d.commission_paid is not distinct from p_paid then return d; end if;
+  if p_expected_updated_at is null or d.updated_at is distinct from p_expected_updated_at then
+    raise exception 'Stale deal version; reload before saving commission' using errcode = '40001';
+  end if;
   update deals set expected_commission = p_expected, commission_paid = p_paid, updated_at = now()
     where id = p_id returning * into d;
   insert into events(event_type, entity_type, entity_id, meta)
@@ -114,5 +131,5 @@ end $$;
 -- Invoker rights; functions are callable only by the backend database role, not public roles.
 revoke all on function operations_convert_partner(uuid,text) from public;
 revoke all on function operations_partner_status(uuid,text,text) from public;
-revoke all on function operations_deal_commission(uuid,numeric,numeric,boolean,text) from public;
+revoke all on function operations_deal_commission(uuid,numeric,numeric,boolean,text,timestamptz) from public;
 commit;

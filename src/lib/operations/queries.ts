@@ -234,14 +234,17 @@ export async function createDeal(input: DealCreateInput): Promise<CreateDealResu
      ), existing as (
        select d.id from deals d where d.buyer_lead_id = $1 and (
          ($2::uuid is not null and d.land_id = $2::uuid)
-         or ($2::uuid is null and d.land_id is null and lower(coalesce(d.listing_ref, d.listing_title, '')) = lower(coalesce($3, $4, ''))))
+         or ($2::uuid is null and d.land_id is null and (
+           ($3::text is not null and lower(d.listing_ref) = lower($3))
+           or ($3::text is null and d.listing_ref is null and $4::text is not null and lower(d.listing_title) = lower($4)))))
        limit 1
      ), inserted as (
        insert into deals (land_id, listing_ref, listing_title, buyer_lead_id, partner_id, referral_code,
          deal_value, expected_commission, status, stage, assigned_to, notes)
        select $2::uuid, $3::text, $4::text, lead.id,
-         coalesce((select partner_id from attribution), (select p.id from partners p where p.referral_code = lead.referral_code limit 1)),
-         coalesce((select referral_code from attribution), lead.referral_code),
+         coalesce((select partner_id from attribution), (select p.id from partners p where p.referral_code =
+           case when exists (select 1 from attribution) then (select referral_code from attribution) else lead.referral_code end limit 1)),
+         case when exists (select 1 from attribution) then (select referral_code from attribution) else lead.referral_code end,
          $5::numeric, $6::numeric, 'in_progress', 'qualified', $7::text, $8::text
        from lead where not exists (select 1 from existing)
        on conflict do nothing
