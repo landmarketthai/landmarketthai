@@ -99,7 +99,7 @@ export default function HomePropertyMap({ properties }: Props) {
                 </button>
               </div>
               <AssetMeta property={selected} />
-              <Link href={`/properties/${selected.slug}`} className="btn-green mt-3 w-full justify-center text-sm">
+              <Link href={`/property/${selected.slug}`} className="btn-green mt-3 w-full justify-center text-sm">
                 ดูรายละเอียดทรัพย์
               </Link>
             </div>
@@ -144,7 +144,7 @@ export default function HomePropertyMap({ properties }: Props) {
                     <div className="mt-1.5 text-[11px] font-medium text-amber-700">ตำแหน่งโดยประมาณ</div>
                   ) : null}
                 </button>
-                <Link href={`/properties/${property.slug}`} className="mt-1 inline-flex min-h-9 items-center text-sm font-bold text-[#2f9e44] hover:underline">
+                <Link href={`/property/${property.slug}`} className="mt-1 inline-flex min-h-9 items-center text-sm font-bold text-[#2f9e44] hover:underline">
                   ดูรายละเอียด ›
                 </Link>
               </li>

@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+import { cache } from "react";
+import DynamicPropertyDetail from "@/components/properties/DynamicPropertyDetail";
+import { listingMetadata } from "@/lib/public-seo";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,6 +31,7 @@ import { landVerification } from "@/lib/marketplace/verification";
 import VerificationBadges from "@/components/listings/VerificationBadges";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
 import { getPublicInventory } from "@/lib/public-inventory";
+import { getListingBySlug } from "@/lib/neon/queries";
 import { SEED_PUBLIC_LISTINGS, resolveListingPresentation } from "@/lib/seed-listings";
 import { rankSimilarProperties } from "@/lib/similar-properties";
 import {
@@ -36,6 +41,22 @@ import {
 
 interface Params {
   slug: string;
+}
+
+const readInventory = cache(() => getPublicInventory().catch(() => SEED_PUBLIC_LISTINGS));
+const readListing = cache(getListingBySlug);
+
+export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+  const { slug } = await params;
+  const land = await readListing(slug);
+  if (!land) return {
+    title: { absolute: "ไม่พบประกาศ" },
+    description: null,
+    alternates: { canonical: null },
+    openGraph: null,
+    robots: { index: false, follow: true },
+  };
+  return listingMetadata(land);
 }
 
 const highlightIcons = [Factory, Truck, ShieldCheck];
@@ -51,13 +72,11 @@ export default async function PropertyDetailPage({
   params: Promise<Params>;
 }) {
   const { slug } = await params;
+  const [land, inventory] = await Promise.all([readListing(slug), readInventory()]);
+  if (!land) notFound();
   const property = getPropertyDetail(slug);
-
-  if (!property) notFound();
-
-  const inventory = await getPublicInventory().catch(() => null);
-  const land = inventory?.find(item => item.slug === slug) ?? SEED_PUBLIC_LISTINGS.find(item => item.slug === slug);
-  const isSoldOut = property.soldOut === true || land?.status === "sold";
+  if (!property) return <DynamicPropertyDetail property={land} inventory={inventory} />;
+  const isSoldOut = land.status === "sold";
   const similar = land ? rankSimilarProperties(land, inventory ?? []) : [];
 
   return (
@@ -95,7 +114,7 @@ export default async function PropertyDetailPage({
               </span>
               {isSoldOut && (
                 <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black tracking-wide text-white shadow-sm">
-                  Sold out
+                  ขายแล้ว
                 </span>
               )}
             </div>
@@ -240,9 +259,6 @@ export default async function PropertyDetailPage({
               {isSoldOut ? (
                 <>
                   <div className="bg-[#071d4a] p-5 text-white">
-                    <div className="inline-flex rounded-md bg-red-600 px-3 py-1.5 text-sm font-black tracking-wide text-white">
-                      Sold out
-                    </div>
                     <p className="mt-3 text-sm leading-relaxed text-blue-50">
                       แปลงนี้ปิดการขายเรียบร้อยแล้ว และไม่ได้เปิดรับข้อเสนอหรือผู้แนะนำเพิ่มเติม
                     </p>
@@ -252,10 +268,6 @@ export default async function PropertyDetailPage({
                       <div className="rounded-xl bg-slate-50 p-3">
                         <div className="text-xs text-slate-400">ขนาดที่ดิน</div>
                         <div className="wrap-break-word font-bold text-slate-800">{property.size}</div>
-                      </div>
-                      <div className="rounded-xl bg-red-50 p-3">
-                        <div className="text-xs text-red-500">สถานะ</div>
-                        <div className="font-black text-red-600">Sold out</div>
                       </div>
                     </div>
                     <Link href="/land" className="btn-green w-full text-sm">
@@ -329,9 +341,6 @@ export default async function PropertyDetailPage({
             {isSoldOut ? (
               <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
-                  <div className="mb-2 inline-flex rounded-md bg-red-600 px-3 py-1 text-xs font-black tracking-wide text-white">
-                    Sold out
-                  </div>
                   <h2 className="text-xl font-black sm:text-2xl">
                     แปลงนี้ปิดการขายเรียบร้อยแล้ว
                   </h2>

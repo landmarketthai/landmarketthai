@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "ฝากความต้องการซื้อทรัพย์",
   description: "แจ้งเงื่อนไขซื้ออสังหาริมทรัพย์ เพื่อจับคู่กับทรัพย์จริงในระบบ LandmarketThai",
   alternates: { canonical: "/buy-request" },
+  openGraph: { url: "/buy-request" },
 };
 
 type Params = Record<string, string | string[] | undefined>;

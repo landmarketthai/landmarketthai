@@ -26,7 +26,7 @@ test("Neon inventory loads every page and never merges seeds into configured inv
 
 test("public history preserves sold 109 rai and active search preserves exact areas and coordinates", async () => {
   const inventory = await getPublicInventory(undefined, false);
-  assert.deepEqual(searchProperties(inventory).map(land => land.size_rai).sort((a, b) => a - b), [36.91825, 101.06]);
+  assert.deepEqual(searchProperties(inventory).map(land => land.size_rai).sort((a, b) => a - b), [36.91825, 101.055]);
   assert.equal(searchProperties(inventory, { history: "1" })[0].slug, "109-rai-eec-rayong");
   assert.equal(searchProperties(inventory, { history: "1" })[0].size_rai, 109.63);
   const filters = parseLandSearchParams({ min_size: "36.91825", max_size: "36.91825", zoning: "purple", eec: "true" });

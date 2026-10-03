@@ -5,10 +5,11 @@ import LineButton from "@/components/ui/LineButton";
 import JsonLd from "@/components/seo/JsonLd";
 
 export const metadata: Metadata = {
-  title: "วิธีรับค่าแนะนำ – LandmarketThai Referral Partner",
+  title: "วิธีรับค่าแนะนำ – Referral Partner",
   description:
     "วิธีทำงานของระบบ Referral Partner LandmarketThai สมัครฟรี แนะนำที่ดินหรือผู้ซื้อ รับค่าคอมเมื่อปิดดีล",
   alternates: { canonical: "/how-it-works" },
+  openGraph: { url: "/how-it-works" },
 };
 
 const steps = [

@@ -1,3 +1,5 @@
+import { getPublicInventory } from "@/lib/public-inventory";
+import { archiveInventory, archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -24,9 +26,12 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const landType = slugToLandType(type);
   if (!province || !landType) return {};
   const typeName = LAND_TYPE_LABELS[landType];
+  const inventory = await getPublicInventory().catch(() => []);
   return {
+    robots: archiveRobots(archiveInventory(inventory, slug, landType).length > 0),
+    openGraph: { url: `/land/${slug}/${type}` },
     title: `${typeName}${province.name_th} – ที่ดิน ${province.name_en} ${typeName}`,
-    description: `${typeName}ใน${province.name_th} EEC ราคาต่อไร่ ทีมงานตรวจสอบประกาศก่อนเผยแพร่ ติดต่อผ่าน LINE`,
+    description: `${typeName}ใน${province.name_th} พร้อมข้อมูลราคาและทำเลตามประกาศ ติดต่อผ่าน LINE`,
     alternates: { canonical: `/land/${slug}/${type}` },
   };
 }
@@ -85,7 +90,7 @@ export default async function ProvinceTypePage({
         <div className="prose prose-slate text-sm max-w-none mb-8 p-5 bg-slate-50 rounded-xl">
           <p>
             <strong>{typeName}{province.name_th}</strong> – LandmarketThai รวบรวมประกาศที่ดินที่ทีมงานตรวจสอบก่อนเผยแพร่
-            จากเครือข่ายพาร์ทเนอร์กว่า 200 รายทั่วภูมิภาค ทีมผู้เชี่ยวชาญพร้อมให้ข้อมูลและจัดเยี่ยมชม
+            จากเครือข่ายพาร์ทเนอร์ ทีมผู้เชี่ยวชาญพร้อมให้ข้อมูลและจัดเยี่ยมชม
             พื้นที่โดยไม่มีค่าใช้จ่าย
           </p>
         </div>

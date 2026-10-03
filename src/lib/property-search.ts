@@ -55,7 +55,7 @@ export function searchProperties(listings: Land[], filters: PropertySearchFilter
 }
 
 export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
-  active: "เปิดขาย", reserved: "จองแล้ว", sold: "ปิดดีลแล้ว", draft: "ฉบับร่าง", archived: "เก็บถาวร", expired: "หมดอายุ",
+  active: "เปิดขาย", reserved: "จองแล้ว", sold: "ขายแล้ว", draft: "ฉบับร่าง", archived: "เก็บถาวร", expired: "หมดอายุ",
 };
 
 export function listingUpdatedLabel(updatedAt: string) {

@@ -1,3 +1,5 @@
+import { getPublicInventory } from "@/lib/public-inventory";
+import { archiveInventory, archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -22,9 +24,12 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { province: slug } = await params;
   const province = await resolveProvince(slug);
   if (!province) return {};
+  const inventory = await getPublicInventory().catch(() => []);
   return {
-    title: `ที่ดินอุตสาหกรรม${province.name_th} – ที่ดิน EEC ${province.name_en}`,
-    description: `ที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC ใน${province.name_th} ทีมงานตรวจสอบประกาศก่อนเผยแพร่ ราคาต่อไร่ สอบถาม LINE`,
+    robots: archiveRobots(archiveInventory(inventory, slug).length > 0),
+    openGraph: { url: `/land/${slug}` },
+    title: `อสังหาริมทรัพย์ใน${province.name_th} – ${province.name_en}`,
+    description: `ค้นหาประกาศอสังหาริมทรัพย์ใน${province.name_th} พร้อมข้อมูลราคา ทำเล และรายละเอียดตามประกาศ ติดต่อผ่าน LINE`,
     alternates: { canonical: `/land/${slug}` },
   };
 }
@@ -71,7 +76,7 @@ export default async function ProvincePage({
             ที่ดินอุตสาหกรรม{province.name_th}
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            ที่ดิน EEC โรงงาน คลังสินค้า ลงทุน ใน{province.name_th} – ตรวจสอบก่อนทุกครั้ง
+            ค้นหาที่ดิน โรงงาน คลังสินค้า และอสังหาริมทรัพย์ใน{province.name_th} – ตรวจสอบก่อนทุกครั้ง
           </p>
         </div>
       </div>
@@ -93,10 +98,9 @@ export default async function ProvincePage({
         {/* SEO intro */}
         <div className="prose prose-slate text-sm max-w-none mb-8 p-5 bg-slate-50 rounded-xl">
           <p>
-            <strong>{province.name_th}</strong>เป็นหนึ่งในจังหวัดสำคัญของ EEC (Eastern Economic Corridor)
-            ที่ดึงดูดการลงทุนจากญี่ปุ่น จีน และยุโรปอย่างต่อเนื่อง
-            ที่ดินอุตสาหกรรมใน{province.name_th}ประกอบด้วยโซนม่วง (อุตสาหกรรม) และพื้นที่ใกล้นิคมชั้นนำ
-            LandmarketThai คัดสรรประกาศโดยทีมงานตรวจสอบก่อนเผยแพร่ ควรตรวจสอบเอกสารสิทธิ์และผังเมืองกับหน่วยงานก่อนตัดสินใจ
+            ค้นหาประกาศอสังหาริมทรัพย์ใน<strong>{province.name_th}</strong>
+            พร้อมข้อมูลราคา ทำเล และรายละเอียดที่ผู้ลงประกาศระบุ
+            ควรตรวจสอบเอกสาร ผังเมือง และข้อจำกัดการใช้พื้นที่กับหน่วยงานก่อนตัดสินใจ
           </p>
         </div>
 

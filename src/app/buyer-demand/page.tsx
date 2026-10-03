@@ -1,3 +1,5 @@
+import { getPublicContentAvailability } from "@/lib/public-content";
+import { archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getActiveDemands } from "@/lib/neon/queries";
@@ -8,12 +10,18 @@ import JsonLd from "@/components/seo/JsonLd";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-  title: "Buyer กำลังหาอสังหาริมทรัพย์ – ตลาดย้อนกลับ LandmarketThai",
+const archiveMetadata: Metadata = {
+  title: "Buyer กำลังหาอสังหาริมทรัพย์ – ตลาดย้อนกลับ",
   description:
     "รายการผู้ซื้อที่กำลังมองหาอสังหาริมทรัพย์ทั่วประเทศไทย แนะนำทรัพย์ที่ตรงความต้องการได้ทันที",
   alternates: { canonical: "/buyer-demand" },
+  openGraph: { url: "/buyer-demand" },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const availability = await getPublicContentAvailability();
+  return { ...archiveMetadata, robots: archiveRobots(availability.buyerDemand !== false) };
+}
 
 export default async function BuyerDemandPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const raw = Number((await searchParams).page ?? 1);

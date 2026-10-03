@@ -25,6 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     description: post.seo_description ?? post.excerpt ?? "",
     alternates: { canonical: `/blog/${slug}` },
     openGraph: {
+      url: `/blog/${slug}`,
       images: post.cover_image_key ? [cdnUrl(post.cover_image_key)] : [],
       type: "article",
       publishedTime: post.published_at ?? undefined,

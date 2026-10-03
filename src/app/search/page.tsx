@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "ค้นหาอสังหาริมทรัพย์",
   description: "ค้นหาอสังหาริมทรัพย์จากข้อมูลจริง พร้อมแผนที่และตัวกรองทำเล ราคา และขนาด",
   alternates: { canonical: "/search" },
+  openGraph: { url: "/search" },
 };
 
 type Params = Record<string, string | string[] | undefined>;

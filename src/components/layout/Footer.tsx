@@ -26,7 +26,7 @@ const policyLinks = [
   { label: "เงื่อนไขการใช้งาน",        href: "/terms" },
 ];
 
-export default function Footer() {
+export default function Footer({ showBlog = true, showBuyerDemand = true }: { showBlog?: boolean; showBuyerDemand?: boolean }) {
   return (
     <footer className="bg-slate-950 text-slate-400">
       <div className="container-xl section">
@@ -44,7 +44,7 @@ export default function Footer() {
               <span>ตลาดที่ดินไทย<span className="text-gold-400">.com</span></span>
             </Link>
             <p className="mt-3 text-sm leading-relaxed">
-              เครือข่ายที่ดินอุตสาหกรรม EEC ที่ใหญ่ที่สุดในไทย
+              แพลตฟอร์มค้นหาและฝากขายอสังหาริมทรัพย์
               ตรวจสอบข้อมูลก่อนทุกครั้ง
             </p>
             <Link
@@ -103,8 +103,8 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link href="/become-partner" className="hover:text-brand-400 transition-colors">สมัครพาร์ทเนอร์</Link></li>
               <li><Link href="/how-it-works"   className="hover:text-brand-400 transition-colors">วิธีรับค่าแนะนำ</Link></li>
-              <li><Link href="/buyer-demand"    className="hover:text-brand-400 transition-colors">ผู้ซื้อกำลังหา</Link></li>
-              <li><Link href="/blog"            className="hover:text-brand-400 transition-colors">บทความ</Link></li>
+              {showBuyerDemand && <li><Link href="/buyer-demand"    className="hover:text-brand-400 transition-colors">ผู้ซื้อกำลังหา</Link></li>}
+              {showBlog && <li><Link href="/blog"            className="hover:text-brand-400 transition-colors">บทความ</Link></li>}
               {policyLinks.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className="hover:text-brand-400 transition-colors">{l.label}</Link>

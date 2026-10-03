@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "นโยบายความเป็นส่วนตัว – LandmarketThai",
+  title: "นโยบายความเป็นส่วนตัว",
   description: "นโยบายความเป็นส่วนตัวของ LandmarketThai การเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคล PDPA Compliant",
   alternates: { canonical: "/privacy" },
 };

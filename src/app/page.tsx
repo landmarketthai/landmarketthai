@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/constants/site";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -25,7 +26,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "LandmarketThai – ที่ดินอุตสาหกรรม EEC ทั่วไทย",
+  alternates: { canonical: SITE_URL },
+  openGraph: { url: SITE_URL },
+  title: { absolute: "LandmarketThai – ค้นหาและฝากขายอสังหาริมทรัพย์" },
   description:
     "แพลตฟอร์มที่ดินอุตสาหกรรม EEC ระยอง ชลบุรี ทีมงานช่วยดูแลข้อมูล นัดหมาย และการเจรจา สำหรับผู้แนะนำ เจ้าของที่ดิน และนักลงทุน",
 };
@@ -97,7 +100,7 @@ export default async function HomePage() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "LandmarketThai",
-    url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://landmarketthai.com",
+    url: SITE_URL,
     description: "แพลตฟอร์มที่ดินอุตสาหกรรมและ EEC",
     contactPoint: { "@type": "ContactPoint", contactType: "customer support", availableLanguage: "Thai" },
   };
@@ -321,11 +324,9 @@ export default async function HomePage() {
           </div>
           <BuyerDemandList demands={buyerDemands} />
         </div>
-      </section> : <section id="buyer-demand" className="border-t border-slate-100 bg-white px-4 py-5 sm:px-6 lg:px-8">
-        <div className="container-xl flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">กำลังมองหาอสังหาริมทรัพย์? ฝากเงื่อนไขให้ทีมงานช่วยจับคู่</p>
-          <Link href="/buy-request" className="btn-green text-sm">ฝากความต้องการซื้อ</Link>
-        </div>
+      </section> : <section className="container-xl py-8 text-center">
+        <h2 className="font-bold">กำลังมองหาอสังหาริมทรัพย์?</h2>
+        <Link href="/buy-request" className="btn-green mt-4">ฝากความต้องการซื้อ</Link>
       </section>}
 
       {/* ── 4. HOW IT WORKS + WHO CAN EARN ───────────────────────────────── */}

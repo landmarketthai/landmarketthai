@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { uniqueGalleryImages } from "@/lib/public-seo";
 import type { PropertyDetailImage } from "@/lib/property-detail-data";
 
 interface Props {
@@ -160,7 +161,8 @@ function PropertyLightbox({
   );
 }
 
-export default function PropertyGallery({ images, title }: Props) {
+export default function PropertyGallery({ images: sourceImages, title }: Props) {
+  const images = uniqueGalleryImages(sourceImages);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const selectedImage = images[selectedIndex];

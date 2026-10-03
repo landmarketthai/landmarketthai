@@ -4,10 +4,11 @@ import { ArrowRight } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 
 export const metadata: Metadata = {
-  title: "เกี่ยวกับเรา – LandmarketThai",
+  title: "เกี่ยวกับเรา",
   description:
-    "LandmarketThai เครือข่ายที่ดินอุตสาหกรรม EEC ที่ใหญ่ที่สุดในไทย เชื่อมเจ้าของที่ดิน นักลงทุน และพาร์ทเนอร์ผ่านระบบ Referral",
+    "LandmarketThai แพลตฟอร์มค้นหาและฝากขายอสังหาริมทรัพย์ เชื่อมเจ้าของที่ดิน นักลงทุน และพาร์ทเนอร์ผ่านระบบ Referral",
   alternates: { canonical: "/about" },
+  openGraph: { url: "/about" },
 };
 
 export default function AboutPage() {
@@ -17,7 +18,7 @@ export default function AboutPage() {
         <div className="container-xl max-w-2xl">
           <h1 className="text-3xl font-bold mb-3">เกี่ยวกับ LandmarketThai</h1>
           <p className="text-slate-400">
-            เครือข่ายที่ดินอุตสาหกรรมและ EEC ที่น่าเชื่อถือที่สุดในไทย
+            แพลตฟอร์มเชื่อมต่อผู้ซื้อ ผู้ขาย และพาร์ทเนอร์อสังหาริมทรัพย์
           </p>
         </div>
       </div>
@@ -26,14 +27,14 @@ export default function AboutPage() {
         <div className="prose prose-slate max-w-none space-y-6 text-slate-600">
           <h2 className="text-xl font-bold text-slate-900">พันธกิจของเรา</h2>
           <p>
-            LandmarketThai ก่อตั้งขึ้นเพื่อเป็นแพลตฟอร์มที่ดินอุตสาหกรรมและ EEC ที่โปร่งใสและน่าเชื่อถือที่สุดในประเทศไทย
+            LandmarketThai ก่อตั้งขึ้นเพื่อเป็นแพลตฟอร์มที่ดินอุตสาหกรรมและ EEC สำหรับค้นหา ฝากขาย และประสานงานผู้ซื้อและผู้ขาย
             เราเชื่อมเจ้าของที่ดิน นักลงทุน โรงงาน และคลังสินค้า เข้าด้วยกันผ่านเครือข่ายพาร์ทเนอร์ทั่วประเทศ
           </p>
 
           <h2 className="text-xl font-bold text-slate-900">จุดแข็งของเรา</h2>
           <ul className="space-y-2">
             <li><strong>การคัดสรรและตรวจสอบ</strong> — ทีมงานตรวจสอบประกาศก่อนเผยแพร่ ข้อมูลเอกสารสิทธิ์และผังเมืองแสดงตามประกาศ ควรตรวจสอบกับเอกสารต้นฉบับและหน่วยงานก่อนตัดสินใจ</li>
-            <li><strong>เครือข่าย Referral</strong> — พาร์ทเนอร์กว่า 200+ รายทั่วไทยช่วยเชื่อมโยงที่ดินกับผู้ซื้อที่ใช่</li>
+            <li><strong>เครือข่าย Referral</strong> — เครือข่ายพาร์ทเนอร์ช่วยเชื่อมโยงที่ดินกับผู้ซื้อที่ใช่</li>
             <li><strong>ความเชี่ยวชาญ EEC</strong> — ทีมงานมีประสบการณ์เฉพาะด้านที่ดินอุตสาหกรรมและ EEC โดยตรง</li>
             <li><strong>ความโปร่งใส</strong> — ราคาต่อไร่ชัดเจน ค่าแนะนำประกาศในที่สาธารณะ</li>
           </ul>

@@ -467,7 +467,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
                   <span className="text-xs text-slate-500">{formatMoneyFull(selectedMapProperty.price_per_rai)} / ไร่</span>
                 )}
               </div>
-              <Link href={`/properties/${selectedMapProperty.slug}`} className="btn-green mt-3 w-full justify-center text-sm">
+              <Link href={`/property/${selectedMapProperty.slug}`} className="btn-green mt-3 w-full justify-center text-sm">
                 ดูรายละเอียดทรัพย์
               </Link>
             </div>

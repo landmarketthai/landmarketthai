@@ -130,12 +130,14 @@ export interface AnchorDistance {
 }
 
 export function rankNearbyAnchors(
-  origin: CoordinateInput | null | undefined,
+  origin: (CoordinateInput & { id?: string; slug?: string; title_th?: string }) | null | undefined,
   anchors: readonly LocationAnchor[] = LOCATION_ANCHORS,
 ): AnchorDistance[] {
   return anchors.flatMap((anchor): AnchorDistance[] => {
     const distanceKm = distanceToAnchorKm(origin, anchor);
-    return distanceKm === null ? [] : [{ anchor, distanceKm, distanceKind: "straight_line" }];
+    const self = anchor.id === origin?.id || anchor.id === origin?.slug ||
+      anchor.id === `listing-${origin?.slug}` || anchor.label === origin?.title_th;
+    return self || distanceKm === null || distanceKm <= 0.001 ? [] : [{ anchor, distanceKm, distanceKind: "straight_line" }];
   }).sort((a, b) => a.distanceKm - b.distanceKm ||
     (a.anchor.id < b.anchor.id ? -1 : a.anchor.id > b.anchor.id ? 1 : 0));
 }

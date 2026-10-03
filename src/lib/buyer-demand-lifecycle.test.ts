@@ -216,10 +216,12 @@ test("public demand rendering and sitemap exclude withdrawn rows and private tex
   const sitemap = loadSource<typeof import("../app/sitemap.ts")>("../app/sitemap.ts", {
     "@/lib/neon/queries": { getActiveDemands: async () => rows, getAllProvinces: async () => [], getPublishedPosts: async () => [] },
     "@/lib/public-inventory": { getPublicInventory: async () => [] }, "@/lib/utils": { LAND_TYPE_LABELS: {} },
+    "@/lib/public-seo": { populatedArchivePaths: () => [] },
+    "@/lib/constants/site": { SITE_URL: "https://www.landmarketthai.com" },
     "@/components/demand/BuyerDemandList": component,
-  }, { process: { env: {} } });
+  }, { process: { env: { DATABASE_URL: "mock-only" } } });
   const links = (await sitemap.default()).filter((entry) => entry.url.includes("/buyer-demand/"));
-  assert.deepEqual(Array.from(links, (entry) => entry.url), ["https://landmarketthai.com/buyer-demand/public-demand"]);
+  assert.deepEqual(Array.from(links, (entry) => entry.url), ["https://www.landmarketthai.com/buyer-demand/public-demand"]);
 });
 
 test("unknown initial province recovers after a valid selection and submits without a source receipt", async () => {
@@ -281,6 +283,8 @@ test("public pages distinguish outages from empty lists and real 404 without exp
   let fail = true;
   let notFoundCalls = 0;
   const modules = {
+    "@/lib/public-content": { getPublicContentAvailability: async () => ({ blog: false, buyerDemand: false }) },
+    "@/lib/public-seo": { archiveRobots: (hasContent: boolean) => ({ index: hasContent, follow: true }) },
     "react/jsx-runtime": jsxRuntime, "next/link": "link", "lucide-react": {},
     "next/navigation": { notFound: () => { notFoundCalls++; throw new Error("404"); } },
     "@/lib/neon/queries": {
@@ -782,9 +786,11 @@ test("sitemap demand pagination propagates later outages and caps the total at 5
       }, getAllProvinces: async () => [], getPublishedPosts: async () => [],
     },
     "@/lib/public-inventory": { getPublicInventory: async () => [] },
+    "@/lib/public-seo": { populatedArchivePaths: () => [] },
+    "@/lib/constants/site": { SITE_URL: "https://www.landmarketthai.com" },
     "@/lib/utils": { LAND_TYPE_LABELS: {} },
     "@/components/demand/BuyerDemandList": { isPublishedDemand: () => true },
-  }, { process: { env: {} } });
+  }, { process: { env: { DATABASE_URL: "mock-only" } } });
   assert.equal((await sitemap.default()).filter((entry) => entry.url.includes("/buyer-demand/")).length, 401);
   assert.deepEqual(offsets, [0, 200, 400]);
   failAt = 200;

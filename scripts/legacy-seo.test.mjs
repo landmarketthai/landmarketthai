@@ -11,11 +11,11 @@ test("legacy province category pages filter by their category and keep all eight
   assert.match(utils, /LAND_CATEGORY_TYPES = \["land", "industrial", "eec", "factory", "warehouse", "logistics", "data_center", "investment"\]/);
 });
 
-test("legacy detail presents usable area and canonical listing href without land-only pricing for buildings", () => {
+test("legacy detail permanently redirects to the resolved canonical listing", () => {
   const detail = read("../src/app/listing/[slug]/page.tsx");
-  assert.match(detail, /propertySizeLabel\(land\)/);
-  assert.match(detail, /land\.price_per_rai != null && land\.size_rai != null/);
-  assert.match(detail, /canonical: listingHref\(land\.public_ref, land\.slug\)/);
+  assert.match(detail, /getListingByRef\(ref\)/);
+  assert.match(detail, /permanentRedirect\(propertyHref\(land.slug\)\)/);
+  assert.doesNotMatch(detail, /RealEstateListing|<ListingTrust|generateMetadata/);
 });
 
 test("removed land insights URL redirects permanently to search", () => {

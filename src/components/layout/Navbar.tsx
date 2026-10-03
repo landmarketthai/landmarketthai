@@ -92,7 +92,8 @@ function UserMenu({ onClose }: { onClose?: () => void }) {
   );
 }
 
-export default function Navbar() {
+export default function Navbar({ showBlog = true }: { showBlog?: boolean }) {
+  const visibleLinks = navLinks.filter(link => link.href !== "/blog" || showBlog);
   const [open, setOpen] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -122,7 +123,7 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden xl:flex items-center gap-0.5">
-          {navLinks.map((link) => (
+          {visibleLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -165,7 +166,7 @@ export default function Navbar() {
 
       {open && (
         <div className="border-t border-slate-100 bg-white px-4 pb-4 xl:hidden">
-          {navLinks.map((link) => (
+          {visibleLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}

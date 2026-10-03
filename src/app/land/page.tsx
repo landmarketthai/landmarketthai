@@ -10,7 +10,9 @@ import { SEED_ACTIVE_LISTINGS } from "@/lib/seed-listings";
 import SaveSearchForm from "@/components/listings/SaveSearchForm";
 
 export const metadata: Metadata = {
-  title: "ที่ดินอุตสาหกรรม EEC ทั่วไทย – ตลาดที่ดิน",
+  alternates: { canonical: "/land" },
+  openGraph: { url: "/land" },
+  title: "ค้นหาและฝากขายอสังหาริมทรัพย์ – ตลาดที่ดิน",
   description:
     "ค้นหาที่ดินอุตสาหกรรม โรงงาน คลังสินค้า EEC Rayong Chonburi ตามขนาด ราคาต่อไร่ และสีผังเมือง",
 };
@@ -26,7 +28,7 @@ export default function LandPage({
     <div>
       <div className="bg-slate-900 text-white py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">ที่ดินอุตสาหกรรม EEC ทั่วไทย</h1>
+          <h1 className="text-2xl font-bold mb-1">ค้นหาและฝากขายอสังหาริมทรัพย์</h1>
           <p className="text-slate-400 text-sm">ค้นหาตามทำเล ขนาด ราคาต่อไร่ และสีผังเมือง · ป้าย Verified แสดงเมื่อทีมงานตรวจสอบแล้ว</p>
         </div>
       </div>

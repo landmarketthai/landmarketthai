@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "เงื่อนไขการใช้งาน – LandmarketThai",
+  title: "เงื่อนไขการใช้งาน",
   description: "เงื่อนไขการใช้งานเว็บไซต์และโปรแกรม Referral Partner LandmarketThai",
   alternates: { canonical: "/terms" },
 };

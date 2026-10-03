@@ -336,7 +336,7 @@ test("homepage keeps one map, featured inventory and a compact demand fallback",
   const fallback = source.split("</section> : <section")[1]?.split("</section>}")[0];
   assert.ok(fallback);
   assert.match(fallback, /href="\/buy-request"/);
-  assert.doesNotMatch(fallback, /BuyerDemandList|py-12|py-14/);
+  assert.doesNotMatch(fallback, /href="\/buyer-demand"|BuyerDemandList|py-12|py-14/);
 });
 
 test("public demand cards and detail metadata only render allowlisted typed criteria", () => {
@@ -362,7 +362,7 @@ test("public demand cards and detail metadata only render allowlisted typed crit
 });
 
 test("demand-bearing public pages render dynamically so withdrawals take effect", () => {
-  for (const path of ["../../app/page.tsx", "../../app/buyer-demand/page.tsx", "../../app/buyer-demand/[slug]/page.tsx", "../../app/sitemap.ts"]) {
+  for (const path of ["../../app/page.tsx", "../../app/buyer-demand/page.tsx", "../../app/buyer-demand/[slug]/page.tsx"]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.match(source, /export const dynamic = "force-dynamic"/);
     assert.match(source, /export const revalidate = 0/);

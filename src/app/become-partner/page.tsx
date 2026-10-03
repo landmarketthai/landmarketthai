@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   description:
     "สมัครเป็น Referral Partner กับ LandmarketThai ฟรีตลอดชีพ รับค่าแนะนำสูงสุดหลายล้านบาทต่อดีล ไม่ต้องลงทุน ไม่ต้องสต็อก",
   alternates: { canonical: "/become-partner" },
+  openGraph: { url: "/become-partner" },
 };
 
 const benefits = [
@@ -27,7 +28,7 @@ const commissionExamples = [
 const faqItems = [
   {
     q: "ต้องมีใบอนุญาตนายหน้าไหม?",
-    a: "ไม่ต้อง คุณทำหน้าที่แนะนำ ทีม LandmarketThai ที่มีใบอนุญาตจะดูแลกระบวนการซื้อขายทั้งหมด",
+    a: "ไม่ต้อง คุณทำหน้าที่แนะนำผู้ซื้อหรือผู้ขาย ทีม LandmarketThai ดูแลกระบวนการประสานงาน",
   },
   {
     q: "รับค่าแนะนำเมื่อไหร่?",

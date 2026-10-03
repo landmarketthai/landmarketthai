@@ -1,3 +1,4 @@
+import { KABIN_101 } from "@/lib/flagship-facts";
 import type { Land, LandType, Province } from "@/lib/types/database";
 import { propertyHref } from "@/lib/property-detail-data";
 
@@ -158,15 +159,18 @@ export const SEED_101_KABIN_LAND: Land = {
   province_id: SEED_PRACHIN_PROVINCE.id,
   district: "อ.กบินทร์บุรี ต.หนองกี่",
   land_type: "industrial",
-  size_rai: 101.06,
+  size_rai: KABIN_101.size_rai,
+  area_rai: KABIN_101.area_rai,
+  area_ngan: KABIN_101.area_ngan,
+  area_sqwa: KABIN_101.area_sqwa,
   zoning: null,
   frontage_m: 700,
-  price_per_rai: 1_500_000,
-  total_price: 151_590_000,
+  price_per_rai: KABIN_101.price_per_rai,
+  total_price: KABIN_101.total_price,
   referral_reward_max: 2_275_000,
   is_eec: false,
   nearby_landmarks: ["ตรงข้ามสวนอุตสาหกรรมกวางตุ้ง"],
-  description: null,
+  description: KABIN_101.documentNote,
   lat: 14.0417619,
   lng: 101.8310660,
   location_precision: "exact",

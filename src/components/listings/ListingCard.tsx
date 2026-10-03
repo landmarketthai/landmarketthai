@@ -10,9 +10,7 @@ import {
   ZONING_LABELS,
   formatMoney,
   formatMoneyFull,
-  formatUpdatedDate,
   listingHref,
-  listingStatusLabel,
 } from "@/lib/utils";
 
 interface Props {
@@ -81,7 +79,6 @@ export default function ListingCard({
   const zoningLabel = metaTagLabel ?? (land.zoning ? ZONING_LABELS[land.zoning] : null);
   const totalPrice = land.total_price;
   const totalPriceLabel = "ราคารวม";
-  const updatedLabel = formatUpdatedDate(land.updated_at);
 
   return (
     <article
@@ -130,11 +127,6 @@ export default function ListingCard({
             </div>
           )}
 
-          {isSoldOut && (
-            <span className="absolute right-3 top-3 z-20 rounded-md bg-red-600 px-3 py-1.5 text-xs font-black tracking-wide text-white shadow-lg">
-              Sold out
-            </span>
-          )}
 
           {!isSoldOut && land.referral_reward_max != null && (
             <div className="absolute inset-x-0 bottom-0 z-10 bg-[#001B48]/92 px-4 py-2.5">
@@ -191,12 +183,6 @@ export default function ListingCard({
                   <span>หน้ากว้าง {land.frontage_m.toLocaleString("th-TH")} ม.</span>
                 </span>
               )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`w-fit rounded-full px-2 py-1 text-[11px] font-semibold ${isSoldOut ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
-                {listingStatusLabel(land)}
-              </span>
-              {updatedLabel && <span className="text-[11px] text-slate-400">อัปเดต {updatedLabel}</span>}
             </div>
             {land.verification_status === "pending" && (
               <span className="w-fit rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">

@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     title: `Buyer ต้องการ${demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"} — ${demandProvinceLabel(demand)}`,
     description: `ผู้ซื้อต้องการ${demand.land_type ? (LAND_TYPE_LABELS[demand.land_type] ?? LAND_TYPE_LABELS.other) : "อสังหาริมทรัพย์ทุกประเภท"} ${demandProvinceLabel(demand)} ขนาด ${demandSizeLabel(demand)}`,
     alternates: { canonical: `/buyer-demand/${slug}` },
+    openGraph: { url: `/buyer-demand/${slug}` },
   };
 }
 

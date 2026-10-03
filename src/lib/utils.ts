@@ -42,7 +42,7 @@ export function formatRai(n: number): string {
 export function formatMoney(n: number): string {
   if (n >= 1_000_000) {
     const m = n / 1_000_000;
-    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)} ล้าน`;
+    return `${m % 1 === 0 ? m.toFixed(0) : Number(m.toFixed(2)).toString()} ล้าน`;
   }
   return n.toLocaleString("th-TH");
 }
@@ -68,8 +68,8 @@ export function formatUpdatedDate(value: string): string | null {
   }).format(date);
 }
 
-export function listingHref(publicRef: number, slug: string): string {
-  return `/listing/${publicRef}-${slug}`;
+export function listingHref(_publicRef: number, slug: string): string {
+  return `/property/${slug}`;
 }
 
 export function provinceHref(provinceSlug: string): string {

@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "ฝากขายทรัพย์",
   description: "ฝากขายอสังหาริมทรัพย์ทุกประเภท ข้อมูลจะผ่านการตรวจสอบก่อนเผยแพร่",
   alternates: { canonical: "/sell" },
+  openGraph: { url: "/sell" },
 };
 
 const notes = [

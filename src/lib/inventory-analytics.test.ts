@@ -18,7 +18,7 @@ test("seed inventory has accurate asking-price statistics and explicit scope", (
     count: 2, min: 1_500_000, max: 2_300_000, median: 1_900_000, average: 1_900_000,
   });
   assert.deepEqual(result.totalPrice, {
-    count: 2, min: 84_911_975, max: 151_590_000, median: 118_250_987.5, average: 118_250_987.5,
+    count: 2, min: 84_911_975, max: 151_582_500, median: 118_247_237.5, average: 118_247_237.5,
   });
   assert.equal(result.byProvince.length, 2);
   assert.equal(result.byProvince.find((group) => group.key === SEED_37_RAI_LAND.province_id)?.pricePerRai.median, 2_300_000);

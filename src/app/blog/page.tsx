@@ -1,3 +1,5 @@
+import { getPublicContentAvailability } from "@/lib/public-content";
+import { archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -7,15 +9,25 @@ import { cdnUrl } from "@/lib/utils";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+const archiveMetadata: Metadata = {
   title: "บทความ – ความรู้ที่ดินอุตสาหกรรม EEC",
   description:
     "บทความความรู้ด้านที่ดินอุตสาหกรรม EEC กฎหมาย เอกสารสิทธิ์ การลงทุน สำหรับผู้ซื้อ ผู้ขาย และพาร์ทเนอร์",
   alternates: { canonical: "/blog" },
+  openGraph: { url: "/blog" },
 };
 
+export async function generateMetadata(): Promise<Metadata> {
+  const availability = await getPublicContentAvailability();
+  return { ...archiveMetadata, robots: archiveRobots(availability.blog !== false) };
+}
+
 export default async function BlogPage() {
-  const posts = await getPublishedPosts({ limit: 20 }).catch(() => []);
+  const posts = await getPublishedPosts({ limit: 20 }).catch(() => null);
+  if (posts === null) return <div className="container-xl section text-center" role="alert">
+    <h1 className="text-xl font-bold">โหลดบทความไม่ได้ในขณะนี้</h1>
+    <Link href="/blog" className="btn-outline mt-4">ลองใหม่</Link>
+  </div>;
 
   return (
     <div>

@@ -1,3 +1,5 @@
+import { getPublicContentAvailability } from "@/lib/public-content";
+import { SITE_URL } from "@/lib/constants/site";
 import type { Metadata } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
 import "leaflet/dist/leaflet.css";
@@ -15,21 +17,18 @@ const notoSansThai = Noto_Sans_Thai({
   variable: "--font-sans",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://landmarketthai.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "LandmarketThai – ที่ดินอุตสาหกรรม EEC ทั่วไทย",
+    default: "LandmarketThai – ค้นหาและฝากขายอสังหาริมทรัพย์",
     template: "%s | LandmarketThai",
   },
   description:
-    "เครือข่ายที่ดินอุตสาหกรรมและ EEC ที่ใหญ่ที่สุดในไทย ซื้อ ขาย รับค่าแนะนำ ที่ดิน Rayong Chonburi Samut Prakan",
-  keywords: ["ที่ดินอุตสาหกรรม", "EEC", "ที่ดิน Rayong", "ที่ดินโรงงาน", "referral ที่ดิน"],
+    "แพลตฟอร์มสำหรับค้นหา ฝากขาย และเชื่อมต่อผู้ซื้อ ผู้ขาย และพาร์ทเนอร์อสังหาริมทรัพย์",
   openGraph: {
     type: "website",
     locale: "th_TH",
-    url: SITE_URL,
     siteName: "LandmarketThai",
   },
   twitter: {
@@ -39,23 +38,21 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
   },
-  alternates: {
-    canonical: SITE_URL,
-  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const availability = await getPublicContentAvailability();
   return (
     <html lang="th" className={notoSansThai.variable}>
       <body>
         <AuthProvider>
-          <Navbar />
+          <Navbar showBlog={availability.blog !== false} />
           <main>{children}</main>
-          <Footer />
+          <Footer showBlog={availability.blog !== false} showBuyerDemand={availability.buyerDemand !== false} />
         </AuthProvider>
       </body>
     </html>

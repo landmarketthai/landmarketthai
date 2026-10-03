@@ -114,7 +114,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
         </div>
       </button>
       <div className="border-t border-slate-100 px-3 py-2 text-right min-[380px]:px-4">
-        <Link href={`/properties/${property.slug}`} className="inline-flex min-h-11 items-center justify-end px-1 text-sm font-bold text-[#00A859] hover:underline">
+        <Link href={`/property/${property.slug}`} className="inline-flex min-h-11 items-center justify-end px-1 text-sm font-bold text-[#00A859] hover:underline">
           ดูรายละเอียดทรัพย์
         </Link>
       </div>

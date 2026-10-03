@@ -4,9 +4,10 @@ import LineButton from "@/components/ui/LineButton";
 import LeadForm from "@/components/forms/LeadForm";
 
 export const metadata: Metadata = {
-  title: "ติดต่อเรา – LandmarketThai",
+  title: "ติดต่อเรา",
   description: "ติดต่อทีม LandmarketThai สอบถามที่ดินอุตสาหกรรม EEC สมัครพาร์ทเนอร์ หรือส่งที่ดินของคุณ",
   alternates: { canonical: "/contact" },
+  openGraph: { url: "/contact" },
 };
 
 const contactItems = [

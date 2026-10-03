@@ -65,7 +65,7 @@ test("nearby anchor ranking skips unknowns, sorts distances and breaks ties by i
     { ...base, id: "a", coordinates: { lat: 0, lng: 1 } },
     { ...base, id: "near", coordinates: { lat: 0, lng: 0 } },
   ];
-  assert.deepEqual(rankNearbyAnchors({ lat: 0, lng: 0 }, anchors).map((result) => result.anchor.id), ["near", "a", "z"]);
+  assert.deepEqual(rankNearbyAnchors({ lat: 0, lng: 0 }, anchors).map((result) => result.anchor.id), ["a", "z"]);
   assert.deepEqual(anchors.map((anchor) => anchor.id), ["z", "unknown", "a", "near"]);
   assert.equal(rankNearbyAnchors({ lat: 0, lng: 0 }, anchors)[0].distanceKind, "straight_line");
   assert.deepEqual(rankNearbyAnchors(null, anchors), []);
