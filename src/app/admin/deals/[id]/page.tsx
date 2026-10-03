@@ -56,7 +56,7 @@ export default async function AdminDealDetailPage({ params }: { params: Promise<
       </section>
       <aside className="min-w-0">
         <DealUpdateForm key={deal.updated_at} assignees={assignees}
-          deal={{ id: deal.id, stage: deal.stage, deal_value: deal.deal_value, expected_commission: deal.expected_commission, assigned_to: deal.assigned_to, notes: deal.notes, updated_at: deal.updated_at }} />
+          deal={{ id: deal.id, stage: deal.stage, deal_value: deal.deal_value, assigned_to: deal.assigned_to, notes: deal.notes, updated_at: deal.updated_at }} />
       </aside>
     </div>
   </main>;

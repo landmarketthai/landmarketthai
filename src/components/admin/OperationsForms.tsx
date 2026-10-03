@@ -117,10 +117,10 @@ export function DealCreateForm({ buyerLeadId, assignees }: { buyerLeadId: string
   </form>;
 }
 
-export function DealUpdateForm({ deal, assignees }: { deal: Pick<Deal, "id" | "stage" | "deal_value" | "expected_commission" | "assigned_to" | "notes" | "updated_at">; assignees: string[] }) {
+export function DealUpdateForm({ deal, assignees }: { deal: Pick<Deal, "id" | "stage" | "deal_value" | "assigned_to" | "notes" | "updated_at">; assignees: string[] }) {
   const { busy, error, message, send } = useSubmit();
   const initial = {
-    stage: deal.stage, deal_value: deal.deal_value?.toString() ?? "", expected_commission: deal.expected_commission?.toString() ?? "",
+    stage: deal.stage, deal_value: deal.deal_value?.toString() ?? "",
     assigned_to: deal.assigned_to ?? "", notes: deal.notes ?? "",
   };
   const [form, setForm] = useState(initial);
@@ -129,7 +129,7 @@ export function DealUpdateForm({ deal, assignees }: { deal: Pick<Deal, "id" | "s
     event.preventDefault();
     const body: Record<string, unknown> = { expected_updated_at: deal.updated_at };
     if (form.stage !== initial.stage) body.stage = form.stage;
-    for (const key of ["deal_value", "expected_commission"] as const) if (form[key] !== initial[key]) body[key] = money(form[key]);
+    if (form.deal_value !== initial.deal_value) body.deal_value = money(form.deal_value);
     if (form.assigned_to.trim() !== initial.assigned_to) body.assigned_to = form.assigned_to.trim() || null;
     if (form.notes !== initial.notes) body.notes = form.notes.trim() || null;
     if (Object.keys(body).length === 1) return;
@@ -144,9 +144,8 @@ export function DealUpdateForm({ deal, assignees }: { deal: Pick<Deal, "id" | "s
     </label>
     {form.stage === "won" && deal.stage !== "won" && <p className="text-sm text-amber-800">ปิดดีลสำเร็จ: ดีลจะถูกปิด ลีดผู้ซื้อจะเป็น “ปิดการขายสำเร็จ” และนับคอนเวอร์ชันของผู้แนะนำ</p>}
     {form.stage === "lost" && deal.stage !== "lost" && <p className="text-sm text-amber-800">ดีลไม่สำเร็จ: ดีลจะถูกยกเลิก แต่ลีดผู้ซื้อยังติดตามทรัพย์อื่นได้</p>}
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2">
       <label className="min-w-0"><span className="label">มูลค่าดีล (บาท)</span><input {...field("deal_value")} type="number" min={0} step="any" inputMode="decimal" /></label>
-      <label className="min-w-0"><span className="label">ค่าคอมฯ ที่คาด (บาท)</span><input {...field("expected_commission")} type="number" min={0} step="any" inputMode="decimal" /></label>
       <label className="min-w-0"><span className="label">ผู้รับผิดชอบ</span><input {...field("assigned_to")} list="deal-assignees" maxLength={120} /><Assignees id="deal-assignees" values={assignees} /></label>
     </div>
     <label className="block"><span className="label">หมายเหตุ (เฉพาะผู้ดูแล)</span><textarea {...field("notes")} rows={4} maxLength={4000} /></label>

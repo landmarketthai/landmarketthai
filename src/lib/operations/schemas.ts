@@ -59,7 +59,6 @@ export const dealUpdateSchema = z.object({
   stage: dealStage.optional(),
   status: dealStatus.optional(),
   deal_value: money.optional(),
-  expected_commission: money.optional(),
   assigned_to: owner.optional(),
   notes: z.string().trim().max(4000).transform((value) => value || null).nullable().optional(),
 }).strict().refine(hasChange, { message: "ไม่มีข้อมูลที่ต้องบันทึก" });

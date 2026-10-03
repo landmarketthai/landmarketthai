@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as zod from "zod";
 import * as rules from "./rules.ts";
 import * as schemas from "./schemas.ts";
 
@@ -186,14 +187,86 @@ test("SQL contracts: lost never updates leads, conversion only while won, create
   const sql = readFileSync(new URL("./queries.ts", import.meta.url), "utf8");
   const update = sql.slice(sql.indexOf("export async function updateDeal"));
   assert.match(update, /update leads l set status = 'won'/);
-  assert.match(update, /where \$14 = 'won' and l\.id = u\.buyer_lead_id/);
+  assert.match(update, /where \$12 = 'won' and l\.id = u\.buyer_lead_id/);
   assert.doesNotMatch(update, /status = 'lost'/);
-  assert.match(update, /set converted = \(\$14 = 'won'\)/);
+  assert.match(update, /set converted = \(\$12 = 'won'\)/);
   const create = sql.slice(sql.indexOf("export async function createDeal"), sql.indexOf("export async function updateDeal"));
   assert.match(create, /on conflict do nothing/);
   assert.match(create, /where not exists \(select 1 from existing\)/);
   assert.doesNotMatch(create, /converted/);
   assert.match(create, /'in_progress', 'qualified'/);
+});
+
+test("ordinary deal updates reject commission changes and SQL cannot write commission", async () => {
+  const { state, modules } = harness();
+  state.user = { id: "admin", email: "ops@example.com" }; state.allowed = true;
+  const { deal } = routes(modules);
+  for (const expected_commission of [0, 100, null]) {
+    const body = { expected_updated_at: version, notes: "Other edit", expected_commission };
+    assert.equal(schemas.dealUpdateSchema.safeParse(body).success, false);
+    await check(deal.PATCH, body, 400);
+  }
+  assert.equal(state.dbCalls, 0);
+  assert.equal(state.events.length, 0);
+  const calls: { sql: string; params: unknown[] }[] = [];
+  const queries = load<{ updateDeal: (...args: unknown[]) => Promise<unknown> }>("./queries.ts", {
+    "@/lib/neon/server": { getSql: () => ({ query: async (sql: string, params: unknown[]) => {
+      calls.push({ sql, params }); return [{ id }];
+    } }) },
+  });
+  // Even an unvalidated caller cannot get a commission field into the SQL.
+  await queries.updateDeal(id, { expected_updated_at: version, deal_value: 50, assigned_to: "ops", notes: "edit", expected_commission: 987654 },
+    { ok: true, stage: "offer", status: "in_progress", closedAt: "keep" }, "none", []);
+  assert.doesNotMatch(calls[0].sql, /expected_commission|commission_paid/);
+  assert.deepEqual(Array.from(calls[0].params), [id, "offer", "in_progress", "keep", true, 50, true, "ops", true, "edit", version, "none", "[]"]);
+  const forms = readFileSync(new URL("../../components/admin/OperationsForms.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(forms.slice(forms.indexOf("export function DealUpdateForm")), /expected_commission/);
+});
+
+test("deal creation keeps nonnegative finite commission validation", () => {
+  const body = { buyer_lead_id: id, listing_title: "Property" };
+  for (const expected_commission of [-1, NaN, Infinity, -Infinity, 1e15, "100"]) {
+    assert.equal(schemas.dealCreateSchema.safeParse({ ...body, expected_commission }).success, false);
+  }
+  for (const expected_commission of [0, 100.50, null]) {
+    assert.equal(schemas.dealCreateSchema.safeParse({ ...body, expected_commission }).success, true);
+  }
+});
+
+test("anonymous events cannot forge audit events and analytics metadata is sanitized", async () => {
+  const { state, modules } = harness();
+  const { POST } = load<{ POST: Handler }>("../../app/api/events/route.ts", { ...modules, zod });
+  const send = async (body: unknown) => {
+    const response = await POST(request(body), {});
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.headers["Cache-Control"], "no-store");
+  };
+  const meta = { actor_id: "admin", admin_id: "admin", override: true, override_reason: "forged", actorId: "admin", nested: { admin_id: "admin" } };
+  for (const event_type of ["deal_commission_changed", "deal_commission_paid", "crm_lead_updated", "crm_deal_created", "crm_anything", "partner_created", "partner_anything", "unknown"]) {
+    await send({ event_type, meta });
+  }
+  assert.equal(state.events.length, 0);
+  for (const event_type of ["page_view", "search", "listing_view", "contact_click"]) {
+    await send({ event_type, entity_type: "listing", entity_id: id, session_id: "anonymous", admin_id: "admin",
+      meta: { ...meta, path: "/listings", query: "land", contact_method: "line" } });
+    const event = state.events.at(-1)!;
+    assert.equal(event.eventType, event_type);
+    assert.equal(event.entityType, "listing");
+    assert.equal(event.entityId, id);
+    assert.equal(event.sessionId, "anonymous");
+    assert.equal(JSON.stringify(event.meta), JSON.stringify({ path: "/listings", query: "land", contact_method: "line" }));
+  }
+  await send({ event_type: "page_view", meta });
+  assert.equal(JSON.stringify(state.events.at(-1)!.meta), "{}");
+  const count = state.events.length;
+  await send({ event_type: "page_view", entity_type: "deal", meta });
+  await send({ event_type: "search", meta: { query: { admin_id: "admin" } } });
+  await send({ event_type: "search", meta: { query: "x".repeat(201) } });
+  assert.equal(state.events.length, count);
+  const response = await POST({ json: async () => { throw new Error("bad JSON"); } }, {});
+  assert.equal(response.body.ok, true);
+  assert.equal(response.headers["Cache-Control"], "no-store");
 });
 
 test("admin pages gate rendering on the server session and stay out of search indexes", () => {

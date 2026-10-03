@@ -283,28 +283,26 @@ export async function updateDeal(
        update deals set stage = $2, status = $3,
          closed_at = case $4 when 'set' then now() when 'clear' then null else closed_at end,
          deal_value = case when $5 then $6::numeric else deal_value end,
-         expected_commission = case when $7 then $8::numeric else expected_commission end,
-         assigned_to = case when $9 then $10 else assigned_to end,
-         notes = case when $11 then $12 else notes end,
+         assigned_to = case when $7 then $8 else assigned_to end,
+         notes = case when $9 then $10 else notes end,
          updated_at = now()
-       where id = $1 and updated_at = $13::timestamptz
+       where id = $1 and updated_at = $11::timestamptz
        returning id, buyer_lead_id, referral_code
      ), won_lead as (
        update leads l set status = 'won', updated_at = now(),
-         details = jsonb_set(coalesce(l.details, '{}'::jsonb), '{crm_log}', case when jsonb_typeof(l.details->'crm_log') = 'array' then l.details->'crm_log' else '[]'::jsonb end || $15::jsonb)
-       from updated u where $14 = 'won' and l.id = u.buyer_lead_id and l.status::text is distinct from 'won'
+         details = jsonb_set(coalesce(l.details, '{}'::jsonb), '{crm_log}', case when jsonb_typeof(l.details->'crm_log') = 'array' then l.details->'crm_log' else '[]'::jsonb end || $13::jsonb)
+       from updated u where $12 = 'won' and l.id = u.buyer_lead_id and l.status::text is distinct from 'won'
        returning l.id
      ), converted as (
-       update referral_attributions ra set converted = ($14 = 'won'), deal_id = u.id
+       update referral_attributions ra set converted = ($12 = 'won'), deal_id = u.id
        from updated u
-       where ($14 = 'won' and (ra.deal_id = u.id or (ra.lead_id = u.buyer_lead_id and ra.referral_code = u.referral_code and ra.deal_id is null and not coalesce(ra.converted, false))))
-          or ($14 = 'unwon' and ra.deal_id = u.id)
+       where ($12 = 'won' and (ra.deal_id = u.id or (ra.lead_id = u.buyer_lead_id and ra.referral_code = u.referral_code and ra.deal_id is null and not coalesce(ra.converted, false))))
+          or ($12 = 'unwon' and ra.deal_id = u.id)
        returning ra.id
      )
      select (select id from updated) as id, (select id from won_lead) as won_lead_id, (select count(*) from converted) as converted`,
     [id, state.stage, state.status, state.closedAt,
       input.deal_value !== undefined, input.deal_value ?? null,
-      input.expected_commission !== undefined, input.expected_commission ?? null,
       input.assigned_to !== undefined, input.assigned_to ?? null,
       input.notes !== undefined, input.notes ?? null,
       input.expected_updated_at, conversion, JSON.stringify(leadLog)],
