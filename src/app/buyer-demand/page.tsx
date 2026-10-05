@@ -83,7 +83,7 @@ export default async function BuyerDemandPage({ searchParams }: { searchParams: 
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/sell" className="btn-primary">ส่งข้อมูลทรัพย์</Link>
-            <Link href="/become-partner" className="btn-outline">สมัครพาร์ทเนอร์</Link>
+            <Link href="/become-partner" className="btn-outline">สมัครผู้แนะนำ</Link>
           </div>
         </div>
       </div>

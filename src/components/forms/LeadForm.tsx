@@ -114,7 +114,7 @@ export default function LeadForm({
         <h3 className="font-semibold text-slate-800 text-lg">
           {heading ??
             (defaultType === "buyer" ? "สนใจที่ดินนี้" :
-             defaultType === "partner" ? "สมัครพาร์ทเนอร์" :
+             defaultType === "partner" ? "สมัครผู้แนะนำ" :
              "ส่งข้อมูลที่ดิน")}
         </h3>
       )}
@@ -220,7 +220,7 @@ export default function LeadForm({
         {isLoading ? "กำลังส่ง..." :
           submitLabel ??
           (defaultType === "buyer" ? "สนใจที่ดินนี้" :
-           defaultType === "partner" ? "สมัครพาร์ทเนอร์" :
+           defaultType === "partner" ? "สมัครผู้แนะนำ" :
            "ส่งข้อมูลที่ดิน")}
       </button>
     </form>

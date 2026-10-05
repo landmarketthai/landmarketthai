@@ -14,7 +14,7 @@ export default function MobileStickyCta() {
             ดูที่ดิน
           </Link>
           <Link href="/become-partner" className="btn-gold min-h-11 flex-1 justify-center px-2 text-sm">
-            แนะนำผู้ซื้อ
+            รับค่าแนะนำ
           </Link>
           <a
             href={LINE_OA}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Phone, MessageCircle, MapPin, UserRound } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import LeadForm from "@/components/forms/LeadForm";
@@ -111,11 +112,12 @@ export default function ContactPage() {
 
           {/* Quick contact form */}
           <div className="card p-4 sm:p-8">
-            <h2 className="mb-1 text-lg font-semibold text-slate-800">ส่งข้อความหาเรา</h2>
-            <p className="mb-5 text-sm leading-relaxed text-slate-500">
-              ฝากชื่อ เบอร์โทร และ LINE ID ทีมงานจะติดต่อกลับเพื่อคัดกรองความต้องการเบื้องต้น
+            <h2 className="mb-1 text-lg font-semibold text-slate-800">ให้ทีมงานโทรกลับ</h2>
+            <p className="mb-5 text-sm leading-relaxed text-slate-500">ฝากชื่อและเบอร์โทร ทีมงานจะติดต่อกลับ</p>
+            <LeadForm defaultType="buyer" compact submitLabel="ให้ทีมงานโทรกลับ" />
+            <p className="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-600">
+              กำลังหาที่ดินตามเงื่อนไข? <Link href="/buy-request" className="font-semibold text-brand-700 underline">ฝากความต้องการซื้อ</Link> ระบบจะเทียบกับแปลงที่เปิดขายให้ทันที
             </p>
-            <LeadForm defaultType="buyer" heading="ส่งข้อมูลติดต่อ" submitLabel="ส่งข้อมูลติดต่อ" />
           </div>
         </div>
       </div>

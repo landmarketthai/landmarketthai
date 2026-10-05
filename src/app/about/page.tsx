@@ -61,7 +61,7 @@ export default function AboutPage() {
 
         <div className="mt-10 flex flex-col sm:flex-row gap-3">
           <Link href="/become-partner" className="btn-primary">
-            สมัครพาร์ทเนอร์
+            สมัครผู้แนะนำ
             <ArrowRight size={16} />
           </Link>
           <Link href="/contact" className="btn-outline">ติดต่อเรา</Link>

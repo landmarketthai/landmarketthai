@@ -105,7 +105,7 @@ export default function Footer({ showBlog = true, showBuyerDemand = true }: { sh
               เกี่ยวกับ
             </h3>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/become-partner" className="hover:text-brand-400 transition-colors">สมัครพาร์ทเนอร์</Link></li>
+              <li><Link href="/become-partner" className="hover:text-brand-400 transition-colors">สมัครผู้แนะนำ</Link></li>
               <li><Link href="/how-it-works"   className="hover:text-brand-400 transition-colors">วิธีรับค่าแนะนำ</Link></li>
               {showBuyerDemand && <li><Link href="/buyer-demand"    className="hover:text-brand-400 transition-colors">ผู้ซื้อกำลังหา</Link></li>}
               {showBlog && <li><Link href="/blog"            className="hover:text-brand-400 transition-colors">บทความ</Link></li>}

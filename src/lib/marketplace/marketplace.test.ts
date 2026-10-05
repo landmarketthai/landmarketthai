@@ -445,7 +445,7 @@ test("homepage leads with buyers, gives brokers a gold path and keeps sellers se
   const sticky = readFileSync(new URL("../../components/ui/MobileStickyCta.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(home, /HomePropertyMap/);
   // Buyer CTA comes before the broker CTA, seller is a text link after both.
-  assert.match(home, /btn-green[^>]*>ดูที่ดินพร้อมขาย[\s\S]*btn-gold[\s\S]*href="\/sell"/);
+  assert.match(home, /btn-green[^>]*>ดูที่ดินพร้อมขาย[\s\S]*href="\/become-partner"[\s\S]*รู้จักคนกำลังหาที่ดินโรงงาน[\s\S]*href="\/sell"/);
   assert.match(home, /href="\/buy-request"/);
   assert.match(home, /ผลงานปิดการขาย/);
   assert.match(sticky, /href="\/search"[\s\S]*btn-green/);

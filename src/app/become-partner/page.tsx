@@ -1,23 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, TrendingUp, Users, Award } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import PartnerForm from "@/components/forms/PartnerForm";
 import LineButton from "@/components/ui/LineButton";
 import JsonLd from "@/components/seo/JsonLd";
+import ListingCard from "@/components/listings/ListingCard";
+import { getFeaturedListings } from "@/lib/neon/queries";
+import { resolveListingPresentation } from "@/lib/seed-listings";
 
 export const metadata: Metadata = {
   title: "สมัครพาร์ทเนอร์ – หารายได้จากที่ดินอุตสาหกรรม",
   description:
-    "สมัครเป็น Referral Partner กับ LandmarketThai ฟรีตลอดชีพ รับค่าแนะนำสูงสุดหลายล้านบาทต่อดีล ไม่ต้องลงทุน ไม่ต้องสต็อก",
+    "แนะนำผู้ซื้อหรือเจ้าของที่ดินอุตสาหกรรมให้ LandmarketThai สมัครฟรี รับค่าแนะนำตามเงื่อนไขของแต่ละแปลงเมื่อปิดดีล",
   alternates: { canonical: "/become-partner" },
   openGraph: { url: "/become-partner" },
 };
-
-const benefits = [
-  { icon: <Award size={20} />, title: "ค่าแนะนำสูงสุดหลายล้าน", desc: "ต่อดีล – จ่ายจริงเมื่อปิดดีล" },
-  { icon: <Users size={20} />, title: "ไม่ต้องมีใบอนุญาต", desc: "ทุกคนสมัครได้ ทำนอกเวลาได้" },
-  { icon: <TrendingUp size={20} />, title: "ทีมปิดดีลให้คุณ", desc: "แค่แนะนำ เราดูแลทุกขั้นตอน" },
-];
 
 const faqItems = [
   {
@@ -30,15 +27,17 @@ const faqItems = [
   },
   {
     q: "ถ้าไม่มีที่ดินแนะนำ แต่รู้จักคนที่อยากซื้อ ได้ไหม?",
-    a: "ได้ครับ! แนะนำผู้ซื้อ (Buyer Referral) ก็รับค่าคอมได้เช่นกัน",
+    a: "ได้ การแนะนำผู้ซื้อรับค่าแนะนำได้เช่นกัน",
   },
   {
     q: "ทำงานร่วมกับที่ดินหลายแปลงได้ไหม?",
-    a: "ได้ ไม่มีขีดจำกัด ยิ่งแนะนำมาก ยิ่งรับมาก",
+    a: "ได้ แนะนำได้ทุกแปลงที่เปิดรับแนะนำ",
   },
 ];
 
-export default function BecomePartnerPage() {
+export default async function BecomePartnerPage() {
+  const openListings = (await getFeaturedListings(12).catch(() => []))
+    .filter((land) => land.status === "active" && land.referral_reward_max != null);
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -54,51 +53,41 @@ export default function BecomePartnerPage() {
       <JsonLd data={faqSchema} />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-slate-950 to-brand-900 text-white py-20 px-4 sm:px-6 lg:px-8">
-        <div className="container-xl text-center max-w-3xl mx-auto flex flex-col gap-6">
-          <div className="inline-flex items-center gap-2 bg-brand-500/20 text-brand-300 text-xs px-4 py-1.5 rounded-full border border-brand-500/30 mx-auto">
-            💰 สมัครฟรี – รับค่าคอมจริง
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold">
-            เปลี่ยน Connection <span className="text-brand-400">เป็นรายได้</span>
+      <section className="bg-[#071d4a] px-4 py-14 text-white sm:px-6 sm:py-20 lg:px-8">
+        <div className="container-xl mx-auto max-w-3xl text-center">
+          <h1 className="text-3xl font-black leading-tight sm:text-5xl">
+            รู้จักคนกำลังหาที่ดินโรงงาน?
           </h1>
-          <p className="text-slate-300 text-lg">
-            แนะนำที่ดินหรือผู้ซื้อ รับค่าคอมสูงสุดหลายล้านบาทต่อดีล
-            ทีมเราดูแลทุกขั้นตอน คุณแค่ส่งต่อ Connection
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-blue-100 sm:text-lg">
+            ส่งชื่อผู้ซื้อหรือเจ้าของที่ดินให้ทีมเรา ทีมงานดูแลข้อมูล นัดดูพื้นที่ และเจรจาจนจบ
+            เมื่อปิดดีลได้ คุณรับค่าแนะนำตามเงื่อนไขของแปลงนั้น ไม่ต้องมีใบอนุญาตนายหน้า
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="#partner-form" className="btn-gold text-lg px-8 py-4">
-              สมัครเลย – ฟรีตลอดชีพ
-            </a>
-            <Link href="/how-it-works" className="btn-outline border-white/30 text-white hover:bg-white/10 text-lg px-8 py-4">
-              ดูวิธีทำงาน
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a href="#partner-form" className="btn-gold px-8 py-4 text-lg">สมัครผู้แนะนำ ฟรี</a>
+            <Link href="/how-it-works" className="btn-outline border-white/30 px-8 py-4 text-lg text-white hover:bg-white/10">
+              ดูขั้นตอน
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Benefits */}
-      <section className="section bg-slate-50">
-        <div className="container-xl">
-          <div className="grid sm:grid-cols-3 gap-6">
-            {benefits.map((b) => (
-              <div key={b.title} className="card p-6 flex flex-col gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                  {b.icon}
-                </div>
-                <h3 className="font-semibold text-slate-900">{b.title}</h3>
-                <p className="text-sm text-slate-500">{b.desc}</p>
-              </div>
-            ))}
+      {openListings.length > 0 && (
+        <section className="section">
+          <div className="container-xl">
+            <h2 className="text-2xl font-black text-[#06235f]">แปลงที่เปิดรับแนะนำตอนนี้</h2>
+            <p className="mt-1 text-slate-600">ค่าแนะนำที่แสดงคือยอดสูงสุดของแต่ละแปลง จ่ายเมื่อธุรกรรมสำเร็จตามเงื่อนไข</p>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {openListings.map((land) => <ListingCard key={land.id} land={land} {...resolveListingPresentation(land)} />)}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Form + LINE */}
       <section id="partner-form" className="section bg-slate-50">
         <div className="container-xl max-w-lg">
           <div className="card p-8">
-            <h2 className="text-xl font-bold text-slate-900 mb-1 text-center">สมัครพาร์ทเนอร์</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-1 text-center">สมัครผู้แนะนำ</h2>
             <p className="text-sm text-slate-500 text-center mb-6">
               หรือเพิ่ม LINE OA ด้านล่าง เพื่อเริ่มทันที
             </p>

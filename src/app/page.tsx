@@ -56,14 +56,21 @@ export default async function HomePage() {
           <p className="mt-3 text-base leading-relaxed text-blue-50 md:font-semibold md:text-[#0a2a63] lg:text-lg">
             ข้อมูลตรวจสอบโดยทีมงาน พร้อมนัดดูพื้นที่และดูแลการเจรจาจนจบ
           </p>
-          <div className="mt-5 flex flex-col gap-2 min-[400px]:flex-row">
-            <Link href="#listings" className="btn-green px-6 text-base">ดูที่ดินพร้อมขาย</Link>
-            <Link href="/become-partner" className="btn-gold px-6 text-base">
-              <Handshake size={18} />
-              {topReward > 0 ? `แนะนำผู้ซื้อ รับสูงสุด ${formatMoney(topReward)}` : "แนะนำผู้ซื้อ รับค่าแนะนำ"}
-            </Link>
-          </div>
-          <Link href="/sell" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-white md:text-[#0f3478]">
+          <Link href="#listings" className="btn-green mt-5 w-full px-8 text-base min-[400px]:w-auto">ดูที่ดินพร้อมขาย</Link>
+          {/* Broker path reads as a full sentence so first-time visitors know who it is for */}
+          <Link
+            href="/become-partner"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-gold-400/70 bg-[#071d4a]/85 px-4 py-3 text-sm text-white transition-colors hover:bg-[#071d4a] md:max-w-md"
+          >
+            <Handshake size={20} className="mt-0.5 shrink-0 text-gold-400" />
+            <span>
+              รู้จักคนกำลังหาที่ดินโรงงาน? แนะนำให้ทีมเรา
+              <strong className="block text-gold-400">
+                {topReward > 0 ? `รับค่าแนะนำสูงสุด ${formatMoney(topReward)}บาท เมื่อปิดดีล` : "รับค่าแนะนำเมื่อปิดดีล"} →
+              </strong>
+            </span>
+          </Link>
+          <Link href="/sell" className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-white md:text-[#0f3478]">
             มีที่ดินต้องการขาย <ArrowRight size={14} />
           </Link>
         </div>
