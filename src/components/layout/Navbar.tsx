@@ -12,8 +12,7 @@ import { authClient } from "@/lib/auth/client";
 
 const navLinks = [
   { label: "หน้าแรก", href: "/" },
-  { label: "ค้นหาทรัพย์", href: "/search?view=list" },
-  { label: "แผนที่", href: "/search?view=map" },
+  { label: "ค้นหาทรัพย์", href: "/search" },
   { label: "ฝากซื้อ", href: "/buy-request" },
   { label: "ฝากขาย", href: "/sell" },
   { label: "สมัครผู้แนะนำ", href: "/become-partner" },

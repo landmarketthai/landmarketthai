@@ -19,12 +19,6 @@ const benefits = [
   { icon: <TrendingUp size={20} />, title: "ทีมปิดดีลให้คุณ", desc: "แค่แนะนำ เราดูแลทุกขั้นตอน" },
 ];
 
-const commissionExamples = [
-  { dealValue: "50 ล้าน", commission: "500,000 – 1,500,000", landSize: "50 ไร่" },
-  { dealValue: "200 ล้าน", commission: "2,000,000 – 6,000,000", landSize: "200 ไร่" },
-  { dealValue: "500 ล้าน", commission: "5,000,000 – 15,000,000", landSize: "500 ไร่" },
-];
-
 const faqItems = [
   {
     q: "ต้องมีใบอนุญาตนายหน้าไหม?",
@@ -96,34 +90,6 @@ export default function BecomePartnerPage() {
                 <p className="text-sm text-slate-500">{b.desc}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Commission examples */}
-      <section className="section">
-        <div className="container-xl max-w-3xl">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2 text-center">ตัวอย่างค่าแนะนำ</h2>
-          <p className="text-slate-500 text-sm text-center mb-8">ค่าแนะนำจริงขึ้นอยู่กับมูลค่าดีลและเงื่อนไข</p>
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-6 py-4 text-left font-medium">ขนาดที่ดิน</th>
-                  <th className="px-6 py-4 text-left font-medium">มูลค่าดีล</th>
-                  <th className="px-6 py-4 text-left font-medium text-green-700">ค่าแนะนำ (โดยประมาณ)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {commissionExamples.map((row) => (
-                  <tr key={row.dealValue} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 font-medium text-slate-800">{row.landSize}</td>
-                    <td className="px-6 py-4 text-slate-600">{row.dealValue} บาท</td>
-                    <td className="px-6 py-4 font-semibold text-green-700">{row.commission} บาท</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </section>
