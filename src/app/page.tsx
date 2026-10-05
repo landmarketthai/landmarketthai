@@ -45,19 +45,23 @@ export default async function HomePage() {
     <JsonLd data={[orgSchema]} />
 
     {/* Hero: buyer action first, broker action second, seller as a text link */}
-    {/* Mobile: height follows content, photo shows above the copy instead of behind it */}
+    {/* Mobile: copy sits on the sky, actions on the dark ground, faces stay clear in between */}
     <section className="hero-banner max-md:h-auto">
-      <Image src="/images/final-banner.png" alt="" fill priority sizes="100vw" className="object-cover object-[center_40%] md:object-[center_43%]" />
-      <div className="absolute inset-0 bg-linear-to-b from-transparent from-30% via-[#071f58]/85 via-60% to-[#071f58] md:bg-linear-to-r md:from-white/90 md:via-white/55 md:to-transparent" />
-      <div className="container-xl relative flex h-full items-end px-4 pb-8 pt-64 sm:px-6 md:items-center md:py-0 lg:px-8">
+      <Image src="/images/final-banner.png" alt="" fill priority sizes="100vw" className="object-cover object-[center_45%] md:object-[center_43%]" />
+      <div className="absolute inset-0 md:hidden bg-linear-to-b from-white/85 via-white/30 via-25% to-transparent to-40%" />
+      <div className="absolute inset-0 md:hidden bg-linear-to-t from-[#071f58] via-[#071f58]/80 via-30% to-transparent to-50%" />
+      <div className="absolute inset-0 hidden md:block bg-linear-to-r from-white/90 via-white/55 to-transparent" />
+      <div className="container-xl relative flex h-full min-h-[max(600px,calc(100svh-9rem))] flex-col justify-between px-4 py-6 sm:px-6 md:min-h-0 md:justify-center md:py-0 lg:px-8">
         <div className="max-w-xl">
-          <h1 className="text-[1.7rem] font-black leading-[1.2] text-white sm:text-4xl md:text-[#06235f] lg:text-5xl">
+          <h1 className="text-[1.7rem] font-black leading-[1.2] text-[#06235f] sm:text-4xl lg:text-5xl">
             ที่ดินอุตสาหกรรม EEC<br />พร้อมขาย
           </h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-blue-50 sm:mt-3 sm:text-base md:font-semibold md:text-[#0a2a63] lg:text-lg">
+          <p className="mt-2 text-[15px] font-semibold leading-relaxed text-[#0a2a63] sm:mt-3 sm:text-base lg:text-lg">
             ข้อมูลตรวจสอบโดยทีมงาน พร้อมนัดดูพื้นที่และดูแลการเจรจาจนจบ
           </p>
-          <Link href="#listings" className="btn-green mt-6 w-full px-8 text-base sm:w-auto">ดูที่ดินพร้อมขาย</Link>
+        </div>
+        <div className="max-w-xl md:mt-0">
+          <Link href="#listings" className="btn-green w-full px-8 text-base sm:w-auto md:mt-6">ดูที่ดินพร้อมขาย</Link>
           {/* Broker path reads as a full sentence so first-time visitors know who it is for */}
           <Link
             href="/become-partner"
