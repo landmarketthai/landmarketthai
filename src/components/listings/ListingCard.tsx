@@ -26,7 +26,6 @@ interface Props {
   metaTagLabel?: string;
   rewardLabel?: string;
   pricePerRaiLabel?: string;
-  publicBuyerMode?: boolean;
 }
 
 function exactAreaLabel(land: Land): string | null {
@@ -64,7 +63,6 @@ export default function ListingCard({
   metaTagLabel,
   rewardLabel,
   pricePerRaiLabel,
-  publicBuyerMode = false,
 }: Props) {
   const isSoldOut = soldOut ?? land.status === "sold";
   const coverImage = land.images?.find((img) => img.is_cover) ?? land.images?.[0];
@@ -115,11 +113,6 @@ export default function ListingCard({
             </span>
           </div>
 
-          {!publicBuyerMode && featured && !isSoldOut && (
-            <span className="absolute right-3 top-3 z-10 rounded-md bg-gold-400 px-2.5 py-1 text-sm font-black text-[#001B48] shadow-sm">
-              เปิดรับแนะนำ
-            </span>
-          )}
 
           {land.status === "reserved" && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
@@ -130,7 +123,7 @@ export default function ListingCard({
           )}
 
 
-          {!publicBuyerMode && !isSoldOut && land.referral_reward_max != null && (
+          {!isSoldOut && land.referral_reward_max != null && (
             <div className="absolute inset-x-0 bottom-0 z-10 bg-[#001B48]/92 px-4 py-2.5">
               <div className="text-sm font-medium text-white/85">
                 {rewardLabel ?? "ค่าตอบแทนผู้แนะนำสูงสุด"}
@@ -212,12 +205,6 @@ export default function ListingCard({
             </div>
           )}
         </div>
-
-        {totalPrice != null && (
-          <div className="mt-1 text-right text-sm text-slate-400">
-            {totalPriceLabel}: {formatMoneyFull(totalPrice)}
-          </div>
-        )}
 
         <Link
           href={href}

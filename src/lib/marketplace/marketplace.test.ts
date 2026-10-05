@@ -440,49 +440,38 @@ test("buyer province filtering is parameterized and agrees with the in-memory re
   assert.equal(propertyMatchesSearchFilters(rayong, { location_terms: ["nowhere"] }), false);
 });
 
-test("homepage gives buyer, seller and referrer distinct primary entry paths", () => {
+test("homepage leads with buyers, gives brokers a gold path and keeps sellers secondary", () => {
   const home = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
   const sticky = readFileSync(new URL("../../components/ui/MobileStickyCta.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(home, /HomePropertyMap/);
-  assert.match(home, /ซื้อ ขาย และแนะนำอสังหาริมทรัพย์ในที่เดียว/);
-  assert.match(home, /คนซื้อ · ค้นหาทรัพย์/);
-  assert.match(home, /คนขาย · ฝากขายทรัพย์/);
-  assert.match(home, /ผู้แนะนำ · ส่งต่อดีล/);
-  assert.match(home, /ทรัพย์แนะนำที่เปิดขาย/);
+  // Buyer CTA comes before the broker CTA, seller is a text link after both.
+  assert.match(home, /btn-green[^>]*>ดูที่ดินพร้อมขาย[\s\S]*btn-gold[\s\S]*href="\/sell"/);
+  assert.match(home, /href="\/buy-request"/);
   assert.match(home, /ผลงานปิดการขาย/);
-  assert.match(home, /publicBuyerMode/);
-  assert.doesNotMatch(home, /มีคอนเนกชันนักลงทุนหรือเจ้าของโรงงาน\?/);
-  assert.match(sticky, /href="\/search"/);
-  assert.match(sticky, /href="\/sell"/);
-  assert.match(sticky, /href="\/become-partner"/);
-  assert.match(sticky, />\s*ซื้อ\s*</);
-  assert.match(sticky, />\s*ขาย\s*</);
-  assert.match(sticky, />\s*แนะนำ\s*</);
+  assert.match(sticky, /href="\/search"[\s\S]*btn-green/);
+  assert.match(sticky, /href="\/become-partner"[\s\S]*btn-gold/);
+  assert.doesNotMatch(sticky, /href="\/sell"/);
 });
 
-test("mobile property detail keeps buyer actions sticky and referral rewards secondary", () => {
+test("property detail keeps buyer actions sticky and shows the referral reward", () => {
   const actions = readFileSync(new URL("../../components/properties/PropertyMobileActions.tsx", import.meta.url), "utf8");
   assert.match(actions, /fixed inset-x-0 bottom-0[\s\S]*md:hidden/);
   assert.match(actions, /href="tel:0860555595"/);
   assert.match(actions, /ทัก LINE/);
   assert.match(actions, /onClick=\{\(\) => setOpen\(true\)\}[\s\S]*ขอข้อมูล/);
   assert.match(actions, /<LeadForm[\s\S]*listingId=\{listingId\}/);
+  assert.match(actions, /referralReward != null[\s\S]*btn-gold/);
 
   const card = readFileSync(new URL("../../components/listings/ListingCard.tsx", import.meta.url), "utf8");
-  assert.match(card, /publicBuyerMode = false/);
-  assert.match(card, /!publicBuyerMode && !isSoldOut && land\.referral_reward_max != null/);
+  assert.match(card, /!isSoldOut && land\.referral_reward_max != null/);
 
-  for (const rel of [
-    "../../components/listings/ListingGrid.tsx",
-    "../../components/listings/PropertySearchResults.tsx",
-    "../../components/forms/BuyerRequirementForm.tsx",
-  ]) {
-    assert.match(readFileSync(new URL(rel, import.meta.url), "utf8"), /publicBuyerMode/);
+  for (const rel of ["../../app/property/[slug]/page.tsx", "../../components/properties/DynamicPropertyDetail.tsx"]) {
+    const page = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.match(page, /isSoldOut \? null : \w+\.referral_reward_max/);
+    assert.match(page, /<ReferralCallout[^>]*variant="sidebar"/);
+    assert.match(page, /<VerificationSummary/);
+    assert.match(page, /<PropertyMobileActions[\s\S]*referralReward=\{referralReward\}/);
   }
-
-  const flagship = readFileSync(new URL("../../app/property/[slug]/page.tsx", import.meta.url), "utf8");
-  assert.match(flagship, /md:hidden[\s\S]*aspect-video[\s\S]*<h1[\s\S]*ราคารวม[\s\S]*VerificationChecklist[\s\S]*PropertyMobileActions/);
-  assert.match(flagship, /สำหรับพาร์ทเนอร์ผู้แนะนำ/);
 });
 
 test("location choices are a strict hierarchy from listing data", () => {

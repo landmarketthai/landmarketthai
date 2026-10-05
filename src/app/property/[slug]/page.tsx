@@ -363,7 +363,7 @@ export default async function PropertyDetailPage({
 
       {similar.length > 0 && <section className="container-xl section">
         <h2 className="mb-6 text-xl font-bold">ที่ดินใกล้เคียงที่ยังเปิดขาย</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} publicBuyerMode />)}</div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{similar.map(item => <ListingCard key={item.id} land={item} {...resolveListingPresentation(item)} />)}</div>
       </section>}
 
       <section className="px-4 py-10 sm:px-6 sm:py-12 lg:px-8">

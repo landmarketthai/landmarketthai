@@ -1,25 +1,30 @@
-import { SITE_URL } from "@/lib/constants/site";
+import { LINE_OA, SITE_URL } from "@/lib/constants/site";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight, Handshake, MapPin, Search } from "lucide-react";
 import MobileStickyCta from "@/components/ui/MobileStickyCta";
 import ListingCard from "@/components/listings/ListingCard";
+import LineIcon from "@/components/ui/LineIcon";
 import JsonLd from "@/components/seo/JsonLd";
 import { getActiveDemands, getFeaturedListings, getListingBySlug } from "@/lib/neon/queries";
 import BuyerDemandList, { isPublishedDemand } from "@/components/demand/BuyerDemandList";
 import { SEED_109_RAI_SLUG, resolveListingPresentation } from "@/lib/seed-listings";
-import { VERIFICATION_TITLES } from "@/lib/marketplace/verification";
+import { formatMoney } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const metadata: Metadata = {
   alternates: { canonical: SITE_URL },
   openGraph: { url: SITE_URL },
-  title: { absolute: "LandmarketThai – ซื้อ ขาย และแนะนำอสังหาริมทรัพย์" },
-  description: "ตลาดอสังหาริมทรัพย์สำหรับผู้ซื้อ เจ้าของทรัพย์ และผู้แนะนำ ค้นหาทรัพย์ ฝากซื้อ ฝากขาย และเชื่อมต่อดีลกับ LandmarketThai",
+  title: { absolute: "LandmarketThai – ที่ดินอุตสาหกรรม EEC พร้อมขาย" },
+  description: "ที่ดินอุตสาหกรรม EEC พร้อมขาย ทีมงานดูแลข้อมูล นัดดูพื้นที่ และการเจรจา ผู้แนะนำผู้ซื้อรับค่าแนะนำเมื่อดีลสำเร็จ",
 };
-const shortcuts = [
-  ["ที่ดิน", "/search?property_type=land"], ["โรงงาน", "/search?property_type=factory"],
-  ["โกดัง", "/search?property_type=warehouse"], ["EEC", "/search?eec=1"], ["ผังม่วง", "/search?zoning=purple"],
+
+const steps = [
+  ["ส่งชื่อผู้ซื้อ", "ทาง LINE หรือแบบฟอร์ม ไม่ต้องลงทุน"],
+  ["ทีมงานดูแลต่อ", "ข้อมูล นัดดูพื้นที่ และการเจรจา"],
+  ["ดีลสำเร็จ รับค่าแนะนำ", "ตามเงื่อนไขของแต่ละแปลง"],
 ];
 
 export default async function HomePage() {
@@ -29,105 +34,135 @@ export default async function HomePage() {
     getListingBySlug(SEED_109_RAI_SLUG).catch(() => null),
   ]);
   const openListings = featured.filter(land => land.status === "active").slice(0, 6);
+  const topReward = Math.max(0, ...openListings.map(land => land.referral_reward_max ?? 0));
   const orgSchema = {
     "@context": "https://schema.org", "@type": "Organization",
-    name: "LandmarketThai", url: SITE_URL, description: "แพลตฟอร์มค้นหาและฝากขายอสังหาริมทรัพย์",
+    name: "LandmarketThai", url: SITE_URL, description: "แพลตฟอร์มที่ดินอุตสาหกรรมและ EEC",
     contactPoint: { "@type": "ContactPoint", contactType: "customer support", availableLanguage: "Thai" },
   };
+
   return <>
     <JsonLd data={[orgSchema]} />
-    <section className="bg-brand-50 px-4 py-5 sm:py-10">
-      <div className="container-xl">
-        <h1 className="max-w-3xl text-2xl font-black leading-tight text-brand-900 sm:text-4xl">ซื้อ ขาย และแนะนำอสังหาริมทรัพย์ในที่เดียว</h1>
-        <p className="mt-2 max-w-2xl text-base text-slate-700">LandmarketThai เชื่อมผู้ซื้อ เจ้าของทรัพย์ และผู้แนะนำ ให้เริ่มต้นดีลได้จากทางที่ตรงกับคุณ</p>
-        <p className="mt-2 text-sm text-slate-600">ทุกประกาศบอกชัดว่าข้อมูลส่วนไหนผ่านการตรวจสอบแล้ว</p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <Link href="/search" className="min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-emerald-700">
-            คนซื้อ · ค้นหาทรัพย์
-          </Link>
-          <Link href="/sell" className="min-h-11 rounded-xl border border-brand-200 bg-white px-4 py-3 text-center text-sm font-bold text-brand-900 hover:bg-brand-50">
-            คนขาย · ฝากขายทรัพย์
-          </Link>
-          <Link href="/become-partner" className="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-900 hover:bg-amber-100">
-            ผู้แนะนำ · ส่งต่อดีล
+
+    {/* Hero: buyer action first, broker action second, seller as a text link */}
+    <section className="hero-banner">
+      <Image src="/images/final-banner.png" alt="" fill priority sizes="100vw" className="object-cover object-[center_43%]" />
+      <div className="absolute inset-0 bg-linear-to-t from-[#071f58]/95 via-[#071f58]/70 to-[#071f58]/10 md:bg-linear-to-r md:from-white/90 md:via-white/55 md:to-transparent" />
+      <div className="container-xl relative flex h-full items-end px-4 pb-6 sm:px-6 md:items-center md:pb-0 lg:px-8">
+        <div className="max-w-xl">
+          <h1 className="text-[1.75rem] font-black leading-tight text-white sm:text-4xl md:text-[#06235f] lg:text-5xl">
+            ที่ดินอุตสาหกรรม EEC<br />พร้อมขาย
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-blue-50 md:font-semibold md:text-[#0a2a63] lg:text-lg">
+            ข้อมูลตรวจสอบโดยทีมงาน พร้อมนัดดูพื้นที่และดูแลการเจรจาจนจบ
+          </p>
+          <div className="mt-5 flex flex-col gap-2 min-[400px]:flex-row">
+            <Link href="#listings" className="btn-green px-6 text-base">ดูที่ดินพร้อมขาย</Link>
+            <Link href="/become-partner" className="btn-gold px-6 text-base">
+              <Handshake size={18} />
+              {topReward > 0 ? `แนะนำผู้ซื้อ รับสูงสุด ${formatMoney(topReward)}` : "แนะนำผู้ซื้อ รับค่าแนะนำ"}
+            </Link>
+          </div>
+          <Link href="/sell" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-white md:text-[#0f3478]">
+            มีที่ดินต้องการขาย <ArrowRight size={14} />
           </Link>
         </div>
-        <div className="mt-2 text-center sm:text-left">
-          <Link href="/buy-request" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700">ยังไม่เจอทรัพย์ที่ใช่? ฝากความต้องการซื้อ →</Link>
+
+        <div className="absolute right-6 top-1/2 hidden w-56 -translate-y-1/2 rounded-2xl bg-[#06235f] p-2 text-center shadow-2xl lg:block xl:right-16">
+          <p className="px-2 pt-1 text-base font-black text-white">คุยกับทีมงาน</p>
+          <p className="px-2 pb-2 text-xs font-semibold text-gold-400">สอบถามที่ดินและเงื่อนไขผู้แนะนำ</p>
+          <div className="rounded-xl bg-white p-3">
+            <Image src="/images/line-qr.png" alt="คิวอาร์โค้ด LINE OA" width={288} height={288} className="mx-auto h-36 w-36 rounded-lg" />
+            <a href={LINE_OA} target="_blank" rel="noopener noreferrer" className="btn-line mt-3 w-full text-sm">
+              <LineIcon size={18} /> @landmarketthai
+            </a>
+          </div>
         </div>
       </div>
     </section>
-    <section aria-label="ค้นหาตามทำเลและประเภททรัพย์" className="container-xl px-4 py-3">
-      <form action="/search" className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <label htmlFor="home-location" className="sr-only">จังหวัดหรือทำเล</label>
-        <input id="home-location" name="q" placeholder="จังหวัด / อำเภอ / ทำเล" className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-3 text-base" />
-        <button className="btn-green min-h-11 px-3" type="submit">ค้นหา</button>
-        <Link href="/search?view=map" className="btn-outline col-span-2 min-h-11 justify-center px-3 text-sm">ดูบนแผนที่</Link>
-      </form>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {shortcuts.map(([label, href]) => <Link key={label} href={href} className="inline-flex min-h-11 items-center rounded-full border border-slate-200 px-3 text-sm text-brand-800">{label}</Link>)}
-        <Link href="/search" className="inline-flex min-h-11 items-center px-3 text-sm text-brand-800">ทุกประเภท</Link>
+
+    <section id="listings" className="container-xl scroll-mt-20 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+        <h2 className="text-2xl font-black text-[#06235f]">ที่ดินพร้อมขาย</h2>
+        <Link href="/search?view=map" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-700">
+          <MapPin size={16} /> ดูบนแผนที่
+        </Link>
       </div>
+      {openListings.length ? (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {openListings.map(land => <ListingCard key={land.id} land={land} {...resolveListingPresentation(land)} />)}
+          {/* ponytail: buyer-demand card always closes the grid; fine while inventory is small, revisit past ~5 listings */}
+          <div className="flex flex-col justify-center gap-4 rounded-xl bg-[#071d4a] p-6 text-white sm:col-span-2 lg:col-span-1">
+            <Search size={32} className="text-[#00A859]" />
+            <div>
+              <h3 className="text-xl font-black">ยังไม่เจอแปลงที่ใช่?</h3>
+              <p className="mt-2 text-blue-100">บอกทำเล ขนาด และงบประมาณ ทีมงานจะหาแปลงที่ตรงให้ ไม่มีค่าใช้จ่าย</p>
+            </div>
+            <Link href="/buy-request" className="btn-green px-6 text-base">ฝากความต้องการซื้อ</Link>
+          </div>
+        </div>
+      ) : (
+        <p className="text-base text-slate-600">ยังไม่มีที่ดินเปิดขายในขณะนี้ <Link href="/buy-request" className="font-semibold text-brand-700 underline">ฝากความต้องการไว้ก่อน</Link></p>
+      )}
     </section>
-    <section className="container-xl px-4 pb-6 pt-2">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-xl font-bold">ทรัพย์แนะนำที่เปิดขาย</h2>
-        <Link href="/search?status=active" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700">ดูทั้งหมด →</Link>
-      </div>
-      {openListings.length ? <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 md:grid md:grid-cols-2 md:overflow-visible lg:grid-cols-3">
-        {openListings.map(land => <div key={land.id} className="w-[85%] shrink-0 snap-start md:w-auto"><ListingCard land={land} {...resolveListingPresentation(land)} publicBuyerMode /></div>)}
-      </div> : <p className="text-base text-slate-600">ยังไม่มีทรัพย์แนะนำในขณะนี้ <Link href="/search" className="inline-flex min-h-11 items-center underline">ค้นหาทรัพย์ทั้งหมด</Link></p>}
-    </section>
-    <section className="container-xl px-4 py-6">
-      <h2 className="text-xl font-bold">เราตรวจอะไรบ้าง</h2>
-      <p className="mt-2 text-base text-slate-600">บอกชัดว่าตรวจอะไรแล้ว แสดงสถานะแยกในแต่ละประกาศ หัวข้อที่มีข้อมูลยังไม่เท่ากับผ่านการตรวจสอบ</p>
-      <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {Object.entries(VERIFICATION_TITLES).map(([key, title]) => <li key={key} className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">{title}</li>)}
-      </ul>
-      <p className="mt-3 text-sm text-slate-600">การตรวจประกาศไม่ใช่การรับรองทุกข้อมูล กรรมสิทธิ์ หรือผลตอบแทน ควรตรวจเอกสารและข้อมูลเพิ่มเติมก่อนตัดสินใจ</p>
-    </section>
-    {soldProof?.status === "sold" && <section className="container-xl px-4 py-6">
-      <h2 className="mb-4 text-xl font-bold">ผลงานปิดการขาย</h2>
-      <div className="max-w-sm"><ListingCard land={soldProof} {...resolveListingPresentation(soldProof)} publicBuyerMode ctaLabel="ดูผลงานปิดการขาย" /></div>
-    </section>}
-    <section className="container-xl px-4 py-6">
-      <div className="rounded-2xl bg-brand-50 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4">
-        <div><h2 className="text-xl font-bold">ไม่เจอแปลงที่ใช่?</h2><p className="mt-2 text-base text-slate-600">ฝากทำเล งบประมาณ และประเภททรัพย์ที่ต้องการให้ทีมช่วยหา</p></div>
-        <Link href="/buy-request" className="btn-green mt-4 min-h-11 sm:mt-0">ฝากความต้องการซื้อ</Link>
-      </div>
-    </section>
+
     {buyerDemands === null ? (
-      <section className="container-xl px-4 py-4 text-center" role="alert">
-        <p className="text-sm text-slate-500">โหลดความต้องการซื้อไม่ได้ในขณะนี้ แต่ยังฝากความต้องการซื้อใหม่ได้</p>
-        <Link href="/buy-request" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">ฝากความต้องการซื้อ →</Link>
-      </section>
+      <p className="container-xl px-4 pb-6 text-sm text-slate-500" role="alert">
+        โหลดรายการผู้ซื้อกำลังหาไม่ได้ในขณะนี้ <Link href="/buyer-demand" className="font-semibold text-brand-700 underline">ลองดูอีกครั้ง</Link>
+      </p>
     ) : buyerDemands.length > 0 && (
-      <section className="container-xl px-4 py-6">
-        <h2 className="mb-4 text-xl font-bold">ความต้องการซื้อที่เผยแพร่</h2>
-        <BuyerDemandList demands={buyerDemands} />
-        <Link href="/buyer-demand" className="mt-3 inline-flex min-h-11 items-center text-sm text-brand-700">ดูความต้องการซื้อทั้งหมด →</Link>
+      <section className="bg-slate-50 py-10">
+        <div className="container-xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-black text-[#06235f]">ผู้ซื้อกำลังหาที่ดิน</h2>
+          <p className="mt-1 text-slate-600">มีที่ดินหรือรู้จักเจ้าของที่ตรงกับความต้องการเหล่านี้? ส่งข้อมูลให้ทีมงานได้เลย</p>
+          <div className="mt-5"><BuyerDemandList demands={buyerDemands} /></div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link href="/sell" className="btn-primary">ส่งข้อมูลที่ดิน</Link>
+            <Link href="/buyer-demand" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-700">
+              ดูทั้งหมด <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
       </section>
     )}
-    <section className="container-xl px-4 py-6">
-      <h2 className="text-xl font-bold">เริ่มดีลจากบทบาทของคุณ</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Link href="/search" className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
-          <div className="text-sm font-semibold text-emerald-700">สำหรับผู้ซื้อ</div>
-          <h3 className="mt-1 text-lg font-bold">ค้นหาทรัพย์หรือฝากซื้อ</h3>
-          <p className="mt-2 text-base text-slate-600">ดูทรัพย์ที่เปิดขาย หรือฝากเงื่อนไขให้ทีมช่วยจับคู่</p>
-        </Link>
-        <Link href="/sell" className="rounded-2xl border border-brand-200 bg-brand-50/50 p-5">
-          <div className="text-sm font-semibold text-brand-700">สำหรับเจ้าของทรัพย์</div>
-          <h3 className="mt-1 text-lg font-bold">ฝากขายกับ LandmarketThai</h3>
-          <p className="mt-2 text-base text-slate-600">ส่งข้อมูลทรัพย์เพื่อเข้าสู่ขั้นตอนตรวจสอบและประกาศขาย</p>
-        </Link>
-        <Link href="/become-partner" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-          <div className="text-sm font-semibold text-amber-800">สำหรับผู้แนะนำ / นายหน้า</div>
-          <h3 className="mt-1 text-lg font-bold">แนะนำคนซื้อหรือเจ้าของทรัพย์</h3>
-          <p className="mt-2 text-base text-slate-600">ส่งต่อโอกาสทางการขายและรับค่าตอบแทนตามเงื่อนไขเมื่อดีลสำเร็จ</p>
+
+    <section className="container-xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="grid gap-8 rounded-2xl border border-amber-200 bg-amber-50/60 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <h2 className="text-2xl font-black text-[#06235f]">มีผู้ซื้อในมือ? แนะนำแล้วรับค่าแนะนำ</h2>
+          <ol className="mt-5 grid gap-4 sm:grid-cols-3">
+            {steps.map(([title, detail], index) => (
+              <li key={title} className="flex gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-400 font-black text-[#071d4a]">{index + 1}</span>
+                <div>
+                  <div className="font-bold text-slate-900">{title}</div>
+                  <div className="text-sm text-slate-600">{detail}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <Link href="/become-partner" className="btn-gold px-6 text-base">
+          <Handshake size={18} /> สมัครผู้แนะนำ ฟรี
         </Link>
       </div>
     </section>
+
+    {soldProof?.status === "sold" && (
+      <section className="container-xl px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,22rem)_1fr] md:items-center">
+          <div className="md:order-last">
+            <h2 className="text-2xl font-black text-[#06235f]">ผลงานปิดการขาย</h2>
+            <p className="mt-2 max-w-md text-slate-600">ทีมงานดูแลตั้งแต่ข้อมูลแปลง นัดดูพื้นที่ จนถึงการเจรจาปิดดีล</p>
+            <Link href="/sell" className="mt-4 inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700">
+              มีที่ดินต้องการขาย? ฝากขายกับเรา <ArrowRight size={14} />
+            </Link>
+          </div>
+          <ListingCard land={soldProof} {...resolveListingPresentation(soldProof)} ctaLabel="ดูผลงานปิดการขาย" />
+        </div>
+      </section>
+    )}
+
     <MobileStickyCta />
   </>;
 }
