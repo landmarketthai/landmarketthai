@@ -246,8 +246,8 @@ test("sell form is one page: section headings, one submit, autosave, no stepper"
   assert.match(wizard, /if \(loading \|\| submitting \|\| submitted \|\| !draftId \|\| !token\) return;/, "no autosave while loading or after submit");
   assert.match(wizard, /กำลังบันทึก/);
   assert.match(wizard, /บันทึกแล้ว/);
-  assert.match(wizard, /PROPERTY_TYPES\.map/);
-  assert.match(wizard, /grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/, "compact responsive type grid");
+  assert.match(wizard, /PRIMARY_TYPES\.map/);
+  assert.match(wizard, /PROPERTY_TYPES\.filter\(\(value\) => !PRIMARY_TYPES\.includes\(value\)\)/, "every other type stays selectable");
   assert.match(wizard, /usable_area_sqm/);
   assert.match(wizard, /วางลิงก์ Google Maps หรือพิกัด/);
   assert.match(wizard, /\/api\/maps-link/);

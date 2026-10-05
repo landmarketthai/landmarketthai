@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCircle2, FileText, ImagePlus, Info, Link2, MapPin, Save, UploadCloud } from "lucide-react";
+import { Check, CheckCircle2, FileText, ImagePlus, Link2, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { draftPatch, loadSellerDraft, mergeDraft, phoneLooksValid } from "@/lib/seller-draft";
@@ -111,6 +111,9 @@ const SERVER_FIELD_LABELS: Record<string, string> = {
   area_rai: "ไร่ (จำนวนเต็ม)", area_ngan: "งาน (0–3)", area_sqwa: "ตร.ว. (น้อยกว่า 100)", usable_area_sqm: "พื้นที่ใช้สอย",
   sale_price: "ราคาขาย", title: "ชื่อทรัพย์", contact_phone: "เบอร์โทรศัพท์", lat: "พิกัด", lng: "พิกัด",
 };
+
+// The marketplace is industrial land first; every other type stays one select away.
+const PRIMARY_TYPES: PropertyType[] = ["land", "factory", "warehouse"];
 
 const AUTOSAVE_DELAY_MS = 1500;
 const DRAFT_STORAGE_KEY = "landmarketthai:sell-draft";
@@ -543,31 +546,36 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
 
         <section id="sell-type" className="scroll-mt-20 p-5 sm:p-8">
           {heading("type")}
-          <div role="radiogroup" aria-label="ประเภททรัพย์" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {PROPERTY_TYPES.map((value) => (
+          <div role="radiogroup" aria-label="ประเภททรัพย์" className="grid gap-2 sm:grid-cols-4">
+            {PRIMARY_TYPES.map((value) => (
               <label
                 key={value}
-                className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-bold leading-tight transition ${form.property_type === value ? "border-[#00A859] bg-emerald-50 text-emerald-800 ring-1 ring-[#00A859]" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
+                className={`flex min-h-12 items-center rounded-xl border px-3 py-2 text-sm font-bold transition ${form.property_type === value ? "border-[#071d4a] bg-brand-50 text-[#071d4a] ring-1 ring-[#071d4a]" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
               >
-                <input type="radio" name="property_type" value={value} checked={form.property_type === value} {...invalid("property_type")} className="mr-2 accent-emerald-600" onChange={() => { setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }} />
+                <input type="radio" name="property_type" value={value} checked={form.property_type === value} {...invalid("property_type")} className="mr-2 accent-[#071d4a]" onChange={() => { setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }} />
                 {PROPERTY_TYPE_LABELS[value]}
               </label>
             ))}
+            <select
+              aria-label="ประเภทอื่น"
+              className={`input min-h-12 font-bold ${form.property_type && !PRIMARY_TYPES.includes(form.property_type) ? "border-[#071d4a] ring-1 ring-[#071d4a]" : ""}`}
+              value={form.property_type && !PRIMARY_TYPES.includes(form.property_type) ? form.property_type : ""}
+              onChange={(e) => { const value = e.target.value as PropertyType; if (!value) return; setForm((v) => ({ ...v, property_type: value })); clearFieldError("property_type"); }}
+            >
+              <option value="">ประเภทอื่น…</option>
+              {PROPERTY_TYPES.filter((value) => !PRIMARY_TYPES.includes(value)).map((value) => <option key={value} value={value}>{PROPERTY_TYPE_LABELS[value]}</option>)}
+            </select>
           </div>
           {fieldError("property_type")}
         </section>
 
         <section id="sell-location" className="scroll-mt-20 p-5 sm:p-8">
-          {heading("location","เลือกจังหวัด / อำเภอ / ตำบลก่อน แล้วปักหมุดด้วยลิงก์ Google Maps หรือคลิกบนแผนที่ หากไม่แน่ใจสามารถเว้นพิกัดได้")}
+          {heading("location","ปักหมุดไม่บังคับ แต่ช่วยให้ผู้ซื้อตัดสินใจได้เร็วขึ้น")}
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label><span className="label">จังหวัด *</span><select className="input" {...invalid("province_id")} value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select>{fieldError("province_id")}</label>
             <label><span className="label">{districtLabel}</span><select className="input" value={form.district} disabled={!provinceName} onChange={(e) => selectDistrict(e.target.value)}><option value="">{provinceName ? `เลือก${districtLabel}` : "เลือกจังหวัดก่อน"}</option>{districtOptions.map((d) => <option key={d.name_th} value={d.name_th}>{d.name_th}</option>)}</select></label>
             <label><span className="label">{subdistrictLabel}</span><select className="input" value={form.subdistrict} disabled={!form.district} onChange={(e) => selectSubdistrict(e.target.value)}><option value="">{form.district ? `เลือก${subdistrictLabel}` : `เลือก${districtLabel}ก่อน`}</option>{subdistrictOptions.map((s) => <option key={s.name_th} value={s.name_th}>{s.name_th}</option>)}</select></label>
             <label><span className="label">ที่อยู่ / จุดสังเกต</span><input className="input" maxLength={500} value={form.address} onChange={(e) => setText("address", e.target.value)} /></label>
-          </div>
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <Info size={16} className="mt-0.5 shrink-0" />
-            <span>การเลือกจังหวัด / {districtLabel} / {subdistrictLabel} จะเลื่อนแผนที่ไปยังบริเวณโดยประมาณเท่านั้น และจะล้างหมุดเดิม กรุณา<strong>วางลิงก์ด้านล่าง</strong>หรือ<strong>คลิกบนแผนที่</strong>เพื่อปักหมุดตำแหน่งจริงของทรัพย์</span>
           </div>
           <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
             <label htmlFor="sell-maps-link" className="flex items-center gap-2 text-sm font-bold text-slate-800"><Link2 size={16} className="text-blue-700" />วางลิงก์ Google Maps หรือพิกัด</label>
@@ -588,7 +596,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             </div>
             {mapsStatus.state === "error" && <p role="alert" className="mt-2 text-xs font-semibold text-red-600">{mapsStatus.message}</p>}
             {pinFromLink && <p role="status" className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={14} />ปักหมุดตามลิงก์แล้ว (พิกัดจริง) — คลิกบนแผนที่เพื่อปรับตำแหน่งได้</p>}
-            {!pinFromLink && <p className="mt-2 text-[11px] text-slate-500">ใน Google Maps กด “แชร์” แล้วคัดลอกลิงก์ หรือกดค้างที่ตำแหน่งเพื่อคัดลอกพิกัด</p>}
+            {!pinFromLink && <p className="mt-2 text-xs text-slate-500">ใน Google Maps กด “แชร์” แล้วคัดลอกลิงก์ หรือคลิกบนแผนที่ด้านล่าง (การเลือกจังหวัด/{districtLabel}/{subdistrictLabel}จะล้างหมุดเดิม)</p>}
           </div>
 
           <div className="mt-3"><LocationPicker lat={form.lat} lng={form.lng} focus={mapFocus} disabled={submitting} onChange={(lat,lng) => { if (frozen.current) return; cancelMapsLookup(); setForm((v) => ({ ...v, lat, lng })); }} /></div>
@@ -623,12 +631,17 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณเมื่อมีขนาดที่ดิน (ไร่)" /></label>
             <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ""} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
             <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber("frontage_m", e.target.value)} /></label>
-            <label><span className="label">ความลึกต่ำสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_min_m)} onChange={(e) => setNumber("depth_min_m", e.target.value)} /></label>
-            <label><span className="label">ความลึกสูงสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_max_m)} onChange={(e) => setNumber("depth_max_m", e.target.value)} /></label>
-            <label><span className="label">ชื่อถนน</span><input className="input" maxLength={160} value={form.road_name} onChange={(e) => setText("road_name", e.target.value)} /></label>
-            <label><span className="label">ความกว้างถนน (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.road_width_m)} onChange={(e) => setNumber("road_width_m", e.target.value)} /></label>
-            <label className="sm:col-span-2"><span className="label">รายละเอียดเพิ่มเติม</span><textarea className="input min-h-28" maxLength={5000} value={form.description} onChange={(e) => setText("description", e.target.value)} /></label>
           </div>
+          <details className="group mt-4 rounded-xl border border-slate-200">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-brand-700 [&::-webkit-details-marker]:hidden">รายละเอียดเพิ่มเติม (ไม่บังคับ)<span className="transition-transform group-open:rotate-180">▾</span></summary>
+            <div className="grid gap-4 border-t border-slate-100 p-4 sm:grid-cols-2">
+              <label><span className="label">ความลึกต่ำสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_min_m)} onChange={(e) => setNumber("depth_min_m", e.target.value)} /></label>
+              <label><span className="label">ความลึกสูงสุด (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.depth_max_m)} onChange={(e) => setNumber("depth_max_m", e.target.value)} /></label>
+              <label><span className="label">ชื่อถนน</span><input className="input" maxLength={160} value={form.road_name} onChange={(e) => setText("road_name", e.target.value)} /></label>
+              <label><span className="label">ความกว้างถนน (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.road_width_m)} onChange={(e) => setNumber("road_width_m", e.target.value)} /></label>
+              <label className="sm:col-span-2"><span className="label">รายละเอียดอื่น</span><textarea className="input min-h-28" maxLength={5000} value={form.description} onChange={(e) => setText("description", e.target.value)} placeholder="เช่น สาธารณูปโภค ไฟฟ้า น้ำ ทางเข้าออก" /></label>
+            </div>
+          </details>
         </section>
 
         <section id="sell-media" className="scroll-mt-20 p-5 sm:p-8">
@@ -664,7 +677,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           </div>
           <label className={`mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm text-slate-600 ${fieldErrors.consent ? "border-red-300" : "border-slate-200"}`}><input type="checkbox" className="mt-1" {...invalid("consent")} checked={consent} onChange={(e) => { setConsent(e.target.checked); clearFieldError("consent"); }}/><span>ยินยอมให้ LandmarketThai เก็บและใช้ข้อมูลที่ส่งเพื่อการตรวจสอบทรัพย์และติดต่อกลับตามนโยบายความเป็นส่วนตัว</span></label>
           {fieldError("consent")}
-          <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">ข้อมูลจะเข้าสถานะ Pending Review และไม่เผยแพร่อัตโนมัติ</div>
+          <p className="mt-3 text-sm text-slate-500">ทีมงานตรวจสอบก่อนเผยแพร่ทุกครั้ง และจะติดต่อกลับภายใน 1 วันทำการ</p>
           {errorCount > 0 && (
             <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               กรุณาตรวจสอบ {errorCount} รายการ: {[...new Set((Object.keys(fieldErrors) as FieldKey[]).map((key) => SECTIONS[FIELD_SECTION[key]]))].join(", ")}
@@ -673,7 +686,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           {saveState === "error" && saveError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>}
           <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button type="button" onClick={() => void saveDraft()} disabled={submitting} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold text-slate-500"><Save size={16}/>{saveState === "saving" ? "กำลังบันทึก..." : "บันทึกแบบร่าง"}</button>
-            <button type="button" onClick={() => void submit()} disabled={submitting} className="btn-green justify-center disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "กำลังส่ง..." : "ส่งให้ทีมงานตรวจสอบ"} <Check size={17}/></button>
+            <button type="button" onClick={() => void submit()} disabled={submitting} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "กำลังส่ง..." : "ส่งให้ทีมงานตรวจสอบ"} <Check size={17}/></button>
           </div>
         </section>
       </fieldset>

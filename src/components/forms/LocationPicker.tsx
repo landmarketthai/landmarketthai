@@ -45,8 +45,8 @@ export default function LocationPicker({ lat, lng, onChange, focus = null, disab
       const position = positionRef.current;
       const pending = focusRef.current;
       const map = L.map(containerRef.current, {
-        center: position ?? (pending ? [pending.lat, pending.lng] : [13.0, 101.0]),
-        zoom: position ? 14 : pending ? pending.zoom : 6,
+        center: position ?? (pending ? [pending.lat, pending.lng] : [13.3, 101.3]), // EEC
+        zoom: position ? 14 : pending ? pending.zoom : 8,
       });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
