@@ -45,14 +45,10 @@ export default async function HomePage() {
     <JsonLd data={[orgSchema]} />
 
     {/* Hero: buyer action first, broker action second, seller as a text link */}
-    {/* Mobile: copy sits on the sky, actions on the dark ground, faces stay clear in between */}
-    <section className="hero-banner max-md:h-auto">
-      <Image src="/images/final-banner.png" alt="" fill priority sizes="100vw" className="object-cover object-[center_45%] md:object-[center_43%]" />
-      <div className="absolute inset-0 md:hidden bg-linear-to-b from-white/85 via-white/30 via-25% to-transparent to-40%" />
-      <div className="absolute inset-0 md:hidden bg-linear-to-t from-[#071f58] via-[#071f58]/80 via-30% to-transparent to-50%" />
-      <div className="absolute inset-0 hidden md:block bg-linear-to-r from-white/90 via-white/55 to-transparent" />
-      <div className="container-xl relative flex h-full min-h-[max(600px,calc(100svh-9rem))] flex-col justify-between px-4 py-6 sm:px-6 md:min-h-0 md:justify-center md:py-0 lg:px-8">
-        <div className="max-w-xl">
+    {/* Keep copy and controls outside the photo at every width so faces stay unobstructed. */}
+    <section className="hero-banner">
+      <div className="container-xl grid md:grid-cols-2 md:items-center">
+        <div className="px-4 pb-5 pt-6 sm:px-6 md:col-start-1 md:row-start-1 md:pb-0 md:pt-8 lg:px-8 lg:pt-10">
           <h1 className="text-[1.7rem] font-black leading-[1.2] text-[#06235f] sm:text-4xl lg:text-5xl">
             ที่ดินอุตสาหกรรม EEC<br />พร้อมขาย
           </h1>
@@ -60,7 +56,10 @@ export default async function HomePage() {
             ข้อมูลตรวจสอบโดยทีมงาน พร้อมนัดดูพื้นที่และดูแลการเจรจาจนจบ
           </p>
         </div>
-        <div className="max-w-xl md:mt-0">
+        <div className="relative row-start-2 aspect-[1561/1008] md:col-start-2 md:row-span-2 md:row-start-1">
+          <Image src="/images/final-banner.png" alt="" fill priority sizes="(min-width: 768px) 50vw, 100vw" className="object-contain" />
+        </div>
+        <div className="px-4 py-6 sm:px-6 md:col-start-1 md:row-start-2 md:pt-0 lg:px-8 lg:pb-10">
           <Link href="#listings" className="btn-green w-full px-8 text-base sm:w-auto md:mt-6">ดูที่ดินพร้อมขาย</Link>
           {/* Broker path reads as a full sentence so first-time visitors know who it is for */}
           <Link
@@ -75,19 +74,18 @@ export default async function HomePage() {
               </strong>
             </span>
           </Link>
-          <Link href="/sell" className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-white md:text-[#0f3478]">
+          <Link href="/sell" className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-[#0f3478]">
             มีที่ดินต้องการขาย <ArrowRight size={14} />
           </Link>
-        </div>
-
-        <div className="absolute right-6 top-1/2 hidden w-56 -translate-y-1/2 rounded-2xl bg-[#06235f] p-2 text-center shadow-2xl lg:block xl:right-16">
-          <p className="px-2 pt-1 text-base font-black text-white">คุยกับทีมงาน</p>
-          <p className="px-2 pb-2 text-xs font-semibold text-gold-400">สอบถามที่ดินและเงื่อนไขผู้แนะนำ</p>
-          <div className="rounded-xl bg-white p-3">
-            <Image src="/images/line-qr.png" alt="คิวอาร์โค้ด LINE OA" width={288} height={288} className="mx-auto h-36 w-36 rounded-lg" />
-            <a href={LINE_OA} target="_blank" rel="noopener noreferrer" className="btn-line mt-3 w-full text-sm">
-              <LineIcon size={18} /> @landmarketthai
-            </a>
+          <div className="mt-4 hidden max-w-md items-center gap-3 rounded-2xl bg-[#06235f] p-3 shadow-lg lg:flex">
+            <Image src="/images/line-qr.png" alt="คิวอาร์โค้ด LINE OA" width={288} height={288} className="h-24 w-24 shrink-0 rounded-lg bg-white p-2" />
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-black text-white">คุยกับทีมงาน</p>
+              <p className="mt-1 text-xs font-semibold text-gold-400">สอบถามที่ดินและเงื่อนไขผู้แนะนำ</p>
+              <a href={LINE_OA} target="_blank" rel="noopener noreferrer" className="btn-line mt-2 w-full px-2 text-sm">
+                <LineIcon size={18} /> @landmarketthai
+              </a>
+            </div>
           </div>
         </div>
       </div>
