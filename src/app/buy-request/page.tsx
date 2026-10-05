@@ -18,16 +18,16 @@ export default async function BuyRequestPage({ searchParams }: { searchParams: P
 
   return (
     <main className="bg-slate-50">
-      <section className="bg-[#071d4a] px-4 py-10 text-white sm:px-6 sm:py-14 lg:px-8">
+      <section className="bg-[#071d4a] px-4 py-7 text-white sm:px-6 sm:py-14 lg:px-8">
         <div className="container-xl max-w-3xl text-center">
-          <h1 className="text-3xl font-black sm:text-4xl">บอกเราว่าต้องการที่ดินแบบไหน</h1>
+          <h1 className="text-2xl font-black sm:text-4xl">บอกเราว่าต้องการที่ดินแบบไหน</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
             ระบบจะเทียบกับที่ดินที่เปิดขายทันที และทีมงานจะหาแปลงที่ตรงเพิ่มให้ ไม่มีค่าใช้จ่าย
           </p>
         </div>
       </section>
 
-      <section className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <section className="px-4 pb-8 sm:px-6 sm:py-12 lg:px-8">
         <div className="container-xl max-w-3xl">
           <BuyerRequirementForm
             provinces={provinces}

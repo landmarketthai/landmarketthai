@@ -223,18 +223,20 @@ export default async function PropertyDetailPage({
                 <Factory size={20} className="text-brand-600" />
                 <h2 className="text-xl font-bold text-slate-900">จุดเด่นของแปลงนี้</h2>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                 {property.highlightCards.map((card, index) => {
                   const Icon = highlightIcons[index] ?? ShieldCheck;
                   return (
-                    <div key={card.title} className="card-ref p-5">
-                      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                        <Icon size={22} />
+                    <div key={card.title} className="card-ref flex gap-4 p-4 sm:block sm:p-5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 sm:mb-4 sm:h-11 sm:w-11">
+                        <Icon size={20} />
                       </div>
-                      <h3 className="font-bold text-slate-900">{card.title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                        {card.description}
-                      </p>
+                      <div>
+                        <h3 className="font-bold text-slate-900">{card.title}</h3>
+                        <p className="mt-1 text-sm leading-relaxed text-slate-600 sm:mt-2">
+                          {card.description}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}

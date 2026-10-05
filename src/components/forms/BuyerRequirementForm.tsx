@@ -86,7 +86,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
   }
 
   return <>
-    {!matches && <form onSubmit={submit} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+    {!matches && <form onSubmit={submit} className="-mx-4 border-b border-slate-200 bg-white px-4 py-6 sm:mx-0 sm:mt-0 sm:rounded-3xl sm:border sm:p-8 sm:shadow-sm">
       {(!provinces.length || (initial.province && !initialProvince && !form.province_ids.length)) && <p role="alert" className="mb-5 text-red-700">กรุณาเลือกจังหวัดที่ถูกต้อง หรือโหลดหน้าใหม่หากไม่มีตัวเลือกจังหวัด</p>}
       {error && <div role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <h2 className="text-lg font-black text-[#06235f]">ที่ดินที่ต้องการ</h2>

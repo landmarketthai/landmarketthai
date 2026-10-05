@@ -284,14 +284,14 @@ export default function SearchExperience({ initialProperties, provinces, provinc
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
-      <div className="bg-[#071d4a] px-4 py-6 text-white sm:px-6 sm:py-8 lg:px-8">
+      <div className="bg-[#071d4a] px-4 py-4 text-white sm:px-6 sm:py-8 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
-              <p className="mt-1 text-sm text-blue-100">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
+              <h1 className="text-xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
+              <p className="mt-1 hidden text-sm text-blue-100 sm:block">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
             </div>
-            <Link href="/buy-request" className="text-sm font-semibold text-white underline-offset-4 hover:underline">ยังไม่เจอทรัพย์? ฝากเงื่อนไข ›</Link>
+            <Link href="/buy-request" className="shrink-0 text-xs font-semibold text-white underline-offset-4 hover:underline sm:text-sm"><span className="hidden sm:inline">ยังไม่เจอทรัพย์? </span>ฝากเงื่อนไข ›</Link>
           </div>
         </div>
       </div>
@@ -318,7 +318,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
               {propertyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <select
-              className="input col-span-2 min-[420px]:col-span-1 lg:col-span-1"
+              className="input"
               value={values.province ?? ""}
               onChange={(event) => setValues((current) => ({ ...current, province: event.target.value || undefined, district: undefined, subdistrict: undefined }))}
             >
@@ -382,11 +382,15 @@ export default function SearchExperience({ initialProperties, provinces, provinc
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div className="text-sm text-slate-600">
-              {loading ? "กำลังค้นหา..." : `พบ ${properties.length.toLocaleString("th-TH")} ทรัพย์`}
+            <div className="flex items-center justify-between gap-2 text-sm text-slate-600">
+              <span>{loading ? "กำลังค้นหา..." : `พบ ${properties.length.toLocaleString("th-TH")} ทรัพย์`}
               {visibleMapProperties.length < properties.length && properties.length > 0 && (
                 <span className="ml-2 text-xs text-slate-400">({visibleMapProperties.length} ทรัพย์มีพิกัดแผนที่)</span>
-              )}
+              )}</span>
+              <div className="flex shrink-0 rounded-lg border border-slate-200 p-1 lg:hidden">
+                <button type="button" onClick={() => setMobileMode("list")} className={`flex min-h-9 items-center gap-1 rounded-md px-3 text-xs font-bold ${mobileMode === "list" ? "bg-slate-900 text-white" : "text-slate-600"}`}><List size={14} />รายการ</button>
+                <button type="button" onClick={() => setMobileMode("map")} className={`flex min-h-9 items-center gap-1 rounded-md px-3 text-xs font-bold ${mobileMode === "map" ? "bg-slate-900 text-white" : "text-slate-600"}`}><MapIcon size={14} />แผนที่</button>
+              </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -401,12 +405,8 @@ export default function SearchExperience({ initialProperties, provinces, provinc
                 </select>
               </label>
               <button type="button" onClick={clearFilters} className="inline-flex min-h-10 items-center gap-1.5 px-2 text-xs font-semibold text-slate-500 hover:text-slate-800">
-                <RotateCcw size={14} /> ล้างตัวกรอง
+                <RotateCcw size={14} /> ล้าง<span className="hidden sm:inline">ตัวกรอง</span>
               </button>
-              <div className="flex rounded-lg border border-slate-200 p-1 lg:hidden">
-                <button type="button" onClick={() => setMobileMode("list")} className={`flex min-h-9 items-center gap-1 rounded-md px-3 text-xs font-bold ${mobileMode === "list" ? "bg-slate-900 text-white" : "text-slate-600"}`}><List size={14} />รายการ</button>
-                <button type="button" onClick={() => setMobileMode("map")} className={`flex min-h-9 items-center gap-1 rounded-md px-3 text-xs font-bold ${mobileMode === "map" ? "bg-slate-900 text-white" : "text-slate-600"}`}><MapIcon size={14} />แผนที่</button>
-              </div>
             </div>
           </div>
           {activeFilters.length > 0 && (

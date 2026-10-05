@@ -533,8 +533,8 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก";
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 sm:px-8">
+    <div className="-mx-4 border-b border-slate-200 bg-white sm:mx-0 sm:rounded-3xl sm:border sm:shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-8">
         <span className="text-sm font-bold text-slate-700">ฝากขายทรัพย์ · กรอกได้ในหน้าเดียว</span>
         <span role="status" aria-live="polite" className={`text-xs font-semibold ${saveState === "error" ? "text-red-600" : "text-slate-500"}`}>
           {saveLabel ?? "บันทึกแบบร่างอัตโนมัติ"}
@@ -544,7 +544,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       <fieldset disabled={submitting} className="min-w-0 divide-y divide-slate-100">
         {error && <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-8">{error}</div>}
 
-        <section id="sell-type" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-type" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("type")}
           <div role="radiogroup" aria-label="ประเภททรัพย์" className="grid gap-2 sm:grid-cols-4">
             {PRIMARY_TYPES.map((value) => (
@@ -569,7 +569,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           {fieldError("property_type")}
         </section>
 
-        <section id="sell-location" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-location" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("location","ปักหมุดไม่บังคับ แต่ช่วยให้ผู้ซื้อตัดสินใจได้เร็วขึ้น")}
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label><span className="label">จังหวัด *</span><select className="input" {...invalid("province_id")} value={form.province_id} onChange={(e) => selectProvince(e.target.value)}><option value="">เลือกจังหวัด</option>{provinces.map((p) => <option key={p.id} value={p.id}>{p.name_th}</option>)}</select>{fieldError("province_id")}</label>
@@ -606,7 +606,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           <p className="mt-2 text-[11px] text-slate-400">ข้อมูลเขตการปกครอง: <a className="underline" href="https://openadmindata.org/th/" target="_blank" rel="noopener noreferrer">Open Admin Data</a> (CC-BY-4.0)</p>
         </section>
 
-        <section id="sell-details" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-details" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("details")}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="sm:col-span-2"><span className="label">ชื่อทรัพย์ *</span><input className="input" {...invalid("title")} maxLength={180} value={form.title} onChange={(e) => setText("title", e.target.value)} placeholder="เช่น ที่ดินอุตสาหกรรม อ.นิคมพัฒนา ระยอง" />{fieldError("title")}</label>
@@ -644,7 +644,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           </details>
         </section>
 
-        <section id="sell-media" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-media" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("media","ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private")}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "image"); e.target.value = ""; }}/></label>
@@ -655,7 +655,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           {draft?.media && draft.media.length > 0 && <div className="mt-4 divide-y rounded-2xl border border-slate-200">{draft.media.map((media) => <div key={media.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="truncate">{media.file_name}</span><span className="shrink-0 text-xs text-slate-400">{media.media_kind === "image" ? "รูป" : "เอกสาร"}</span></div>)}</div>}
         </section>
 
-        <section id="sell-contact" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-contact" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("contact")}
           <div className="grid gap-4 sm:grid-cols-2">
             <label><span className="label">ชื่อ – นามสกุล *</span><input className="input" autoComplete="name" maxLength={120} {...invalid("contact_name")} value={form.contact_name} onChange={(e) => setText("contact_name", e.target.value)}/>{fieldError("contact_name")}</label>
@@ -664,7 +664,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           </div>
         </section>
 
-        <section id="sell-review" className="scroll-mt-20 p-5 sm:p-8">
+        <section id="sell-review" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("review")}
           <div className="grid gap-3 rounded-2xl bg-slate-50 p-5 text-sm sm:grid-cols-2">
             <div><span className="text-slate-400">ประเภท</span><div className="font-bold">{form.property_type ? PROPERTY_TYPE_LABELS[form.property_type] : "-"} · ขาย</div></div>

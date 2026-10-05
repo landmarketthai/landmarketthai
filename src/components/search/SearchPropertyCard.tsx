@@ -34,10 +34,10 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
       onMouseLeave={() => onHover?.(false)}
     >
       <button type="button" onClick={onSelect} className="w-full text-left">
-        <div className="grid grid-cols-[104px_minmax(0,1fr)] min-[380px]:grid-cols-[132px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)]">
-          <div className="relative min-h-36 bg-slate-100 min-[380px]:min-h-40 sm:min-h-44">
+        <div className="grid sm:grid-cols-[180px_minmax(0,1fr)]">
+          <div className="relative h-44 bg-slate-100 sm:h-auto sm:min-h-44">
             {cover ? (
-              <Image src={cover.url_or_cdn_path} alt={cover.alt_th ?? property.title_th} fill sizes="180px" className="object-cover" />
+              <Image src={cover.url_or_cdn_path} alt={cover.alt_th ?? property.title_th} fill sizes="(max-width: 640px) 100vw, 180px" className="object-cover" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-slate-300">
                 <Building2 size={34} />

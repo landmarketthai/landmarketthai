@@ -53,7 +53,7 @@ export default async function BecomePartnerPage() {
       <JsonLd data={faqSchema} />
 
       {/* Hero */}
-      <section className="bg-[#071d4a] px-4 py-14 text-white sm:px-6 sm:py-20 lg:px-8">
+      <section className="bg-[#071d4a] px-4 py-10 text-white sm:px-6 sm:py-20 lg:px-8">
         <div className="container-xl mx-auto max-w-3xl text-center">
           <h1 className="text-3xl font-black leading-tight sm:text-5xl">
             รู้จักคนกำลังหาที่ดินโรงงาน?
@@ -86,7 +86,7 @@ export default async function BecomePartnerPage() {
       {/* Form + LINE */}
       <section id="partner-form" className="section bg-slate-50">
         <div className="container-xl max-w-lg">
-          <div className="card p-8">
+          <div className="card p-5 sm:p-8">
             <h2 className="text-xl font-bold text-slate-900 mb-1 text-center">สมัครผู้แนะนำ</h2>
             <p className="text-sm text-slate-500 text-center mb-6">
               หรือเพิ่ม LINE OA ด้านล่าง เพื่อเริ่มทันที
