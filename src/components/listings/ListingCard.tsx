@@ -159,7 +159,7 @@ export default function ListingCard({
           {facts.length > 0 && (
             <p className="mt-2 text-sm text-slate-700">
               {facts.map((fact, index) => (
-                <span key={fact} className="whitespace-nowrap">{index > 0 && <span className="mx-1.5 text-slate-300">|</span>}{fact} </span>
+                <span key={fact}>{index > 0 && <span className="mx-1.5 text-slate-300">| </span>}<span className="whitespace-nowrap">{fact}</span></span>
               ))}
             </p>
           )}
