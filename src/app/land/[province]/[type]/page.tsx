@@ -2,9 +2,7 @@ import { getPublicInventory } from "@/lib/public-inventory";
 import { archiveInventory, archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import ListingGrid from "@/components/listings/ListingGrid";
+import LandArchive from "@/components/search/LandArchive";
 import JsonLd from "@/components/seo/JsonLd";
 import { getProvinceBySlug } from "@/lib/neon/queries";
 import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
@@ -14,7 +12,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 interface Params { province: string; type: string }
-interface SearchParams { page?: string }
 
 async function resolveProvince(slug: string) {
   return (await getProvinceBySlug(slug).catch(() => null)) ?? getFallbackProvinceBySlug(slug);
@@ -38,13 +35,10 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 
 export default async function ProvinceTypePage({
   params,
-  searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: Promise<SearchParams>;
 }) {
   const { province: slug, type } = await params;
-  const { page } = await searchParams;
   const [province, landType] = await Promise.all([
     resolveProvince(slug),
     Promise.resolve(slugToLandType(type)),
@@ -65,42 +59,9 @@ export default async function ProvinceTypePage({
   };
 
   return (
-    <div>
+    <>
       <JsonLd data={breadcrumb} />
-
-      <div className="bg-slate-900 text-white py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <nav className="flex items-center gap-1 text-xs text-slate-400 mb-3">
-            <Link href="/" className="hover:text-white">หน้าแรก</Link>
-            <ChevronRight size={12} />
-            <Link href="/land" className="hover:text-white">ที่ดิน</Link>
-            <ChevronRight size={12} />
-            <Link href={`/land/${slug}`} className="hover:text-white">{province.name_th}</Link>
-            <ChevronRight size={12} />
-            <span className="text-white">{typeName}</span>
-          </nav>
-          <h1 className="text-2xl font-bold">{typeName}{province.name_th}</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            {typeName}ใน{province.name_th} ราคาต่อไร่โปร่งใส ทีมงานตรวจสอบประกาศก่อนเผยแพร่
-          </p>
-        </div>
-      </div>
-
-      <div className="container-xl section">
-        <div className="prose prose-slate text-sm max-w-none mb-8 p-5 bg-slate-50 rounded-xl">
-          <p>
-            <strong>{typeName}{province.name_th}</strong> – LandmarketThai รวบรวมประกาศที่ดินที่ทีมงานตรวจสอบก่อนเผยแพร่
-            จากเครือข่ายพาร์ทเนอร์ ทีมผู้เชี่ยวชาญพร้อมให้ข้อมูลและจัดเยี่ยมชม
-            พื้นที่โดยไม่มีค่าใช้จ่าย
-          </p>
-        </div>
-        <ListingGrid
-          provinceSlug={slug}
-          landType={type}
-          page={Number(page ?? 1)}
-          basePath={`/land/${slug}/${type}`}
-        />
-      </div>
-    </div>
+      <LandArchive province={province} slug={slug} landType={landType} />
+    </>
   );
 }

@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/thai-admin": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
     "/search": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
+    "/land/[province]": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
+    "/land/[province]/[type]": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
   },
   images: {
     remotePatterns: [

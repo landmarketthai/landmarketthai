@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import type { Geometry } from "geojson";
 import type { Land, PropertyType, Province } from "@/lib/types/database";
@@ -46,6 +46,8 @@ interface Props {
   locationOptions: LocationOption[];
   initialValues: SearchValues;
   initialMode?: "list" | "map";
+  /** Replaces the default title block (the /land SEO pages pass breadcrumb + h1). */
+  header?: ReactNode;
 }
 
 const propertyTypes: ReadonlyArray<readonly [string, string]> = [["", "ทั้งหมด"], ...PROPERTY_TYPES.map((type) => [type, PROPERTY_TYPE_LABELS[type]] as const)];
@@ -111,7 +113,7 @@ function paramsFromValues(values: SearchValues) {
   return params;
 }
 
-export default function SearchExperience({ initialProperties, provinces, provinceCodes = {}, locationOptions, initialValues, initialMode = "list" }: Props) {
+export default function SearchExperience({ initialProperties, provinces, provinceCodes = {}, locationOptions, initialValues, initialMode = "list", header }: Props) {
   const router = useRouter();
   const [values, setValues] = useState<SearchValues>(initialValues);
   const [properties, setProperties] = useState(initialProperties);
@@ -309,10 +311,12 @@ export default function SearchExperience({ initialProperties, provinces, provinc
       <div className="bg-[#071d4a] px-4 py-4 text-white sm:px-6 sm:py-8 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
           <div className="flex items-end justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
-              <p className="mt-1 hidden text-sm text-blue-100 sm:block">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
-            </div>
+            {header ?? (
+              <div>
+                <h1 className="text-xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
+                <p className="mt-1 hidden text-sm text-blue-100 sm:block">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
+              </div>
+            )}
             <Link href="/buy-request" className="shrink-0 text-xs font-semibold text-white underline-offset-4 hover:underline sm:text-sm"><span className="hidden sm:inline">ยังไม่เจอทรัพย์? </span>ฝากเงื่อนไข ›</Link>
           </div>
         </div>

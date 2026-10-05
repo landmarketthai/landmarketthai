@@ -88,7 +88,7 @@ test("canonical route renders future inventory, rejects unknown slugs and redire
 test("archive metadata noindexes empty scopes and leaves populated scopes indexable", async () => {
   const modules = {
     "react/jsx-runtime": runtime, "next/navigation": {}, "next/link": {}, "lucide-react": {},
-    "@/components/listings/ListingGrid": {}, "@/components/seo/JsonLd": {},
+    "@/components/listings/ListingGrid": {}, "@/components/search/LandArchive": {}, "@/components/seo/JsonLd": {},
     "@/lib/neon/queries": { getProvinceBySlug: async (slug: string) => ({ slug, name_th: slug, name_en: slug }) },
     "@/lib/fallback-provinces": {}, "@/lib/public-seo": seo,
     "@/lib/public-inventory": { getPublicInventory: async () => SEED_PUBLIC_LISTINGS },

@@ -2,19 +2,16 @@ import { getPublicInventory } from "@/lib/public-inventory";
 import { archiveInventory, archiveRobots } from "@/lib/public-seo";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import ListingGrid from "@/components/listings/ListingGrid";
+import LandArchive from "@/components/search/LandArchive";
 import JsonLd from "@/components/seo/JsonLd";
 import { getProvinceBySlug } from "@/lib/neon/queries";
 import { getFallbackProvinceBySlug } from "@/lib/fallback-provinces";
-import { LAND_CATEGORY_TYPES, LAND_TYPE_LABELS } from "@/lib/utils";
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 interface Params { province: string }
-interface SearchParams { page?: string }
 
 async function resolveProvince(slug: string) {
   return (await getProvinceBySlug(slug).catch(() => null)) ?? getFallbackProvinceBySlug(slug);
@@ -34,17 +31,13 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   };
 }
 
-const LAND_TYPES = LAND_CATEGORY_TYPES;
 
 export default async function ProvincePage({
   params,
-  searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: Promise<SearchParams>;
 }) {
   const { province: slug } = await params;
-  const { page } = await searchParams;
   const province = await resolveProvince(slug);
   if (!province) notFound();
 
@@ -59,57 +52,9 @@ export default async function ProvincePage({
   };
 
   return (
-    <div>
+    <>
       <JsonLd data={breadcrumb} />
-
-      {/* Header */}
-      <div className="bg-slate-900 text-white py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <nav className="flex items-center gap-1 text-xs text-slate-400 mb-3">
-            <Link href="/" className="hover:text-white">หน้าแรก</Link>
-            <ChevronRight size={12} />
-            <Link href="/land" className="hover:text-white">ที่ดิน</Link>
-            <ChevronRight size={12} />
-            <span className="text-white">{province.name_th}</span>
-          </nav>
-          <h1 className="text-2xl font-bold">
-            ที่ดินอุตสาหกรรม{province.name_th}
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            ค้นหาที่ดิน โรงงาน คลังสินค้า และอสังหาริมทรัพย์ใน{province.name_th} – ตรวจสอบก่อนทุกครั้ง
-          </p>
-        </div>
-      </div>
-
-      <div className="container-xl section">
-        {/* Type sub-links */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {LAND_TYPES.map((type) => (
-            <Link
-              key={type}
-              href={`/land/${slug}/${type.replace(/_/g, "-")}`}
-              className="badge bg-slate-100 text-slate-700 hover:bg-brand-100 hover:text-brand-700 px-3 py-1 text-sm transition-colors"
-            >
-              {LAND_TYPE_LABELS[type]}
-            </Link>
-          ))}
-        </div>
-
-        {/* SEO intro */}
-        <div className="prose prose-slate text-sm max-w-none mb-8 p-5 bg-slate-50 rounded-xl">
-          <p>
-            ค้นหาประกาศอสังหาริมทรัพย์ใน<strong>{province.name_th}</strong>
-            พร้อมข้อมูลราคา ทำเล และรายละเอียดที่ผู้ลงประกาศระบุ
-            ควรตรวจสอบเอกสาร ผังเมือง และข้อจำกัดการใช้พื้นที่กับหน่วยงานก่อนตัดสินใจ
-          </p>
-        </div>
-
-        <ListingGrid
-          provinceSlug={slug}
-          page={Number(page ?? 1)}
-          basePath={`/land/${slug}`}
-        />
-      </div>
-    </div>
+      <LandArchive province={province} slug={slug} />
+    </>
   );
 }

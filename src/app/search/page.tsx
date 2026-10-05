@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import SearchExperience, { type SearchValues } from "@/components/search/SearchExperience";
-import { getAllProvinces, getLocationOptions, searchProperties } from "@/lib/neon/queries";
+import { searchProperties } from "@/lib/neon/queries";
 import { parsePropertySearchParams } from "@/lib/marketplace/search-filters";
-import { findProvince } from "@/lib/thai-admin";
+import { loadSearchContext } from "@/lib/search-context";
 
 export const metadata: Metadata = {
   title: "ค้นหาอสังหาริมทรัพย์",
@@ -47,17 +47,10 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     sort: filters.sort,
   };
 
-  const [initialProperties, provinces, locationOptions] = await Promise.all([
+  const [initialProperties, { provinces, locationOptions, provinceCodes }] = await Promise.all([
     searchProperties({ ...filters, west: undefined, south: undefined, east: undefined, north: undefined, limit: 24, offset: 0 }).catch(() => []),
-    getAllProvinces().catch(() => []),
-    getLocationOptions().catch(() => []),
+    loadSearchContext(),
   ]);
-
-  // Province slug -> admin code, used to load /geo/th/<code>.json boundaries on the map.
-  const provinceCodes = Object.fromEntries(provinces.flatMap((province) => {
-    const code = findProvince(province.name_th)?.code;
-    return code ? [[province.slug, code]] : [];
-  }));
 
   return (
     <SearchExperience
