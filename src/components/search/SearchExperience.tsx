@@ -10,6 +10,7 @@ import { formatMoneyFull, listingStatusLabel } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
 import { locationChoices, type LocationOption } from "@/lib/marketplace/search-filters";
+import { areaFromText, type AreaIndex } from "@/lib/area-text";
 import PropertyMap, { type MapBounds } from "./PropertyMap";
 import SearchPropertyCard from "./SearchPropertyCard";
 
@@ -86,6 +87,21 @@ function useAdminBoundaries(code: string | undefined) {
   return code && loaded?.code === code ? loaded.file : null;
 }
 
+let areaIndex: Promise<AreaIndex | null> | null = null;
+
+/** Loads the province/district name index only once someone types a search. */
+function useAreaIndex(enabled: boolean) {
+  const [index, setIndex] = useState<AreaIndex | null>(null);
+  useEffect(() => {
+    if (!enabled || index) return;
+    let cancelled = false;
+    areaIndex ??= fetch("/geo/th/index.json").then((response) => response.ok ? response.json() : null).catch(() => null);
+    void areaIndex.then((loaded) => { if (!cancelled) setIndex(loaded); });
+    return () => { cancelled = true; };
+  }, [enabled, index]);
+  return index;
+}
+
 function paramsFromValues(values: SearchValues) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
@@ -100,7 +116,10 @@ export default function SearchExperience({ initialProperties, provinces, provinc
   const [values, setValues] = useState<SearchValues>(initialValues);
   const [properties, setProperties] = useState(initialProperties);
   const [fitKey, setFitKey] = useState(0);
-  const boundaryFile = useAdminBoundaries(values.province ? provinceCodes[values.province] : undefined);
+  // Dropdowns win; otherwise a province/district typed in the search box ("ระยอง", "อ.บางพลี") draws the outline.
+  const index = useAreaIndex(!values.province && Boolean(values.q?.trim()));
+  const typedArea = !values.province && index ? areaFromText(values.q, index) : null;
+  const boundaryFile = useAdminBoundaries(values.province ? provinceCodes[values.province] : typedArea?.code);
   const { districts: listingDistricts, subdistricts: subdistrictOptions } = useMemo(
     () => locationChoices(locationOptions, values),
     [locationOptions, values],
@@ -110,7 +129,8 @@ export default function SearchExperience({ initialProperties, provinces, provinc
     () => [...new Set([...listingDistricts, ...Object.keys(boundaryFile?.d ?? {})])].sort((a, b) => a.localeCompare(b, "th")),
     [listingDistricts, boundaryFile],
   );
-  const boundary = boundaryFile ? (values.district ? boundaryFile.d[values.district] : boundaryFile.p) ?? null : null;
+  const district = values.province ? values.district : typedArea?.district;
+  const boundary = boundaryFile ? (district ? boundaryFile.d[district] : boundaryFile.p) ?? null : null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mobileMode, setMobileMode] = useState<"list" | "map">(initialMode);

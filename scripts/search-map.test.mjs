@@ -84,6 +84,7 @@ function harness(file, extra = {}) {
     'next/link': { default: 'Link' }, 'next/navigation': { useRouter: () => ({ replace() {} }) },
     'lucide-react': {}, '@/lib/utils': {}, '@/lib/marketplace/verification': { verificationBadges: () => [] },
     '@/lib/marketplace/search-filters': { locationChoices: () => ({ districts: [], subdistricts: [] }) },
+    '@/lib/area-text': { areaFromText: () => null },
     '@/lib/marketplace/presentation': presentation,
     './PropertyMap': 'PropertyMap', './SearchPropertyCard': 'SearchPropertyCard',
   };

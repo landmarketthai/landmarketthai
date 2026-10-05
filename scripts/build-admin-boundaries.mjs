@@ -70,4 +70,18 @@ for (const province of provinceOut) {
   };
   writeFileSync(`public/geo/th/${code}.json`, JSON.stringify(file));
 }
+// Name index so free-text search ("ระยอง", "อ.บางพลี") can find the right boundary file.
+const provinceNames = JSON.parse(readFileSync("src/data/thailand-flat.json", "utf8")).data.filter((entry) => entry.level === 1);
+const index = {
+  p: Object.fromEntries([
+    ...provinceNames.map((entry) => [entry.name.local, entry.id]),
+    ["กรุงเทพ", "10"], ["กรุงเทพฯ", "10"], ["กทม", "10"], ["อยุธยา", "14"],
+  ]),
+  d: {},
+};
+for (const [district] of matched) {
+  const name = district.name.local.replace(/^(อำเภอ|เขต)\s*/, "");
+  (index.d[name] ??= []).push(district.parent.id);
+}
+writeFileSync("public/geo/th/index.json", JSON.stringify(index));
 console.log(`wrote ${provinceOut.length} provinces, ${districtOut.length} districts to public/geo/th`);
