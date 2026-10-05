@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SearchExperience, { type SearchValues } from "@/components/search/SearchExperience";
 import { getAllProvinces, getLocationOptions, searchProperties } from "@/lib/neon/queries";
 import { parsePropertySearchParams } from "@/lib/marketplace/search-filters";
+import { findProvince } from "@/lib/thai-admin";
 
 export const metadata: Metadata = {
   title: "ค้นหาอสังหาริมทรัพย์",
@@ -52,10 +53,17 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     getLocationOptions().catch(() => []),
   ]);
 
+  // Province slug -> admin code, used to load /geo/th/<code>.json boundaries on the map.
+  const provinceCodes = Object.fromEntries(provinces.flatMap((province) => {
+    const code = findProvince(province.name_th)?.code;
+    return code ? [[province.slug, code]] : [];
+  }));
+
   return (
     <SearchExperience
       initialProperties={initialProperties}
       provinces={provinces}
+      provinceCodes={provinceCodes}
       locationOptions={locationOptions}
       initialValues={values}
       initialMode={initialMode}

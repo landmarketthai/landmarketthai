@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Geometry } from "geojson";
 import type { Land } from "@/lib/types/database";
+
+// ponytail: keyless public tiles. OSM and Esri allow light use with attribution; move to a keyed provider
+// (Esri Location Platform, MapTiler, Mapbox) before heavy commercial traffic.
+const BASE_LAYERS = {
+  map: {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+  },
+} as const;
+type BaseLayer = keyof typeof BASE_LAYERS;
+const BOUNDARY_ATTRIBUTION = 'ขอบเขตปกครอง: <a href="https://www.geoboundaries.org">geoBoundaries</a> (RTSD/OCHA, CC BY 3.0 IGO)';
 
 export interface MapBounds {
   west: number;
@@ -19,6 +35,8 @@ interface Props {
   onBoundsChange?: (bounds: MapBounds) => void;
   /** Map re-fits to the result set only when this changes (not on pan-driven refreshes). */
   fitKey?: number;
+  /** Selected province/district outline; the map dims everything outside it and fits to it. */
+  boundary?: Geometry | null;
   className?: string;
   interactive?: boolean;
   scrollWheelZoom?: boolean;
@@ -39,12 +57,21 @@ function markerArea(property: Land): string | null {
   return null;
 }
 
+/** Land buyers compare price per rai, so it leads whenever the listing has one. */
+function markerHeadline(property: Land): string {
+  const perRai = property.price_per_rai;
+  if (perRai == null || property.size_rai == null) return markerPrice(property);
+  return perRai >= 1_000_000
+    ? `฿${(perRai / 1_000_000).toLocaleString("th-TH", { maximumFractionDigits: 2 })} ล./ไร่`
+    : `฿${Math.round(perRai / 1_000).toLocaleString("th-TH")} พัน/ไร่`;
+}
+
 function markerLabel(property: Land): string {
   const area = markerArea(property);
   const verified = property.verification_status === "verified"
     ? '<span class="property-marker-verified" aria-hidden="true">✓</span>'
     : "";
-  return `<span class="property-marker-main"><strong>${markerPrice(property)}</strong>${verified}</span>${area ? `<small>${area}</small>` : ""}`;
+  return `<span class="property-marker-main"><strong>${markerHeadline(property)}</strong>${verified}</span>${area ? `<small>${area}</small>` : ""}`;
 }
 
 function markerTitle(property: Land): string {
@@ -67,6 +94,7 @@ export default function PropertyMap({
   onHover,
   onBoundsChange,
   fitKey = 0,
+  boundary = null,
   className = "h-full min-h-[420px]",
   interactive = true,
   scrollWheelZoom = interactive,
@@ -87,6 +115,10 @@ export default function PropertyMap({
   const lastFitKeyRef = useRef<number | null>(null);
   const fitKeyRef = useRef(fitKey);
   const [ready, setReady] = useState(0);
+  const [baseLayer, setBaseLayer] = useState<BaseLayer>("map");
+  const tileRef = useRef<import("leaflet").TileLayer | null>(null);
+  const boundaryLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const boundaryRef = useRef(boundary);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -132,6 +164,7 @@ export default function PropertyMap({
       const map = L.map(containerRef.current, {
         center: [13.2, 101.2],
         zoom: 7,
+        maxZoom: 19,
         zoomControl: true,
         scrollWheelZoom,
         dragging: interactive,
@@ -141,10 +174,6 @@ export default function PropertyMap({
         boxZoom: interactive,
         trackResize: false,
       });
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
 
       const cluster = L.markerClusterGroup({
         showCoverageOnHover: false,
@@ -239,6 +268,8 @@ export default function PropertyMap({
       mapRef.current?.remove();
       mapRef.current = null;
       clusterRef.current = null;
+      tileRef.current = null;
+      boundaryLayerRef.current = null;
       markers.clear();
     };
   }, [interactive, scrollWheelZoom]);
@@ -283,13 +314,14 @@ export default function PropertyMap({
         points.push([property.lat, property.lng]);
       }
 
-      if (points.length && map.getSize().x && map.getSize().y && lastFitKeyRef.current !== fitKey) {
+      // A selected area frames the map itself (see the boundary effect); otherwise frame the results.
+      if (points.length && map.getSize().x && map.getSize().y && lastFitKeyRef.current !== fitKey && !boundaryRef.current) {
         lastFitKeyRef.current = fitKey;
         const bounds = L.latLngBounds(points);
         userMapInteractionRef.current = false;
         userInputRef.current = false;
         map.stop();
-        map.fitBounds(bounds.pad(0.25), { maxZoom: 13, animate: false });
+        map.fitBounds(bounds.pad(0.12), { maxZoom: 12, animate: false });
       }
     }
     void syncMarkers();
@@ -297,6 +329,62 @@ export default function PropertyMap({
       cancelled = true;
     };
   }, [properties, ready, fitKey]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    let cancelled = false;
+    void import("leaflet").then((leaflet) => {
+      if (cancelled || mapRef.current !== map) return;
+      const L = (leaflet.default ?? leaflet) as typeof import("leaflet");
+      tileRef.current?.remove();
+      tileRef.current = L.tileLayer(BASE_LAYERS[baseLayer].url, {
+        attribution: BASE_LAYERS[baseLayer].attribution,
+        maxZoom: 19,
+      }).addTo(map);
+    });
+    return () => { cancelled = true; };
+  }, [baseLayer, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const hadBoundary = boundaryRef.current != null;
+    boundaryRef.current = boundary;
+    if (!map) return;
+    let cancelled = false;
+    void import("leaflet").then((leaflet) => {
+      if (cancelled || mapRef.current !== map) return;
+      const L = (leaflet.default ?? leaflet) as typeof import("leaflet");
+      if (boundaryLayerRef.current) {
+        boundaryLayerRef.current.remove();
+        boundaryLayerRef.current = null;
+        map.attributionControl.removeAttribution(BOUNDARY_ATTRIBUTION);
+      }
+      if (!boundary) {
+        // Area cleared: let the results frame the map again.
+        if (hadBoundary) { lastFitKeyRef.current = null; setReady((generation) => generation + 1); }
+        return;
+      }
+      const outer = (boundary.type === "Polygon" ? [boundary.coordinates] : boundary.type === "MultiPolygon" ? boundary.coordinates : [])
+        .map((polygon) => polygon[0].map(([lng, lat]) => [lat, lng] as [number, number]));
+      const world: [number, number][] = [[-90, -360], [-90, 360], [90, 360], [90, -360]];
+      const outline = L.geoJSON(boundary, { interactive: false, style: { color: "#dc2626", weight: 3, fill: false } });
+      boundaryLayerRef.current = L.layerGroup([
+        // Inverted mask: the whole world minus the selected area, so the area reads as "cropped".
+        L.polygon([world, ...outer], { interactive: false, stroke: false, fillColor: "#0f172a", fillOpacity: 0.35 }),
+        outline,
+      ]).addTo(map);
+      map.attributionControl.addAttribution(BOUNDARY_ATTRIBUTION);
+      if (map.getSize().x && map.getSize().y) {
+        lastFitKeyRef.current = fitKeyRef.current;
+        userMapInteractionRef.current = false;
+        userInputRef.current = false;
+        map.stop();
+        map.fitBounds(outline.getBounds(), { padding: [24, 24], animate: true });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [boundary, ready]);
 
   useEffect(() => {
     for (const [id, marker] of markerRefs.current) {
@@ -322,9 +410,24 @@ export default function PropertyMap({
   return (
     <div className={`relative overflow-hidden bg-slate-100 ${className}`}>
       <div ref={containerRef} className="absolute inset-0" aria-label="แผนที่ทรัพย์" />
+      {interactive && (
+        <div className="absolute bottom-7 left-3 z-[600] flex overflow-hidden rounded-lg bg-white text-xs font-bold shadow-md" role="group" aria-label="รูปแบบแผนที่">
+          {([["map", "แผนที่"], ["satellite", "ดาวเทียม"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={baseLayer === key}
+              onClick={() => setBaseLayer(key)}
+              className={`min-h-10 px-3 ${baseLayer === key ? "bg-[#071d4a] text-white" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {geocodedCount === 0 && (
-        <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-slate-50/90 p-6 text-center text-sm text-slate-500">
-          ยังไม่มีพิกัดจริงสำหรับทรัพย์ในผลการค้นหานี้
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 whitespace-nowrap rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-slate-600 shadow-md">
+          ยังไม่มีทรัพย์ในพื้นที่นี้
         </div>
       )}
     </div>

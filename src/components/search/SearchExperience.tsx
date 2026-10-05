@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import type { Geometry } from "geojson";
 import type { Land, PropertyType, Province } from "@/lib/types/database";
 import { formatMoneyFull, listingStatusLabel } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
@@ -39,6 +40,8 @@ export interface SearchValues {
 interface Props {
   initialProperties: Land[];
   provinces: Province[];
+  /** Province slug -> admin code for /geo/th/<code>.json boundary files. */
+  provinceCodes?: Record<string, string>;
   locationOptions: LocationOption[];
   initialValues: SearchValues;
   initialMode?: "list" | "map";
@@ -65,6 +68,24 @@ const sortOptions: Array<[NonNullable<SearchValues["sort"]>, string]> = [
   ["size_desc", "ขนาด: มาก → น้อย"],
 ];
 
+type BoundaryFile = { p: Geometry; d: Record<string, Geometry> };
+const boundaryCache = new Map<string, Promise<BoundaryFile | null>>();
+
+/** Loads /geo/th/<code>.json once per province; null while loading or when unavailable. */
+function useAdminBoundaries(code: string | undefined) {
+  const [loaded, setLoaded] = useState<{ code: string; file: BoundaryFile | null } | null>(null);
+  useEffect(() => {
+    if (!code) return;
+    let cancelled = false;
+    if (!boundaryCache.has(code)) {
+      boundaryCache.set(code, fetch(`/geo/th/${code}.json`).then((response) => response.ok ? response.json() : null).catch(() => null));
+    }
+    void boundaryCache.get(code)!.then((file) => { if (!cancelled) setLoaded({ code, file }); });
+    return () => { cancelled = true; };
+  }, [code]);
+  return code && loaded?.code === code ? loaded.file : null;
+}
+
 function paramsFromValues(values: SearchValues) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
@@ -74,15 +95,22 @@ function paramsFromValues(values: SearchValues) {
   return params;
 }
 
-export default function SearchExperience({ initialProperties, provinces, locationOptions, initialValues, initialMode = "list" }: Props) {
+export default function SearchExperience({ initialProperties, provinces, provinceCodes = {}, locationOptions, initialValues, initialMode = "list" }: Props) {
   const router = useRouter();
   const [values, setValues] = useState<SearchValues>(initialValues);
   const [properties, setProperties] = useState(initialProperties);
   const [fitKey, setFitKey] = useState(0);
-  const { districts: districtOptions, subdistricts: subdistrictOptions } = useMemo(
+  const boundaryFile = useAdminBoundaries(values.province ? provinceCodes[values.province] : undefined);
+  const { districts: listingDistricts, subdistricts: subdistrictOptions } = useMemo(
     () => locationChoices(locationOptions, values),
     [locationOptions, values],
   );
+  // Every official district is selectable once its province boundary file loads, not only districts with listings.
+  const districtOptions = useMemo(
+    () => [...new Set([...listingDistricts, ...Object.keys(boundaryFile?.d ?? {})])].sort((a, b) => a.localeCompare(b, "th")),
+    [listingDistricts, boundaryFile],
+  );
+  const boundary = boundaryFile ? (values.district ? boundaryFile.d[values.district] : boundaryFile.p) ?? null : null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mobileMode, setMobileMode] = useState<"list" | "map">(initialMode);
@@ -237,8 +265,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
       <div className="bg-[#071d4a] px-4 py-6 text-white sm:px-6 sm:py-8 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
-          <div className="text-xs font-bold tracking-[0.16em] text-gold-400">PROPERTY SEARCH</div>
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-2xl font-black sm:text-3xl">ค้นหาอสังหาริมทรัพย์</h1>
               <p className="mt-1 text-sm text-blue-100">ผลลัพธ์และตำแหน่งบนแผนที่มาจากข้อมูลจริงที่เผยแพร่ในระบบ</p>
@@ -423,6 +450,7 @@ export default function SearchExperience({ initialProperties, provinces, locatio
             onHover={setHoveredId}
             onBoundsChange={handleBoundsChange}
             fitKey={fitKey}
+            boundary={boundary}
             className="h-[calc(100dvh-13rem)] min-h-[360px] sm:min-h-[440px] lg:h-full lg:min-h-0"
           />
           <label className="absolute right-3 top-3 z-[600] flex min-h-10 items-center gap-2 rounded-lg bg-white/95 px-3 text-xs font-semibold text-slate-700 shadow-md backdrop-blur">
