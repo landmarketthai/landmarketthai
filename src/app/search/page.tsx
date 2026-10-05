@@ -26,6 +26,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const values: SearchValues = {
     q: filters.q,
     property_type: filters.property_type,
+    type: filters.type,
     status: filters.status,
     province: filters.province_slug,
     district: filters.district,

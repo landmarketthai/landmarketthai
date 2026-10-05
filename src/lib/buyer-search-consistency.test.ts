@@ -99,3 +99,23 @@ test("SQL filters and size sort keep units separate and rank missing sizes last"
   assert.match(propertySqlOrder("size_desc"), /l\.size_rai > 0[\s\S]*usable_area_sqm/);
   assert.doesNotMatch(sql + propertySqlOrder("size_desc"), /1600|400/);
 });
+
+
+test("SEO category filters survive query parsing and match both SQL and inventory predicates", () => {
+  for (const type of ["land", "industrial", "eec", "factory", "warehouse", "logistics", "data_center", "investment"] as const) {
+    const filters = parsePropertySearchParams(new URLSearchParams({ type: type.replaceAll("_", "-"), status: "active" }));
+    assert.equal(filters.type, type);
+    const property = { ...building, land_type: type, is_eec: false };
+    assert.equal(propertyMatchesSearchFilters(property, filters), true);
+    assert.equal(propertyMatchesSearchFilters({ ...property, land_type: "other" }, filters), false);
+    const values: unknown[] = [];
+    const sql = propertySearchSqlClauses(filters, value => { values.push(value); return "$" + values.length; }, []).join(" and ");
+    assert.ok(values.includes(type));
+    assert.match(sql, /l\.land_type::text = \$\d+/);
+    if (type === "eec") {
+      assert.match(sql, /or l\.is_eec = true/);
+      assert.equal(propertyMatchesSearchFilters({ ...property, land_type: "industrial", is_eec: true }, filters), true);
+    }
+  }
+  assert.equal(parsePropertySearchParams(new URLSearchParams({ type: "__proto__" })).type, undefined);
+});

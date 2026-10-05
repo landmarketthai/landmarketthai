@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   // src/lib/thai-admin.ts reads these with fs at runtime; make sure they ship with the route.
   outputFileTracingIncludes: {
     "/api/thai-admin": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
+    "/land": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
     "/search": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
     "/land/[province]": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],
     "/land/[province]/[type]": ["./src/data/thailand-flat.json", "./src/data/thailand-admin.json"],

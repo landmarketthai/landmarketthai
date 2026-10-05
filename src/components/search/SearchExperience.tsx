@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { List, Map as MapIcon, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import type { Geometry } from "geojson";
-import type { Land, PropertyType, Province } from "@/lib/types/database";
-import { formatMoneyFull, listingStatusLabel } from "@/lib/utils";
+import type { Land, LandType, PropertyType, Province } from "@/lib/types/database";
+import { formatMoneyFull, listingStatusLabel, LAND_TYPE_LABELS } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
 import { locationChoices, type LocationOption } from "@/lib/marketplace/search-filters";
@@ -17,6 +17,7 @@ import SearchPropertyCard from "./SearchPropertyCard";
 export interface SearchValues {
   q?: string;
   property_type?: PropertyType;
+  type?: LandType;
   status?: "active" | "sold";
   province?: string;
   district?: string;
@@ -107,8 +108,8 @@ function useAreaIndex(enabled: boolean) {
 function paramsFromValues(values: SearchValues) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
-    if (value === undefined || value === "" || value === false) continue;
-    params.set(key, value === true ? "1" : String(value));
+    if (value === undefined || value === "") continue;
+    params.set(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
   }
   return params;
 }
@@ -181,6 +182,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
 
     if (values.q) items.push({ key: "q", label: `คำค้น: ${values.q}` });
     if (values.property_type) items.push({ key: "property_type", label: propertyTypes.find(([value]) => value === values.property_type)?.[1] ?? values.property_type });
+    if (values.type) items.push({ key: "type", label: LAND_TYPE_LABELS[values.type] });
     if (values.status) items.push({ key: "status", label: values.status === "active" ? "พร้อมขาย" : "ขายแล้ว" });
     if (values.province) items.push({ key: "province", label: province?.name_th ?? values.province });
     if (values.district) items.push({ key: "district", label: `อำเภอ: ${values.district}` });
@@ -197,7 +199,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
     if (values.min_depth_m) items.push({ key: "min_depth_m", label: `ความลึก ≥ ${numberLabel(values.min_depth_m)} ม.` });
     if (values.min_road_width_m) items.push({ key: "min_road_width_m", label: `ถนน ≥ ${numberLabel(values.min_road_width_m)} ม.` });
     if (values.zoning) items.push({ key: "zoning", label: zoning ?? values.zoning });
-    if (values.eec) items.push({ key: "eec", label: "EEC" });
+    if (values.eec != null) items.push({ key: "eec", label: values.eec ? "EEC" : "นอก EEC" });
     if (values.location_precision === "exact") items.push({ key: "location_precision", label: "พิกัดแบบ Exact" });
     return items;
   }, [provinces, values]);
@@ -288,7 +290,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
       className="input"
       aria-label="ประเภททรัพย์"
       value={values.property_type ?? ""}
-      onChange={(event) => setValues((current) => ({ ...current, property_type: (event.target.value || undefined) as SearchValues["property_type"], ...(event.target.value === "land" ? { min_usable_area_sqm: undefined, max_usable_area_sqm: undefined } : {}) }))}
+      onChange={(event) => setValues((current) => ({ ...current, type: undefined, property_type: (event.target.value || undefined) as SearchValues["property_type"], ...(event.target.value === "land" ? { min_usable_area_sqm: undefined, max_usable_area_sqm: undefined } : {}) }))}
     >
       {propertyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select>

@@ -101,6 +101,10 @@ test("archive metadata noindexes empty scopes and leaves populated scopes indexa
       const meta = await page.generateMetadata({ params: Promise.resolve({ province, type }) });
       assert.equal((meta.robots as { index: boolean }).index, index);
       assert.equal((meta.robots as { follow: boolean }).follow, true);
+      const path = route.includes("[type]") ? `/land/${province}/${type}` : `/land/${province}`;
+      assert.equal(meta.alternates?.canonical, path);
+      assert.equal((meta.openGraph as { url: string }).url, path);
+      assert.equal(meta.title, route.includes("[type]") ? `${type === "warehouse" ? "โกดัง/คลังสินค้า" : "ที่ดินอุตสาหกรรม"}${province} – ที่ดิน ${province} ${type === "warehouse" ? "โกดัง/คลังสินค้า" : "ที่ดินอุตสาหกรรม"}` : `อสังหาริมทรัพย์ใน${province} – ${province}`);
     }
   }
 });
@@ -288,4 +292,45 @@ test("corrective Kabin migration is a single targeted idempotent-safe update", (
   assert.match(read("../app/sitemap.ts"), /export const revalidate = 300/);
   assert.match(read("../app/sitemap.ts"), /shard when inventory approaches the limit/);
   assert.doesNotMatch(read("../app/sitemap.ts"), /force-dynamic|revalidate = 0/);
+});
+
+
+test("land overview and province archives retain their filters in the shared search screen", async () => {
+  const SearchExperience = "SearchExperience";
+  const page = load<{ default: (props: unknown) => Promise<{ props: { children: Array<{ type: unknown; props: { initialProperties: Land[]; initialValues: Record<string, unknown> } }> } }> }>("../components/search/LandArchive.tsx", {
+    "react/jsx-runtime": runtime, "next/link": "Link", "lucide-react": {},
+    "@/components/search/SearchExperience": SearchExperience,
+    "@/lib/public-inventory": { getPublicInventory: async () => SEED_PUBLIC_LISTINGS },
+    "@/lib/public-seo": seo, "@/lib/land-search": await import("./land-search.ts"),
+    "@/lib/search-context": { loadSearchContext: async () => ({ provinces: [], provinceCodes: {}, locationOptions: [] }) },
+    "@/lib/utils": await import("./utils.ts"),
+  });
+  const filters = { land_type: "industrial", province_slug: "rayong", price_min: 2300000, size_max: 40 };
+  const overview = (await page.default({ filters })).props.children[0];
+  assert.equal(overview.type, SearchExperience);
+  assert.deepEqual(overview.props.initialProperties.map(row => row.slug), ["37-rai-eec-rayong"]);
+  assert.equal(overview.props.initialValues.type, "industrial");
+  assert.equal(overview.props.initialValues.min_price_per_rai, "2300000");
+  assert.equal(overview.props.initialValues.max_size_rai, "40");
+  assert.equal(overview.props.initialValues.province, "rayong");
+  assert.equal(overview.props.initialValues.status, "active");
+  const archive = (await page.default({ province: { name_th: "ระยอง" }, slug: "rayong", landType: "eec" })).props.children[0];
+  assert.equal(archive.props.initialValues.type, "eec");
+  assert.equal(archive.props.initialValues.province, "rayong");
+  assert.equal(archive.props.initialValues.status, "active");
+});
+
+test("footer province links follow populated sitemap scopes, excluding sold-only and deleted inventory", async () => {
+  let inventory: Land[] = [...SEED_PUBLIC_LISTINGS, ...SEED_PUBLIC_LISTINGS,
+    { ...SEED_109_RAI_LAND, province: { ...SEED_109_RAI_LAND.province!, slug: "sold-only" } },
+    { ...SEED_101_KABIN_LAND, deleted_at: "2026-10-05", province: { ...SEED_101_KABIN_LAND.province!, slug: "deleted-only" } }];
+  const footer = load<{ default: (props: unknown) => Promise<unknown> }>("../components/layout/Footer.tsx", {
+    "react/jsx-runtime": runtime, "next/link": "Link", "next/image": "Image",
+    "@/components/ui/LineIcon": {}, "@/lib/constants/site": { LINE_OA: "https://example.test" },
+    "@/lib/public-inventory": { getPublicInventory: async () => inventory }, "@/lib/public-seo": seo,
+  });
+  const links = async () => [...JSON.stringify(await footer.default({})).matchAll(/"href":"(\/land\/[^"?]+)"/g)].map(match => match[1]).sort();
+  assert.deepEqual(await links(), ["/land/prachin-buri", "/land/rayong"]);
+  inventory = [];
+  assert.deepEqual(await links(), []);
 });

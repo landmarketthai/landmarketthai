@@ -1,12 +1,14 @@
-import type { Land, PropertyType } from "@/lib/types/database";
+import type { Land, LandType, PropertyType } from "@/lib/types/database";
 import type { PropertySort } from "@/lib/marketplace/search-sort";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
+import { slugToLandType } from "@/lib/utils";
 export const PROPERTY_SORTS: readonly PropertySort[] = ["newest", "price_asc", "price_desc", "price_per_rai_asc", "size_desc"];
 const ZONINGS = ["purple", "purple_light", "brown", "orange", "yellow", "green", "other"] as const;
 
 export interface PropertySearchFilters {
   q?: string;
   property_type?: PropertyType;
+  type?: LandType;
   status?: "active" | "sold";
   province_slug?: string;
   province_ids?: string[];
@@ -54,6 +56,7 @@ export function parsePropertySearchParams(params: URLSearchParams): PropertySear
   return {
     q: text("q"),
     property_type: oneOf("property_type", PROPERTY_TYPES),
+    type: slugToLandType(params.get("type") ?? "") ?? undefined,
     status: oneOf("status", ["active", "sold"] as const) ?? (params.get("history") === "1" ? "sold" : undefined),
     province_slug: text("province"),
     district: text("district"),
@@ -156,6 +159,7 @@ export function propertyMatchesSearchFilters(property: Land, filters: PropertySe
   }
   const provinceName = property.province?.name_th;
   if (filters.property_type && property.property_type !== filters.property_type) return false;
+  if (filters.type && property.land_type !== filters.type && !(filters.type === "eec" && property.is_eec)) return false;
   if (filters.status && property.status !== filters.status) return false;
   if (filters.province_slug && property.province?.slug !== filters.province_slug) return false;
   if (filters.district && !includesArea(property.district, filters.district, provinceName)) return false;
@@ -257,6 +261,9 @@ export function propertySearchSqlClauses(
       when l.land_type::text = any(${canonical}::text[]) then l.land_type::text
       when l.land_type is null or l.land_type::text in ('industrial','eec','logistics','data_center','investment') then 'land' else 'other' end) = ${add(filters.property_type)}`);
   }
+  if (filters.type) clauses.push(filters.type === "eec"
+    ? `(l.land_type::text = ${add(filters.type)} or l.is_eec = true)`
+    : `l.land_type::text = ${add(filters.type)}`);
   if (filters.status) clauses.push(`l.status = ${add(filters.status)}`);
   if (filters.province_ids?.length) clauses.push(`l.province_id = any(${add(filters.province_ids)}::uuid[])`);
   if (filters.location_terms?.length) {

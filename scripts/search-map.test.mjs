@@ -82,7 +82,7 @@ function harness(file, extra = {}) {
     react: hooks, 'react/jsx-runtime': { jsx, jsxs: jsx },
     leaflet: L, 'leaflet.markercluster': {},
     'next/link': { default: 'Link' }, 'next/navigation': { useRouter: () => ({ replace() {} }) },
-    'lucide-react': {}, '@/lib/utils': {}, '@/lib/marketplace/verification': { verificationBadges: () => [] },
+    'lucide-react': {}, '@/lib/utils': { LAND_TYPE_LABELS: { industrial: 'ที่ดินอุตสาหกรรม' } }, '@/lib/marketplace/verification': { verificationBadges: () => [] },
     '@/lib/marketplace/search-filters': { locationChoices: () => ({ districts: [], subdistricts: [] }) },
     '@/lib/area-text': { areaFromText: () => null },
     '@/lib/marketplace/presentation': presentation,
@@ -221,5 +221,27 @@ test('desktop bounds searches remain enabled in mobile list mode; disabling move
   assert.equal(requests.length, 2);
   requests[1].resolve({ ok: true, json: async () => ({ properties: listings }) }); await h.flush();
   assert.equal(h.mapProps().properties.length, 3);
+  h.unmount();
+});
+
+
+test('archive category, active status and explicit non-EEC filters survive sorting and map searches', async () => {
+  const urls = [];
+  const h = harness('../src/components/search/SearchExperience.tsx', {
+    fetch: async (url) => { urls.push(url); return { ok: true, json: async () => ({ properties: listings }) }; },
+  });
+  h.render({ initialProperties: listings, provinces: [], locationOptions: [], initialValues: { type: 'industrial', status: 'active', eec: false } });
+  h.nodes.find(n => n.props['aria-label'] === 'เรียงผลการค้นหา').props.onChange({ target: { value: 'price_asc' } });
+  await h.flush();
+  h.clickMode('map'); h.mapProps().onBoundsChange({ west: 100, south: 12, east: 102, north: 14 }); h.timers(350);
+  await h.flush();
+  assert.equal(urls.length, 2);
+  for (const url of urls) {
+    const params = new URL(url, 'https://local').searchParams;
+    assert.equal(params.get('type'), 'industrial');
+    assert.equal(params.get('status'), 'active');
+    assert.equal(params.get('eec'), '0');
+    assert.equal(params.get('sort'), 'price_asc');
+  }
   h.unmount();
 });

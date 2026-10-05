@@ -2,14 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import LineIcon from "@/components/ui/LineIcon";
 import { LINE_OA } from "@/lib/constants/site";
-
-const topProvinces = [
-  { name: "ระยอง",         slug: "rayong" },
-  { name: "ชลบุรี",        slug: "chonburi" },
-  { name: "ฉะเชิงเทรา",  slug: "chachoengsao" },
-  { name: "สมุทรปราการ",  slug: "samut-prakan" },
-  { name: "อยุธยา",        slug: "ayutthaya" },
-];
+import { getPublicInventory } from "@/lib/public-inventory";
+import { populatedArchivePaths } from "@/lib/public-seo";
 
 const topTypes = [
   { name: "ที่ดินอุตสาหกรรม", slug: "industrial" },
@@ -26,7 +20,12 @@ const policyLinks = [
   { label: "เงื่อนไขการใช้งาน",        href: "/terms" },
 ];
 
-export default function Footer({ showBlog = true, showBuyerDemand = true }: { showBlog?: boolean; showBuyerDemand?: boolean }) {
+export default async function Footer({ showBlog = true, showBuyerDemand = true }: { showBlog?: boolean; showBuyerDemand?: boolean }) {
+  const inventory = await getPublicInventory().catch(() => []);
+  const paths = new Set(populatedArchivePaths(inventory));
+  const topProvinces = [...new Map(inventory.flatMap(({ province }) =>
+    province && paths.has(`/land/${province.slug}`) ? [[province.slug, province] as const] : [],
+  )).values()];
   return (
     <footer className="bg-slate-950 text-slate-400">
       <div className="container-xl section">
@@ -73,7 +72,7 @@ export default function Footer({ showBlog = true, showBuyerDemand = true }: { sh
                     href={`/land/${p.slug}`}
                     className="hover:text-brand-400 transition-colors"
                   >
-                    ที่ดิน{p.name}
+                    ที่ดิน{p.name_th}
                   </Link>
                 </li>
               ))}
