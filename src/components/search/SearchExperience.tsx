@@ -120,7 +120,8 @@ export default function SearchExperience({ initialProperties, provinces, provinc
   const index = useAreaIndex(!values.province && Boolean(values.q?.trim()));
   const typedArea = !values.province && index ? areaFromText(values.q, index) : null;
   const boundaryFile = useAdminBoundaries(values.province ? provinceCodes[values.province] : typedArea?.code);
-  const { districts: listingDistricts, subdistricts: subdistrictOptions } = useMemo(
+  // ponytail: no subdistrict filter here — boundaries stop at district level and the outline must match the filter.
+  const { districts: listingDistricts } = useMemo(
     () => locationChoices(locationOptions, values),
     [locationOptions, values],
   );
@@ -306,7 +307,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
                 onChange={(event) => setValues((current) => ({ ...current, q: event.target.value || undefined }))}
                 onKeyDown={(event) => event.key === "Enter" && applyFilters()}
                 className="input pl-10"
-                placeholder="จังหวัด / อำเภอ / ตำบล / นิคม / ทำเล"
+                placeholder="จังหวัด / อำเภอ / นิคม / ทำเล"
               />
             </label>
             <select
@@ -340,13 +341,8 @@ export default function SearchExperience({ initialProperties, provinces, provinc
                 <div className="mt-0.5 text-xs text-slate-500">ระบบจะแสดงเฉพาะเงื่อนไขที่มีข้อมูลจริงในประกาศ</div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                <select className="input" aria-label="อำเภอ" value={values.district ?? ""} disabled={!districtOptions.length} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined, subdistrict: undefined }))}>
-                  <option value="">{!values.province ? "เลือกจังหวัดก่อน" : districtOptions.length ? "ทุกอำเภอ" : "ยังไม่มีข้อมูลอำเภอ"}</option>
+                <select className="input" aria-label="อำเภอ" value={values.district ?? ""} disabled={!districtOptions.length} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined, subdistrict: undefined }))}>                  <option value="">{!values.province ? "เลือกจังหวัดก่อน" : districtOptions.length ? "ทุกอำเภอ" : "ยังไม่มีข้อมูลอำเภอ"}</option>
                   {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
-                </select>
-                <select className="input" aria-label="ตำบล" value={values.subdistrict ?? ""} disabled={!subdistrictOptions.length} onChange={(e) => setValues((v) => ({ ...v, subdistrict: e.target.value || undefined }))}>
-                  <option value="">{!values.district ? "เลือกอำเภอก่อน" : subdistrictOptions.length ? "ทุกตำบล" : "ยังไม่มีข้อมูลตำบล"}</option>
-                  {subdistrictOptions.map((subdistrict) => <option key={subdistrict} value={subdistrict}>{subdistrict}</option>)}
                 </select>
                 <select className="input" value={values.status ?? ""} onChange={(e) => setValues((v) => ({ ...v, status: (e.target.value || undefined) as SearchValues["status"] }))}>
                   <option value="">ทุกสถานะ</option>
