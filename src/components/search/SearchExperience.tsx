@@ -69,7 +69,7 @@ const sortOptions: Array<[NonNullable<SearchValues["sort"]>, string]> = [
   ["size_desc", "ขนาด: มาก → น้อย"],
 ];
 
-type BoundaryFile = { p: Geometry; d: Record<string, Geometry> };
+type BoundaryFile = { p: Geometry; d: Record<string, Geometry>; s?: Record<string, string[]> };
 const boundaryCache = new Map<string, Promise<BoundaryFile | null>>();
 
 /** Loads /geo/th/<code>.json once per province; null while loading or when unavailable. */
@@ -120,7 +120,7 @@ export default function SearchExperience({ initialProperties, provinces, provinc
   const index = useAreaIndex(!values.province && Boolean(values.q?.trim()));
   const typedArea = !values.province && index ? areaFromText(values.q, index) : null;
   const boundaryFile = useAdminBoundaries(values.province ? provinceCodes[values.province] : typedArea?.code);
-  const { districts: listingDistricts, subdistricts: subdistrictOptions } = useMemo(
+  const { districts: listingDistricts, subdistricts: listingSubdistricts } = useMemo(
     () => locationChoices(locationOptions, values),
     [locationOptions, values],
   );
@@ -128,6 +128,10 @@ export default function SearchExperience({ initialProperties, provinces, provinc
   const districtOptions = useMemo(
     () => [...new Set([...listingDistricts, ...Object.keys(boundaryFile?.d ?? {})])].sort((a, b) => a.localeCompare(b, "th")),
     [listingDistricts, boundaryFile],
+  );
+  const subdistrictOptions = useMemo(
+    () => [...new Set([...listingSubdistricts, ...(values.district && values.province ? boundaryFile?.s?.[values.district] ?? [] : [])])].sort((a, b) => a.localeCompare(b, "th")),
+    [listingSubdistricts, boundaryFile, values.district, values.province],
   );
   const district = values.province ? values.district : typedArea?.district;
   const boundary = boundaryFile ? (district ? boundaryFile.d[district] : boundaryFile.p) ?? null : null;
