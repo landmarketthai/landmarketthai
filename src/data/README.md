@@ -15,8 +15,7 @@ Subdistricts have no geo in this release, so they reuse their district center.
 ## Map boundaries (`public/geo/th/<provinceCode>.json`)
 
 Province and district outlines for the `/search` map, one file per province:
-`{ p: <province geometry>, d: { <district name_th>: <geometry> }, s: { <district name_th>: [subdistrict names] } }`,
-loaded only for the selected province. Subdistricts are names only (no polygons in the source).
+`{ p: <province geometry>, d: { <district name_th>: <geometry> } }`, loaded only for the selected province.
 
 - Polygons: [geoBoundaries](https://www.geoboundaries.org) THA ADM2 (Royal Thai Survey Department / OCHA ROAP),
   licensed CC BY 3.0 IGO. Province outlines are dissolved from their districts.

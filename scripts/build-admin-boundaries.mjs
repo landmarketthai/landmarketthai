@@ -61,18 +61,12 @@ mapshaper(join(work, "districts.geojson"), "-dissolve", "prov", "-o", "precision
 
 const districtOut = JSON.parse(readFileSync(join(work, "districts.geojson"), "utf8")).features;
 const provinceOut = JSON.parse(readFileSync(join(work, "provinces.geojson"), "utf8")).features;
-// Subdistrict names only (no polygons in the source); they fill the ตำบล dropdown.
-const tree = JSON.parse(readFileSync("src/data/thailand-admin.json", "utf8")).data;
-const subdistricts = (code) => Object.fromEntries((tree.find((p) => p.id === code)?.district ?? [])
-  .map((d) => [d.name.local.replace(/^(อำเภอ|เขต)\s*/, ""), d.subdistrict.map((s) => s.name.local.replace(/^(ตำบล|แขวง)\s*/, ""))]));
-
 mkdirSync("public/geo/th", { recursive: true });
 for (const province of provinceOut) {
   const code = province.properties.prov;
   const file = {
     p: province.geometry,
     d: Object.fromEntries(districtOut.filter((f) => f.properties.prov === code).map((f) => [f.properties.name_th, f.geometry])),
-    s: subdistricts(code),
   };
   writeFileSync(`public/geo/th/${code}.json`, JSON.stringify(file));
 }
