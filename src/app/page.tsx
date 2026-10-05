@@ -48,9 +48,9 @@ export default async function HomePage() {
     {/* Phone/tablet copy stays on the sky and actions below faces; desktop copy stays to their left. */}
     <section className="hero-banner max-lg:h-auto lg:h-[max(34rem,22vw)] xl:h-[max(36rem,22vw)]">
       <Image src="/images/final-banner.png" alt="" fill priority sizes="100vw" className="object-cover object-[center_45%] lg:object-[center_43%]" />
-      <div className="absolute inset-0 lg:hidden bg-linear-to-b from-white/85 via-white/30 via-25% to-transparent to-40%" />
-      <div className="absolute inset-0 lg:hidden bg-linear-to-t from-[#071f58] via-[#071f58]/80 via-30% to-transparent to-50%" />
-      <div className="absolute inset-0 hidden lg:block bg-linear-to-r from-white/90 via-white/55 to-transparent" />
+      <div className="absolute inset-0 lg:hidden bg-linear-to-b from-white/85 via-white/30 via-15% to-transparent to-25%" />
+      <div className="absolute inset-0 lg:hidden bg-linear-to-t from-[#071f58] via-[#071f58]/80 via-30% to-transparent to-40%" />
+      <div className="absolute inset-0 hidden lg:block bg-linear-to-r from-white/85 via-white/70 via-28% to-transparent to-39%" />
       <div className="container-xl relative flex h-full min-h-[max(600px,calc(100svh-9rem))] flex-col justify-between px-4 py-6 sm:px-6 lg:min-h-0 lg:justify-center lg:py-0 lg:max-w-none lg:px-[clamp(2rem,6vw,8rem)]">
         <div className="max-w-xl lg:w-[36%] lg:max-w-md">
           <h1 className="text-[1.7rem] font-black leading-[1.2] text-[#06235f] sm:text-4xl lg:text-[clamp(2rem,3.3vw,3rem)]">
