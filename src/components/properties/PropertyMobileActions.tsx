@@ -6,12 +6,14 @@ import { Phone, X } from "lucide-react";
 import LineIcon from "@/components/ui/LineIcon";
 import LeadForm from "@/components/forms/LeadForm";
 import { LINE_OA } from "@/lib/constants/site";
+import { formatMoney } from "@/lib/utils";
 
 interface Props {
   listingId?: string;
   listingRef?: number | null;
   listingTitle: string;
   soldOut?: boolean;
+  referralReward?: number | null;
 }
 
 export default function PropertyMobileActions({
@@ -19,6 +21,7 @@ export default function PropertyMobileActions({
   listingRef,
   listingTitle,
   soldOut = false,
+  referralReward = null,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -46,16 +49,6 @@ export default function PropertyMobileActions({
             </Link>
           ) : (
             <>
-              <a
-                href={LINE_OA}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-line min-h-11 flex-1 justify-center px-2 text-sm"
-                aria-label={`ทัก LINE เพื่อสอบถาม ${reference}`}
-              >
-                <LineIcon size={17} />
-                ทัก LINE
-              </a>
               <button
                 type="button"
                 onClick={() => setOpen(true)}
@@ -64,28 +57,36 @@ export default function PropertyMobileActions({
               >
                 ขอข้อมูล
               </button>
+              {referralReward != null && (
+                <Link
+                  href="/become-partner"
+                  className="btn-gold min-h-11 flex-1 flex-col gap-0 px-2 py-1 leading-tight"
+                  aria-label={`แนะนำผู้ซื้อ รับค่าแนะนำสูงสุด ${formatMoney(referralReward)} บาท`}
+                >
+                  <span className="text-[11px] font-semibold">แนะนำผู้ซื้อ</span>
+                  <span>รับ {formatMoney(referralReward)}</span>
+                </Link>
+              )}
             </>
           )}
 
-          {soldOut ? (
-            <a
-              href={LINE_OA}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-line min-h-11 flex-1 justify-center px-2 text-sm"
-              aria-label={`ทัก LINE เพื่อสอบถามทรัพย์ใกล้เคียงจาก ${reference}`}
-            >
-              <LineIcon size={17} />
-              ทัก LINE
-            </a>
-          ) : (
+          <a
+            href={LINE_OA}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={soldOut ? "btn-line min-h-11 flex-1 justify-center px-2 text-sm" : "btn-line min-h-11 w-11 shrink-0 px-0"}
+            aria-label={soldOut ? `ทัก LINE เพื่อสอบถามทรัพย์ใกล้เคียงจาก ${reference}` : `ทัก LINE เพื่อสอบถาม ${reference}`}
+          >
+            <LineIcon size={soldOut ? 17 : 20} />
+            {soldOut && "ทัก LINE"}
+          </a>
+          {!soldOut && (
             <a
               href="tel:0860555595"
-              className="btn-outline min-h-11 flex-1 justify-center px-2 text-sm"
+              className="btn-outline min-h-11 w-11 shrink-0 border px-0"
               aria-label={`โทรสอบถาม ${reference}`}
             >
-              <Phone size={17} />
-              โทร
+              <Phone size={18} />
             </a>
           )}
         </div>

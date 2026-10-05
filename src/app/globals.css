@@ -74,7 +74,7 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-bold text-white transition-colors hover:bg-brand-600 active:bg-brand-700;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#071d4a] px-6 py-3 font-bold text-white transition-colors hover:bg-[#0b2a66] active:bg-[#04122f];
   }
 
   .btn-outline {
@@ -84,6 +84,11 @@
   /* Primary green CTA — ref style */
   .btn-green {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#00A859] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#00924d];
+  }
+
+  /* Referral partner CTA — gold is reserved for the broker path */
+  .btn-gold {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gold-400 px-5 py-2.5 text-sm font-bold text-[#071d4a] transition-colors hover:bg-gold-500;
   }
 
   /* LINE brand green */

@@ -214,7 +214,7 @@ export default function LeadForm({
       <button
         type="submit"
         disabled={isLoading}
-        className="btn-primary w-full justify-center text-base disabled:opacity-60"
+        className="btn-green w-full justify-center text-base disabled:opacity-60"
       >
         {isLoading && <Loader2 size={16} className="animate-spin" aria-hidden />}
         {isLoading ? "กำลังส่ง..." :

@@ -73,7 +73,7 @@ export default function BecomePartnerPage() {
             ทีมเราดูแลทุกขั้นตอน คุณแค่ส่งต่อ Connection
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="#partner-form" className="btn-primary text-lg px-8 py-4">
+            <a href="#partner-form" className="btn-gold text-lg px-8 py-4">
               สมัครเลย – ฟรีตลอดชีพ
             </a>
             <Link href="/how-it-works" className="btn-outline border-white/30 text-white hover:bg-white/10 text-lg px-8 py-4">

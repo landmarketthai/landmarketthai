@@ -7,11 +7,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
-  CalendarDays,
   CheckCircle,
   ExternalLink,
   Factory,
-  Handshake,
   MapPin,
   Ruler,
   Send,
@@ -25,10 +23,8 @@ import PropertyMobileActions from "@/components/properties/PropertyMobileActions
 import PropertyVideos from "@/components/properties/PropertyVideos";
 import LineButton from "@/components/ui/LineButton";
 import ListingCard from "@/components/listings/ListingCard";
-import ListingTrust from "@/components/listings/ListingTrust";
-import VerificationChecklist from "@/components/listings/VerificationChecklist";
-import { landVerification } from "@/lib/marketplace/verification";
-import VerificationBadges from "@/components/listings/VerificationBadges";
+import VerificationSummary from "@/components/listings/VerificationSummary";
+import ReferralCallout from "@/components/properties/ReferralCallout";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
 import { getPublicInventory } from "@/lib/public-inventory";
 import { getListingBySlug } from "@/lib/neon/queries";
@@ -82,6 +78,7 @@ export default async function PropertyDetailPage({
   const mobileGallery = property.gallery.filter((image) => image.src !== property.heroImage.src);
   const totalPriceLabel = property.facts.find((fact) => fact.label === "ราคารวม")?.value
     ?? (land.total_price != null ? formatMoneyFull(land.total_price) : null);
+  const referralReward = isSoldOut ? null : land.referral_reward_max;
 
   return (
     <main className="bg-white pb-20 md:pb-0">
@@ -147,6 +144,7 @@ export default async function PropertyDetailPage({
                   <div className="mt-1 text-xl font-black sm:text-2xl">{totalPriceLabel}</div>
                 </div>
               )}
+              {referralReward != null && <ReferralCallout reward={referralReward} variant="hero" />}
             </div>
           </div>
         </div>
@@ -186,20 +184,18 @@ export default async function PropertyDetailPage({
                   <div className="mt-1 text-xl font-black text-brand-900">{totalPriceLabel}</div>
                 </div>
               )}
-            </div>
-            <div className="mt-4 space-y-3">
-              <ListingTrust land={land} />
-              <VerificationBadges land={land} />
-              <VerificationChecklist dimensions={landVerification(land)} />
+              {referralReward != null && <ReferralCallout reward={referralReward} variant="mobile" />}
             </div>
             <div className="mt-4">
-              <PropertyMobileActions
-                listingId={land.id}
-                listingRef={land.public_ref}
-                listingTitle={property.title}
-                soldOut={isSoldOut}
-              />
+              <VerificationSummary land={land} />
             </div>
+            <PropertyMobileActions
+              listingId={land.id}
+              listingRef={land.public_ref}
+              listingTitle={property.title}
+              soldOut={isSoldOut}
+              referralReward={referralReward}
+            />
           </div>
         </div>
       </section>
@@ -246,9 +242,7 @@ export default async function PropertyDetailPage({
             </section>
 
             {land && <>
-              <ListingTrust land={land} />
-              <VerificationBadges land={land} />
-              <VerificationChecklist dimensions={landVerification(land)} />
+              <div className="hidden md:block"><VerificationSummary land={land} /></div>
               {inventory ? <PropertyIntelligence land={land} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}
             </>}
 
@@ -350,54 +344,22 @@ export default async function PropertyDetailPage({
                   </div>
 
                   <div className="space-y-4 p-4 sm:p-5" id="inquiry">
-                    <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="text-xs text-slate-400">ขนาดที่ดิน</div>
-                        <div className="wrap-break-word font-bold text-slate-800">{property.size}</div>
-                      </div>
-                      {property.referralReward && (
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <div className="text-xs text-slate-400">ค่าแนะนำ</div>
-                          <div className="wrap-break-word font-bold text-gold-500">{property.referralReward}</div>
-                        </div>
-                      )}
-                    </div>
+                    <LeadForm listingId={land?.id} compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
 
                     <LineButton
                       size="md"
-                      label="สอบถามผ่าน LINE OA"
+                      label="หรือทัก LINE OA"
                       className="w-full text-sm"
                     />
-
-                    <LeadForm listingId={land?.id} compact defaultType="buyer" submitLabel="ขอข้อมูลที่ดินแปลงนี้" />
-
-                    <div className="grid gap-2 border-t border-slate-100 pt-4">
-                      <Link href="/contact" className="btn-outline w-full text-sm">
-                        <CalendarDays size={16} />
-                        นัดหมายเข้าชมพื้นที่
-                      </Link>
-                      <Link href="/become-partner" className="btn-green w-full text-sm opacity-90">
-                        <Handshake size={16} />
-                        แนะนำลูกค้า รับค่าแนะนำ
-                      </Link>
-                    </div>
                   </div>
+
+                  {referralReward != null && <ReferralCallout reward={referralReward} variant="sidebar" />}
                 </>
               )}
             </div>
           </aside>
         </div>
       </section>
-
-      {!isSoldOut && property.referralReward && (
-        <section className="container-xl px-4 py-5">
-          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-slate-700">
-            <div className="font-semibold text-slate-900">สำหรับพาร์ทเนอร์ผู้แนะนำ</div>
-            <p className="mt-1">{property.referralReward} ตามเงื่อนไขของดีล</p>
-            <Link href="/become-partner" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">ดูรายละเอียดการเป็นผู้แนะนำ →</Link>
-          </div>
-        </section>
-      )}
 
       {similar.length > 0 && <section className="container-xl section">
         <h2 className="mb-6 text-xl font-bold">ที่ดินใกล้เคียงที่ยังเปิดขาย</h2>
@@ -440,23 +402,15 @@ export default async function PropertyDetailPage({
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:justify-end">
+                  <Link href="#inquiry" className="btn-green hidden w-full sm:w-auto md:inline-flex">
+                    <Send size={16} />
+                    ขอข้อมูลแปลงนี้
+                  </Link>
                   <LineButton
                     size="md"
-                    label="สอบถามผ่าน LINE OA"
+                    label="ทัก LINE OA"
                     className="w-full sm:w-auto text-sm"
                   />
-                  <Link href="#inquiry" className="btn-white w-full sm:w-auto">
-                    <Send size={16} />
-                    ขอข้อมูลที่ดินแปลงนี้
-                  </Link>
-                  <Link href="/contact" className="btn-outline w-full border-white/30 text-white hover:bg-white/10 sm:w-auto">
-                    <CalendarDays size={16} />
-                    นัดหมายเข้าชมพื้นที่
-                  </Link>
-                  <Link href="/become-partner" className="btn-green w-full opacity-90 sm:w-auto">
-                    <Handshake size={16} />
-                    แนะนำลูกค้า รับค่าแนะนำ
-                  </Link>
                 </div>
               </div>
             )}

@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  CalendarDays,
   CheckCircle,
   ExternalLink,
   MapPin,
@@ -17,15 +16,13 @@ import PropertyMap from "@/components/search/PropertyMap";
 import LineButton from "@/components/ui/LineButton";
 import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
 import type { Land } from "@/lib/types/database";
-import { landVerification } from "@/lib/marketplace/verification";
 import { PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
 import ListingCard from "@/components/listings/ListingCard";
 import { rankSimilarProperties } from "@/lib/similar-properties";
 import { resolveListingPresentation } from "@/lib/seed-listings";
-import VerificationChecklist from "@/components/listings/VerificationChecklist";
-import ListingTrust from "@/components/listings/ListingTrust";
-import VerificationBadges from "@/components/listings/VerificationBadges";
+import VerificationSummary from "@/components/listings/VerificationSummary";
+import ReferralCallout from "@/components/properties/ReferralCallout";
 
 function legalArea(property: Land): string | null {
   if (property.area_rai != null || property.area_ngan != null || property.area_sqwa != null) {
@@ -63,6 +60,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
   const usable = usableArea(property);
   const location = locationLabel(property);
   const price = property.total_price;
+  const referralReward = isSoldOut ? null : property.referral_reward_max;
   const updatedLabel = formatUpdatedDate(property.updated_at);
   const gallery = (property.images ?? []).map((image) => ({
     src: image.url_or_cdn_path,
@@ -170,7 +168,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
               </div>
             )}
 
-            {(price != null || (!isSoldOut && property.referral_reward_max != null)) && (
+            {(price != null || referralReward != null) && (
               <div className="mt-7 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap">
                 {price != null && (
                   <div className="rounded-2xl bg-white/95 px-4 py-4 text-[#071d4a] shadow-lg sm:px-5">
@@ -186,6 +184,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                     <div className="mt-1 text-xl font-black sm:text-2xl">{formatMoneyFull(property.price_per_rai)}</div>
                   </div>
                 )}
+                {referralReward != null && <ReferralCallout reward={referralReward} variant="hero" />}
               </div>
             )}
           </div>
@@ -226,15 +225,12 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                   <div className="mt-1 text-xl font-black text-brand-900">{formatMoneyFull(price)}</div>
                 </div>
               )}
-            </div>
-            <div className="mt-4 space-y-3">
-              <ListingTrust land={property} />
-              <VerificationBadges land={property} />
-              <VerificationChecklist dimensions={landVerification(property)} />
+              {referralReward != null && <ReferralCallout reward={referralReward} variant="mobile" />}
             </div>
             <div className="mt-4">
-              <PropertyMobileActions listingId={property.id} listingRef={property.public_ref} listingTitle={property.title_th} soldOut={isSoldOut} />
+              <VerificationSummary land={property} />
             </div>
+            <PropertyMobileActions listingId={property.id} listingRef={property.public_ref} listingTitle={property.title_th} soldOut={isSoldOut} referralReward={referralReward} />
           </div>
         </div>
       </section>
@@ -278,14 +274,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
               </section>
             )}
 
-            <section className="card p-4 sm:p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <CheckCircle size={20} className="text-brand-600" />
-                <h2 className="text-xl font-bold text-slate-900">สถานะการตรวจสอบข้อมูล</h2>
-              </div>
-              <VerificationChecklist dimensions={landVerification(property)} />
-              <p className="mt-3 text-xs text-slate-500">แสดงเฉพาะสิ่งที่มีข้อมูลรองรับในระบบ หัวข้อที่ยังไม่ยืนยันควรตรวจสอบเพิ่มเติมก่อนตัดสินใจ</p>
-            </section>
+            <div className="hidden md:block"><VerificationSummary land={property} /></div>
 
             {inventory ? <PropertyIntelligence land={property} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}
 
@@ -363,34 +352,16 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                     </p>
                   </div>
                   <div className="space-y-4 p-4 sm:p-5" id="inquiry">
-                    {area && (
-                      <div className="rounded-xl bg-slate-50 p-3 text-sm">
-                        <div className="text-xs text-slate-400">ขนาดทรัพย์</div>
-                        <div className="font-bold text-slate-800">{area}</div>
-                      </div>
-                    )}
-                    <LineButton size="sm" label="สอบถามผ่าน LINE OA" className="w-full justify-center" />
                     <LeadForm listingId={property.id} compact defaultType="buyer" submitLabel="ขอข้อมูลทรัพย์นี้" />
-                    <Link href="/contact" className="btn-outline w-full text-sm">
-                      <CalendarDays size={16} /> นัดหมายเข้าชมพื้นที่
-                    </Link>
+                    <LineButton size="sm" label="หรือทัก LINE OA" className="w-full justify-center" />
                   </div>
+                  {referralReward != null && <ReferralCallout reward={referralReward} variant="sidebar" />}
                 </>
               )}
             </div>
           </aside>
         </div>
       </section>
-
-      {!isSoldOut && property.referral_reward_max != null && (
-        <section className="container-xl px-4 py-5">
-          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-slate-700">
-            <div className="font-semibold text-slate-900">สำหรับพาร์ทเนอร์ผู้แนะนำ</div>
-            <p className="mt-1">ค่าตอบแทนผู้แนะนำสูงสุด {formatMoneyFull(property.referral_reward_max)} ตามเงื่อนไขของดีล</p>
-            <Link href="/become-partner" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">ดูรายละเอียดการเป็นผู้แนะนำ →</Link>
-          </div>
-        </section>
-      )}
 
       {similar.length > 0 && <section className="container-xl section">
         <h2 className="mb-6 text-xl font-bold">ทรัพย์ใกล้เคียงที่ยังเปิดขาย</h2>
@@ -420,10 +391,10 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
                   </>
                 ) : (
                   <>
-                    <LineButton size="sm" label="สอบถามผ่าน LINE OA" className="w-full justify-center min-[420px]:w-auto" />
-                    <Link href="#inquiry" className="btn-white w-full min-[420px]:w-auto">
+                    <Link href="#inquiry" className="btn-green hidden w-full min-[420px]:w-auto md:inline-flex">
                       <Send size={16} /> ขอข้อมูลทรัพย์นี้
                     </Link>
+                    <LineButton size="sm" label="ทัก LINE OA" className="w-full justify-center min-[420px]:w-auto" />
                   </>
                 )}
               </div>

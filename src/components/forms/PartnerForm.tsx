@@ -185,7 +185,7 @@ export default function PartnerForm({ referralCode }: Props) {
       <button
         type="submit"
         disabled={isPending}
-        className="btn-primary w-full justify-center disabled:opacity-60"
+        className="btn-gold w-full justify-center disabled:opacity-60"
       >
         {isPending && <Loader2 size={16} className="animate-spin" aria-hidden />}
         {isPending ? "กำลังส่ง..." : "สมัครพาร์ทเนอร์ – ฟรีตลอดชีพ"}
