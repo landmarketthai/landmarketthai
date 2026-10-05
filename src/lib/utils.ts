@@ -51,6 +51,16 @@ export function formatMoneyFull(n: number): string {
   return `${n.toLocaleString("th-TH")} บาท`;
 }
 
+/** Listing card fact line, read left to right: "101 ไร่ · ม่วง (อุตสาหกรรม) · EEC · หน้ากว้าง 700 ม." */
+export function listingFacts(land: Pick<Land, "zoning" | "is_eec" | "frontage_m">, size: string | null): string[] {
+  return [
+    size,
+    land.zoning ? ZONING_LABELS[land.zoning] : null,
+    land.is_eec ? "EEC" : null,
+    land.frontage_m != null ? `หน้ากว้าง ${land.frontage_m.toLocaleString("th-TH")} ม.` : null,
+  ].filter((fact): fact is string => Boolean(fact));
+}
+
 export function listingStatusLabel(land: Pick<Land, "status" | "transaction_type">): string {
   if (land.status === "sold") return "ขายแล้ว";
   if (land.status === "reserved") return "จองแล้ว";

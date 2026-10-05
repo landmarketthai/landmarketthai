@@ -1,15 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Ruler, Tag, MoveHorizontal, Building2 } from "lucide-react";
+import { BadgeCheck, Ruler } from "lucide-react";
 import type { Land } from "@/lib/types/database";
 import { propertySizeLabel } from "@/lib/marketplace/presentation";
 import ListingTrust from "./ListingTrust";
-import VerificationBadges from "./VerificationBadges";
 import {
   LAND_TYPE_LABELS,
   ZONING_LABELS,
   formatMoney,
   formatMoneyFull,
+  listingFacts,
   listingHref,
 } from "@/lib/utils";
 
@@ -78,7 +78,10 @@ export default function ListingCard({
   const typeLabel = propertyTypeLabel(land);
   const zoningLabel = metaTagLabel ?? (land.zoning ? ZONING_LABELS[land.zoning] : null);
   const totalPrice = land.total_price;
-  const totalPriceLabel = "ราคารวม";
+  const perRaiText = pricePerRaiLabel ?? (land.price_per_rai != null ? `฿${formatMoney(land.price_per_rai)}` : null);
+  // Override labels (seed presentation) win over stored zoning; fall back to the type when there is no zoning.
+  const facts = listingFacts({ ...land, zoning: null }, area);
+  facts.splice(area ? 1 : 0, 0, zoningLabel ?? typeLabel);
 
   return (
     <article
@@ -137,74 +140,34 @@ export default function ListingCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-4 pb-5">
-        <ListingTrust land={land} className="mb-3" />
-        <VerificationBadges land={land} />
         <Link href={href} className="flex-1">
-          <h3 className="line-clamp-2 text-base font-semibold leading-snug text-slate-800">
+          {totalPrice != null ? (
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-xl font-black text-[#0a2a63]" title={formatMoneyFull(totalPrice)}>฿{totalPrice.toLocaleString("th-TH")}</span>
+              {perRaiText && <span className="text-sm text-slate-500">{perRaiText} / ไร่</span>}
+            </div>
+          ) : (
+            <div className="text-lg font-black text-[#0a2a63]">สอบถามราคา</div>
+          )}
+          <h3 className="mt-1.5 line-clamp-2 text-base font-bold leading-snug text-slate-900">
+            {land.verification_status === "verified" && (
+              <BadgeCheck size={17} className="mr-1 inline align-[-3px] text-[#00A859]" aria-label="ทีมงานตรวจสอบประกาศแล้ว" />
+            )}
             {land.title_th}
           </h3>
-
-          <div className="mt-3 grid gap-2 border-y border-slate-100 py-3 text-sm text-slate-600">
-            {area && (
-              <div className="flex min-w-0 items-start gap-1.5">
-                <Ruler size={13} className="mt-0.5 shrink-0 text-brand-600" />
-                <span className="min-w-0 font-semibold text-slate-700">{area}</span>
-              </div>
-            )}
-            {location && (
-              <div className="flex min-w-0 items-start gap-1.5">
-                <MapPin size={13} className="mt-0.5 shrink-0 text-brand-600" />
-                <span className="min-w-0 break-words">{location}</span>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {zoningLabel ? (
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Tag size={13} className="shrink-0 text-brand-600" />
-                  <span>{zoningLabel}</span>
-                </span>
-              ) : (
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Building2 size={13} className="shrink-0 text-brand-600" />
-                  <span>{typeLabel}</span>
-                </span>
-              )}
-              {land.is_eec && (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-bold text-emerald-700">EEC</span>
-              )}
-              {land.frontage_m != null && (
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <MoveHorizontal size={13} className="shrink-0 text-brand-600" />
-                  <span>หน้ากว้าง {land.frontage_m.toLocaleString("th-TH")} ม.</span>
-                </span>
-              )}
-            </div>
-            {land.verification_status === "pending" && (
-              <span className="w-fit rounded-full bg-amber-50 px-2 py-1 text-sm font-semibold text-amber-700">
-                ข้อมูลกำลังตรวจสอบ
-              </span>
-            )}
-          </div>
+          {location && <p className="mt-1 text-sm text-slate-500">{location}</p>}
+          {facts.length > 0 && (
+            <p className="mt-2 text-sm text-slate-700">
+              {facts.map((fact, index) => (
+                <span key={fact} className="whitespace-nowrap">{index > 0 && <span className="mx-1.5 text-slate-300">|</span>}{fact} </span>
+              ))}
+            </p>
+          )}
+          {land.verification_status === "pending" && (
+            <p className="mt-1 text-xs font-medium text-amber-700">ข้อมูลกำลังตรวจสอบ</p>
+          )}
         </Link>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {(pricePerRaiLabel || land.price_per_rai != null) && (
-            <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-              <div className="text-sm text-slate-400">ราคา / ไร่</div>
-              <div className="mt-0.5 truncate text-sm font-black text-[#0a2a63]">
-                {pricePerRaiLabel ?? `${formatMoney(land.price_per_rai as number)} ฿`}
-              </div>
-            </div>
-          )}
-          {totalPrice != null && (
-            <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-              <div className="text-sm text-slate-400">{totalPriceLabel}</div>
-              <div className="mt-0.5 truncate text-sm font-black text-[#0a2a63]" title={formatMoneyFull(totalPrice)}>
-                {formatMoney(totalPrice)} ฿
-              </div>
-            </div>
-          )}
-        </div>
+        <ListingTrust land={land} className="mt-3" />
 
         <Link
           href={href}

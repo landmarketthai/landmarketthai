@@ -280,7 +280,29 @@ export default function SearchExperience({ initialProperties, provinces, provinc
     debounceRef.current = setTimeout(() => void fetchResults(values, bounds), 350);
   }
 
-  const buyerHref = `/buy-request${paramsFromValues(values).size ? `?${paramsFromValues(values).toString()}` : ""}`;
+  const filterCount = activeFilters.filter((item) => item.key !== "q").length;
+  const typeSelect = (
+    <select
+      className="input"
+      aria-label="ประเภททรัพย์"
+      value={values.property_type ?? ""}
+      onChange={(event) => setValues((current) => ({ ...current, property_type: (event.target.value || undefined) as SearchValues["property_type"], ...(event.target.value === "land" ? { min_usable_area_sqm: undefined, max_usable_area_sqm: undefined } : {}) }))}
+    >
+      {propertyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+    </select>
+  );
+  const provinceSelect = (
+    <select
+      className="input"
+      aria-label="จังหวัด"
+      value={values.province ?? ""}
+      onChange={(event) => setValues((current) => ({ ...current, province: event.target.value || undefined, district: undefined, subdistrict: undefined }))}
+    >
+      <option value="">ทุกจังหวัด</option>
+      {provinces.map((province) => <option key={province.id} value={province.slug}>{province.name_th}</option>)}
+    </select>
+  );
+  const buyerHref =`/buy-request${paramsFromValues(values).size ? `?${paramsFromValues(values).toString()}` : ""}`;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -298,8 +320,9 @@ export default function SearchExperience({ initialProperties, provinces, provinc
 
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-[minmax(260px,1.4fr)_160px_180px_auto]">
-            <label className="relative col-span-2 lg:col-span-1">
+          {/* Mobile: one row (search + filter + go); type and province live in the filter panel. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:gap-3 lg:grid-cols-[minmax(260px,1.4fr)_160px_180px_auto]">
+            <label className="relative">
               <span className="sr-only">ค้นหาทำเล</span>
               <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -310,27 +333,20 @@ export default function SearchExperience({ initialProperties, provinces, provinc
                 placeholder="จังหวัด / อำเภอ / นิคม / ทำเล"
               />
             </label>
-            <select
-              className="input"
-              value={values.property_type ?? ""}
-              onChange={(event) => setValues((current) => ({ ...current, property_type: (event.target.value || undefined) as SearchValues["property_type"], ...(event.target.value === "land" ? { min_usable_area_sqm: undefined, max_usable_area_sqm: undefined } : {}) }))}
-            >
-              {propertyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <select
-              className="input"
-              value={values.province ?? ""}
-              onChange={(event) => setValues((current) => ({ ...current, province: event.target.value || undefined, district: undefined, subdistrict: undefined }))}
-            >
-              <option value="">ทุกจังหวัด</option>
-              {provinces.map((province) => <option key={province.id} value={province.slug}>{province.name_th}</option>)}
-            </select>
-            <div className="col-span-2 grid grid-cols-2 gap-2 lg:col-span-1 lg:flex">
-              <button type="button" onClick={() => setAdvancedOpen((open) => !open)} className="btn-outline justify-center px-3" aria-expanded={advancedOpen}>
+            <div className="hidden lg:block">{typeSelect}</div>
+            <div className="hidden lg:block">{provinceSelect}</div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setAdvancedOpen((open) => !open)} className="btn-outline relative w-11 justify-center px-0 lg:w-auto lg:px-3" aria-expanded={advancedOpen} aria-label={`ตัวกรอง${filterCount ? ` (${filterCount})` : ""}`}>
                 <SlidersHorizontal size={17} />
-                <span>ตัวกรอง</span>
+                <span className="hidden lg:inline">ตัวกรอง</span>
+                {filterCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{filterCount}</span>
+                )}
               </button>
-              <button type="button" onClick={applyFilters} className="btn-green px-5">ค้นหา</button>
+              <button type="button" onClick={applyFilters} className="btn-green w-11 px-0 lg:w-auto lg:px-5" aria-label="ค้นหา">
+                <Search size={18} className="lg:hidden" />
+                <span className="hidden lg:inline">ค้นหา</span>
+              </button>
             </div>
           </div>
 
@@ -340,7 +356,9 @@ export default function SearchExperience({ initialProperties, provinces, provinc
                 <div className="text-sm font-bold text-slate-800">ตัวกรองสำหรับที่ดินอุตสาหกรรม</div>
                 <div className="mt-0.5 text-xs text-slate-500">ระบบจะแสดงเฉพาะเงื่อนไขที่มีข้อมูลจริงในประกาศ</div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 xl:grid-cols-6">
+                <div className="lg:hidden">{typeSelect}</div>
+                <div className="lg:hidden">{provinceSelect}</div>
                 <select className="input" aria-label="อำเภอ" value={values.district ?? ""} disabled={!districtOptions.length} onChange={(e) => setValues((v) => ({ ...v, district: e.target.value || undefined, subdistrict: undefined }))}>                  <option value="">{!values.province ? "เลือกจังหวัดก่อน" : districtOptions.length ? "ทุกอำเภอ" : "ยังไม่มีข้อมูลอำเภอ"}</option>
                   {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
                 </select>
