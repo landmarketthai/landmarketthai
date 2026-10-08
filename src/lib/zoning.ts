@@ -42,10 +42,15 @@ export function getZoning(land: ZonedLand): ZoningInfo {
     // Invalid structured data must never regain a verified status through a legacy field.
     return result.success ? result.data : zoningSchema.parse({});
   }
-  return zoningSchema.parse({
-    zones: land.zoning ? [{ color: land.zoning }] : [],
-    status: land.zoning ? "owner_reported" : "unknown",
-  });
+  // Legacy color has no recorded provenance: show the color but never claim who reported it.
+  return zoningSchema.parse({ zones: land.zoning ? [{ color: land.zoning }] : [] });
+}
+
+export const ZONING_EMPTY_LABEL = "ยังไม่ระบุผังเมือง";
+
+/** True when nothing at all is known; zoning is optional for publishing. */
+export function isZoningEmpty(info: ZoningInfo): boolean {
+  return !info.zones.length && info.status === "unknown" && !info.plan_name && !info.source && !info.checked_at && !info.evidence_url;
 }
 
 export function zoningColors(land: ZonedLand): ZoningColor[] {
@@ -58,6 +63,7 @@ export function sharesZoning(a: ZonedLand, b: ZonedLand): boolean {
 
 export function zoningSummary(land: ZonedLand): string {
   const info = getZoning(land);
+  if (isZoningEmpty(info)) return `ผังเมือง: ${ZONING_EMPTY_LABEL}`;
   const colors = zoningColors(land).map(color => `สี${ZONING_LABELS[color]}`).join(" / ") || "ยังไม่ระบุสี";
   return `ผังเมือง: ${colors} · ${ZONING_STATUS_LABELS[info.status]}`;
 }

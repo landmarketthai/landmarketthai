@@ -1,5 +1,5 @@
 import type { ZonedLand } from "@/lib/zoning";
-import { getZoning, zoningColors, zoningSummary, ZONING_NOTICE } from "@/lib/zoning";
+import { getZoning, isZoningEmpty, zoningColors, zoningSummary, ZONING_NOTICE } from "@/lib/zoning";
 import { ZONING_COLORS, ZONING_LABELS } from "@/lib/utils";
 
 export default function ZoningBadges({ land, detail = false }: { land: ZonedLand; detail?: boolean }) {
@@ -9,7 +9,7 @@ export default function ZoningBadges({ land, detail = false }: { land: ZonedLand
       <span aria-hidden="true" className="h-3 w-3 rounded-sm" style={{ backgroundColor: ZONING_COLORS[color] }} />สี{ZONING_LABELS[color]}
     </span>)}</div>
     <p>{zoningSummary(land)}</p>
-    {detail && <>
+    {detail && !isZoningEmpty(info) && <>
       <dl className="grid gap-2 sm:grid-cols-2">
         {info.zones.map((zone, index) => <div key={index}><dt>ประเภท {index + 1}</dt><dd>{zone.type_code || "ยังไม่ทราบรหัส"} · {zone.type_name || "ยังไม่ทราบชื่อประเภท"}</dd></div>)}
         <div><dt>ชื่อผัง</dt><dd>{info.plan_name || "ยังไม่ทราบ"}</dd></div>

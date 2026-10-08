@@ -66,10 +66,6 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF new.zoning_info IS DISTINCT FROM old.zoning_info THEN
       new.verification_status := 'pending';
-      IF TG_TABLE_NAME = 'lands' THEN
-        new.verified_at := null;
-        new.verified_by := null;
-      END IF;
     END IF;
   END IF;
   RETURN new;
@@ -84,14 +80,15 @@ CREATE TRIGGER sync_land_zoning_info BEFORE INSERT OR UPDATE ON public.property_
 FOR EACH ROW EXECUTE FUNCTION public.sync_land_zoning_info();
 
 -- Keep legacy rows untouched: the shared reader supports them without revoking Verified.
--- Any existing structured facts or verification on the correction target need human review.
+-- The user supplied a correction for previously unknown zoning, not a replacement for known facts.
+-- The target's generic listing review becomes pending; other Verified rows are untouched.
 DO $fn$
 DECLARE correction jsonb := '{"zones":[{"color":"green","type_code":"","type_name":""}],"status":"owner_reported","plan_name":"","source":"พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ","checked_at":"","evidence_url":""}';
 BEGIN
   IF EXISTS (SELECT 1 FROM public.lands WHERE slug = '101-rai-kabin-buri'
     AND deleted_at IS NULL AND zoning_info IS DISTINCT FROM correction
-    AND (zoning_info IS NOT NULL OR verified_at IS NOT NULL OR verified_by IS NOT NULL OR verification_status = 'verified')) THEN
-    RAISE EXCEPTION 'Kabin Buri has existing structured facts or verification; reconcile before applying this correction';
+    AND (zoning_info IS NOT NULL OR zoning IS NOT NULL)) THEN
+    RAISE EXCEPTION 'Kabin Buri has existing zoning facts; reconcile before applying this correction';
   END IF;
   UPDATE public.lands SET zoning_info = correction, updated_at = now()
   WHERE slug = '101-rai-kabin-buri' AND deleted_at IS NULL AND zoning_info IS DISTINCT FROM correction;

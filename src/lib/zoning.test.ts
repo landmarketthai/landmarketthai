@@ -8,6 +8,7 @@ import { searchProperties } from "@/lib/property-search";
 import { rankBuyerMatches } from "@/lib/buyer-matching";
 import { getLandOverlayContext } from "@/lib/land-overlays";
 import { ownerLeadSchema } from "@/lib/validations";
+import { verificationDimensions } from "@/lib/marketplace/verification";
 
 test("Kabin Buri reports green from Krai with no invented official facts", () => {
   const info = getZoning(SEED_101_KABIN_LAND);
@@ -32,7 +33,13 @@ test("partial multi-color data supersedes legacy color across filters, matching 
 
 test("unknown, legacy and invalid structured data never fabricate evidence", () => {
   assert.equal(getZoning({ zoning: null }).status, "unknown");
-  assert.equal(getZoning({ zoning: "purple" }).status, "owner_reported");
+  assert.equal(getZoning({ zoning: "purple" }).status, "unknown", "legacy color has no reporter");
+  assert.equal(zoningSummary({ zoning: "purple" }), "ผังเมือง: สีม่วง · ยังไม่ทราบ");
+  assert.equal(zoningSummary({ zoning: null }), "ผังเมือง: ยังไม่ระบุผังเมือง");
+  assert.equal(zoningSummary({ zoning: null, zoning_info: zoningSchema.parse({}) }), "ผังเมือง: ยังไม่ระบุผังเมือง");
+  const legacyVerified = verificationDimensions({ verification_status: "verified", lat: null, lng: null, location_precision: "approx", zoning: "purple", price: null, updated_at: "2026-10-08", title_deed_on_file: false });
+  assert.equal(legacyVerified.find(d => d.key === "review")?.state, "ok");
+  assert.equal(legacyVerified.find(d => d.key === "zoning")?.state, "partial", "listing review never implies verified zoning");
   assert.deepEqual(zoningColors({ zoning: "purple", zoning_info: zoningSchema.parse({}) }), []);
   const invalid = { zoning: "purple", zoning_info: { status: "document_verified" } } as unknown as typeof SEED_37_RAI_LAND;
   assert.equal(getZoning(invalid).status, "unknown");

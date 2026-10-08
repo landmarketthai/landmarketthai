@@ -4,14 +4,13 @@ CREATE TYPE zoning_enum AS ENUM ('purple','purple_light','brown','orange','yello
 CREATE TABLE public.lands (
   id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug text UNIQUE NOT NULL, zoning zoning_enum,
-  verified_at timestamptz, verified_by uuid,
   verification_status text NOT NULL DEFAULT 'pending',
   updated_at timestamptz DEFAULT now(), deleted_at timestamptz
 );
 CREATE TABLE public.property_submissions (id integer PRIMARY KEY, zoning text, verification_status text DEFAULT 'pending');
-INSERT INTO public.lands (slug,zoning,verified_at,verified_by) VALUES
-  ('legacy-purple','purple',now(),'00000000-0000-0000-0000-000000000001'),
-  ('unknown',null,null,null), ('101-rai-kabin-buri',null,null,null);
+INSERT INTO public.lands (slug,zoning,verification_status) VALUES
+  ('legacy-purple','purple','verified'),
+  ('unknown',null,'pending'), ('101-rai-kabin-buri',null,'pending');
 \ir ../neon/migrations/202610080001_zoning_info.sql
 \ir ../neon/migrations/202610080001_zoning_info.sql
 
@@ -20,7 +19,7 @@ DECLARE info jsonb; invalid jsonb;
 BEGIN
   SELECT zoning_info INTO info FROM public.lands WHERE slug = 'legacy-purple';
   ASSERT info IS NULL, 'legacy data not rewritten';
-  ASSERT (SELECT verified_at IS NOT NULL AND verified_by IS NOT NULL AND zoning = 'purple' FROM public.lands WHERE slug = 'legacy-purple'), 'migration preserves existing Verified';
+  ASSERT (SELECT verification_status = 'verified' AND zoning = 'purple' FROM public.lands WHERE slug = 'legacy-purple'), 'migration preserves existing Verified';
   ASSERT (SELECT zoning_info IS NULL AND zoning IS NULL FROM public.lands WHERE slug = 'unknown'), 'unknown data not rewritten';
   SELECT zoning_info INTO info FROM public.lands WHERE slug = '101-rai-kabin-buri';
   ASSERT info#>>'{zones,0,color}' = 'green' AND info->>'status' = 'owner_reported', 'Kabin green reported';
@@ -46,9 +45,9 @@ BEGIN
     IF SQLERRM = 'legacy-only edit unexpectedly allowed' THEN RAISE; END IF;
   END;
 
-  UPDATE public.lands SET verified_at = now(), verified_by = '00000000-0000-0000-0000-000000000001' WHERE slug = 'unknown';
+  UPDATE public.lands SET verification_status = 'verified' WHERE slug = 'unknown';
   UPDATE public.lands SET zoning_info = jsonb_set(zoning_info,'{source}','"new source"') WHERE slug = 'unknown';
-  ASSERT (SELECT verified_at IS NULL AND verified_by IS NULL FROM public.lands WHERE slug = 'unknown'), 'source changes revoke verification';
+  ASSERT (SELECT verification_status = 'pending' FROM public.lands WHERE slug = 'unknown'), 'source changes revoke verification';
 
   info := info || '{"status":"document_verified","source":"reviewed document","checked_at":"2026-10-08","evidence_url":"https://example.com/evidence.pdf"}';
   UPDATE public.lands SET zoning_info = info WHERE slug = 'unknown';
@@ -64,6 +63,16 @@ WHERE slug = '101-rai-kabin-buri';
 DO $test$
 BEGIN
   ASSERT (SELECT zoning_info->>'status' = 'map_checked' AND zoning_info->>'source' = 'existing reviewed source' FROM public.lands WHERE slug = '101-rai-kabin-buri'), 'migration must not replace reviewed evidence';
+END;
+$test$;
+-- Expected failure: a conflicting legacy color on Kabin Buri also stops the correction.
+UPDATE public.lands SET zoning_info = NULL, zoning = 'purple' WHERE slug = '101-rai-kabin-buri';
+\set ON_ERROR_STOP off
+\ir ../neon/migrations/202610080001_zoning_info.sql
+\set ON_ERROR_STOP on
+DO $test$
+BEGIN
+  ASSERT (SELECT zoning_info IS NULL AND zoning = 'purple' FROM public.lands WHERE slug = '101-rai-kabin-buri'), 'migration must stop on conflicting legacy Kabin color';
 END;
 $test$;
 SELECT 'Zoning migration assertions passed' AS result;

@@ -24,30 +24,28 @@ The former Supabase project was paused. Application source code no longer import
 
 ## Zoning data (prepared, not applied to production)
 
-`migrations/202610080001_zoning_info.sql` extends `lands` with `zoning_info` JSONB. It expects the existing `zoning`, `slug`, `updated_at`, `deleted_at`, `verified_at`, and `verified_by` columns. Confirm these on a nonproduction schema before applying. No new database, public write API, or automatic zoning lookup is introduced.
+`migrations/202610080001_zoning_info.sql` adds nullable `zoning_info` JSONB to `lands` and `property_submissions`. It expects the existing `zoning`, `slug`, `verification_status`, `updated_at`, `deleted_at` and `property_submissions.linked_land_id` columns (confirmed read-only on Neon 2026-10-08). No new database, public write API or automatic zoning lookup is introduced.
 
-- `zones`: up to 20 entries with nullable `color`, optional `type_code`, and optional `type_name`. Multiple entries can have the same color and different types.
+- `zones`: up to 20 entries with nullable `color`, optional `type_code`, and optional `type_name`.
 - `status`: `unknown`, `owner_reported`, `map_checked`, or `document_verified`.
 - `plan_name`, `source`, `checked_at` (ISO calendar date), and `evidence_url` (public HTTP/S link). Missing text stays empty; nothing infers a type code or plan name from color.
-- Map/document statuses require source, check date, and evidence link. This validates recorded provenance; it does not verify the contents of a remote link or grant development permission.
+- Map/document statuses require source, check date and evidence link. Sellers can only send `unknown` or `owner_reported`; only `/manage/zoning` (server-side admin check) can record map/document statuses.
 
-The shared reader in `src/lib/zoning.ts` supplies cards, both detail routes, search, matching, analytics, and metadata. It accepts legacy single-color rows before migration. An explicitly empty structured record overrides a legacy color. A database trigger synchronizes the first known structured color into the legacy column and rejects legacy-only color edits that would discard structured facts. Update `zoning_info` for all future zoning edits.
+Zoning is optional: a listing publishes with `zoning_info` NULL or empty and reads “ยังไม่ระบุผังเมือง”. The shared reader in `src/lib/zoning.ts` supplies cards, detail, search, matching, analytics and metadata. Legacy rows with only the single `zoning` color show that color with status “ยังไม่ทราบ” (no reporter is claimed), and a Verified listing review never implies verified zoning. A trigger copies the first structured color into the legacy column, rejects legacy-only color edits, and resets `verification_status` to `pending` whenever `zoning_info` changes.
 
-Backfill labels existing colors as owner reported, without inventing evidence, plan, code, or date. Adding/changing structured zoning clears existing property verification; plan to review those badges again. The Kabin Buri correction sets green, owner reported, source “พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ”, with other fields empty. Migration aborts if that listing already has map/document evidence, allowing a human to reconcile it first. The migration uses a transaction; application/database rollback must preserve a copy of `zoning_info`, since the legacy column cannot represent multiple colors.
+The migration does not backfill. Its only data change is the Kabin Buri correction (green, owner reported, source “พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ”, other fields empty); because it changes `zoning_info`, that listing's `verification_status` becomes `pending`. It aborts if Kabin Buri already has a different `zoning_info` or any legacy `zoning` color. Deploy the app together with the migration: the old seller form edits only the legacy column, which the trigger rejects.
 
-`/submit-land` stores zoning in the existing owner lead `details.zoning_info` through both lead entry paths; submission does not publish a listing or grant a verification badge. `/manage/zoning` is a development-only editor for sample records with live card/detail/metadata preview and SQL download. It does not persist changes. SQL defaults to `ROLLBACK`; an authenticated database operator must inspect the target and evidence before intentionally committing. Connect a production management UI only after server-side admin authorization exists.
+Validation (disposable local PostgreSQL only, never production):
 
-Validation:
-
-```powershell
+```bash
 npm test
 npm run lint
 npx tsc --noEmit
 npm run build
-# Only on an empty disposable PostgreSQL database (never production):
 psql -v ON_ERROR_STOP=1 -d <disposable_database> -f scripts/zoning-migration-test.sql
-# Start the build without DATABASE_URL before running:
-node scripts/marketplace-smoke.mjs http://127.0.0.1:3101
+# UAT: fresh database named zoning_uat_*, on 127.0.0.1:55438 user zoning_test
+psql -v ON_ERROR_STOP=1 -d zoning_uat_run -f scripts/zoning-uat-fixture.sql
+ZONING_TEST_DATABASE=zoning_uat_run node --import ./scripts/register-ts-paths.mjs --experimental-strip-types scripts/zoning-uat.mjs
 ```
 
-The SQL harness applies the migration twice, checks multi-color synchronization, validation, verification invalidation, and preservation of existing reviewed evidence. Its final migration attempt intentionally errors and rolls back to test that protection.
+`scripts/zoning-preflight.sql` is the read-only production catalog check (run with `PGOPTIONS='-c default_transaction_read_only=on'`).

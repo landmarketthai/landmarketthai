@@ -373,7 +373,7 @@ export async function publishSubmission(id: string): Promise<string | null> {
       str(source.zoning), num(source.frontage_m), num(source.depth_min_m), num(source.depth_max_m), str(source.road_name), num(source.road_width_m),
       num(source.price_per_rai), num(source.sale_price), str(source.description), num(source.lat), num(source.lng),
       source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id), num(source.usable_area_sqm),
-      JSON.stringify(source.zoning_info ?? null),
+      source.zoning_info == null ? null : JSON.stringify(source.zoning_info),
     ],
   );
   const landId = rows[0]?.id ? String(rows[0].id) : null;
