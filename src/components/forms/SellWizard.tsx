@@ -6,6 +6,8 @@ import type { PropertySubmission, Province, PropertyType, TransactionType, Zonin
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { draftPatch, loadSellerDraft, mergeDraft, phoneLooksValid } from "@/lib/seller-draft";
 import LocationPicker, { type MapFocus } from "./LocationPicker";
+import ZoningFields from "./ZoningFields";
+import { getZoning, zoningSchema, type ZoningInfo } from "@/lib/zoning";
 
 interface Props { provinces: Province[]; buyerDemandSlug?: string }
 
@@ -53,6 +55,7 @@ type DraftForm = {
   road_name: string;
   road_width_m: number | null;
   zoning: ZoningColor | null;
+  zoning_info: ZoningInfo;
   sale_price: number | null;
   price_per_rai: number | null;
   description: string;
@@ -81,6 +84,7 @@ const emptyForm: DraftForm = {
   road_name: "",
   road_width_m: null,
   zoning: null,
+  zoning_info: zoningSchema.parse({}),
   sale_price: null,
   price_per_rai: null,
   description: "",
@@ -141,6 +145,7 @@ function fromDraft(draft: PropertySubmission): DraftForm {
     road_name: draft.road_name ?? "",
     road_width_m: draft.road_width_m,
     zoning: draft.zoning,
+    zoning_info: getZoning(draft),
     sale_price: draft.sale_price,
     price_per_rai: draft.price_per_rai,
     description: draft.description ?? "",
@@ -629,7 +634,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             </div>
             <label><span className="label">ราคาขายรวม (บาท) *</span><input type="number" min="0" inputMode="numeric" className="input" {...invalid("sale_price")} value={numberValue(form.sale_price)} onChange={(e) => setNumber("sale_price", e.target.value)} />{fieldError("sale_price")}</label>
             <label><span className="label">ราคา / ไร่ (คำนวณอัตโนมัติ)</span><input readOnly className="input bg-slate-50 text-slate-600" value={derivedPricePerRai == null ? "" : derivedPricePerRai.toLocaleString("th-TH", { maximumFractionDigits: 2 })} placeholder="คำนวณเมื่อมีขนาดที่ดิน (ไร่)" /></label>
-            <label><span className="label">ผังเมือง</span><select className="input" value={form.zoning ?? ""} onChange={(e) => setForm((v) => ({ ...v, zoning: (e.target.value || null) as ZoningColor | null }))}><option value="">ไม่ระบุ</option><option value="purple">ม่วง</option><option value="purple_light">ม่วงอ่อน</option><option value="brown">น้ำตาล</option><option value="orange">ส้ม</option><option value="yellow">เหลือง</option><option value="green">เขียว</option><option value="other">อื่นๆ</option></select></label>
+            <div className="sm:col-span-2"><ZoningFields value={form.zoning_info} onChange={zoning_info => setForm(value => ({ ...value, zoning_info, zoning: zoning_info.zones.find(zone => zone.color)?.color ?? null }))} /></div>
             <label><span className="label">หน้ากว้าง (เมตร)</span><input type="number" min="0" className="input" value={numberValue(form.frontage_m)} onChange={(e) => setNumber("frontage_m", e.target.value)} /></label>
           </div>
           <details className="group mt-4 rounded-xl border border-slate-200">

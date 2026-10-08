@@ -89,6 +89,7 @@ export interface Land {
   /** Building / unit usable area for non-land assets; optional because older schemas lack the column. */
   usable_area_sqm?: number | null;
   zoning: ZoningColor | null;
+  zoning_info?: import("@/lib/zoning").ZoningInfo | null;
   frontage_m: number | null;
   depth_min_m: number | null;
   depth_max_m: number | null;
@@ -147,6 +148,7 @@ export interface LandDocument {
 }
 
 export interface PropertySubmission {
+  zoning_info?: import("@/lib/zoning").ZoningInfo | null;
   id: string;
   draft_token: string;
   user_id: string | null;

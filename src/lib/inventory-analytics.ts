@@ -1,3 +1,4 @@
+import { zoningColors, sharesZoning } from "@/lib/zoning";
 import type { Land } from "@/lib/types/database";
 import { haversineDistanceKm } from "@/lib/location-intelligence";
 
@@ -102,7 +103,7 @@ export function getInventoryAnalytics(lands: readonly Land[]): InventoryAnalytic
     ...summary(active),
     byProvince: groupInventory(active, (land) => land.province_id || "unknown", (land) => land.province?.name_th ?? ""),
     byLandType: groupInventory(active, (land) => land.land_type || "unknown", (land) => land.land_type || "Unknown land type"),
-    byZoning: groupInventory(active, (land) => land.zoning ?? "unknown", (land) => land.zoning ?? "Unknown zoning"),
+    byZoning: groupInventory(active, (land) => zoningColors(land).sort().join("+") || "unknown", (land) => zoningColors(land).sort().join(" / ") || "Unknown zoning"),
   };
 }
 
@@ -122,14 +123,14 @@ export function findInventoryComparables(subject: Land, lands: readonly Land[], 
       && sameProvince(subject, land) && positive(land.price_per_rai))
     .map((land): InventoryComparable => ({
       land,
-      reasons: ["Same province", "Same land type", ...(subject.zoning && subject.zoning === land.zoning ? ["Same reported zoning"] : [])],
+      reasons: ["Same province", "Same land type", ...(sharesZoning(subject, land) ? ["Same reported zoning"] : [])],
       sizeDifferenceRatio: positive(subject.size_rai) && positive(land.size_rai)
         ? Math.abs(land.size_rai - subject.size_rai) / subject.size_rai : null,
       distanceKm: haversineDistanceKm(subject, land),
     }))
     .sort((a, b) => {
-      const zoningA = Number(Boolean(subject.zoning && a.land.zoning === subject.zoning));
-      const zoningB = Number(Boolean(subject.zoning && b.land.zoning === subject.zoning));
+      const zoningA = Number(Boolean(sharesZoning(subject, a.land)));
+      const zoningB = Number(Boolean(sharesZoning(subject, b.land)));
       return zoningB - zoningA
         || (a.sizeDifferenceRatio ?? Infinity) - (b.sizeDifferenceRatio ?? Infinity)
         || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)

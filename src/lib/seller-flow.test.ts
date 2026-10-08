@@ -115,7 +115,7 @@ test("readiness accepts land area or usable area, and requires at least one", ()
   const marketplace = read("./neon/marketplace.ts");
   assert.match(marketplace, /and \(total_rai > 0 or usable_area_sqm > 0\)/, "submit SQL mirrors the area fallback");
   assert.match(marketplace, /usable_area_sqm = \$28/);
-  assert.match(marketplace, /published_at, usable_area_sqm\r?\n/);
+  assert.match(marketplace, /published_at, usable_area_sqm, zoning_info\r?\n/);
 });
 
 test("draft numeric bounds reject database overflows before autosave", () => {

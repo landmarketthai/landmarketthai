@@ -1,3 +1,4 @@
+import { sharesZoning } from "@/lib/zoning";
 import type { Land } from "@/lib/types/database";
 
 function proximity(a: number | null, b: number | null): number {
@@ -17,7 +18,7 @@ export function rankSimilarProperties(source: Land, candidates: Land[], limit = 
         Boolean(source.province?.slug && land.province?.slug === source.province.slug);
       const attributes = (sameProvince ? 35 : 0) +
         (land.land_type === source.land_type ? 25 : 0) +
-        (source.zoning && source.zoning !== "other" && land.zoning === source.zoning ? 15 : 0) +
+        (sharesZoning(source, land) ? 15 : 0) +
         (source.is_eec && land.is_eec ? 10 : 0);
       return {
         land,

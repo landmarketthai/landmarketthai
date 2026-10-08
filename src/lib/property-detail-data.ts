@@ -22,7 +22,6 @@ export interface PropertyDetail {
   shortTitle: string;
   location: string;
   size: string;
-  zoning: string;
   pricePerRai: string;
   referralReward?: string;
   soldOut?: boolean;
@@ -51,7 +50,6 @@ export const propertyDetails: PropertyDetail[] = [
     shortTitle: "109 ไร่ EEC ระยอง",
     location: "นิคมพัฒนา, ระยอง",
     size: "109 ไร่ 2 งาน 52 ตร.ว.",
-    zoning: "ผังสีม่วง",
     pricePerRai: "2.75 ล้านบาท/ไร่",
     soldOut: true,
     frontage: "ประมาณ 240 เมตร",
@@ -63,7 +61,7 @@ export const propertyDetails: PropertyDetail[] = [
     },
     keyHighlights: [
       "พื้นที่ 109 ไร่ 2 งาน 52 ตร.ว.",
-      "ผังสีม่วง เหมาะสำหรับโรงงานและคลังสินค้า",
+      "ตรวจข้อกำหนดและการอนุญาตก่อนพัฒนา",
       "หน้ากว้างประมาณ 240 เมตร",
       "เข้าออกได้ 2 ทาง",
       "ใกล้ WHA และ BYD ในโซน EEC ระยอง",
@@ -71,7 +69,6 @@ export const propertyDetails: PropertyDetail[] = [
     facts: [
       { label: "ขนาดที่ดิน", value: "109 ไร่ 2 งาน 52 ตร.ว." },
       { label: "ทำเล", value: "นิคมพัฒนา, ระยอง" },
-      { label: "ผังเมือง", value: "ผังสีม่วง" },
       { label: "หน้ากว้าง", value: "ประมาณ 240 เมตร" },
       { label: "ทางเข้าออก", value: "เข้าออกได้ 2 ทาง" },
       { label: "ราคาเดิม", value: "2.75 ล้านบาท/ไร่" },
@@ -82,7 +79,7 @@ export const propertyDetails: PropertyDetail[] = [
       {
         title: "เหมาะสำหรับอุตสาหกรรม",
         description:
-          "ที่ดินผังสีม่วงในพื้นที่ EEC เหมาะสำหรับโรงงาน คลังสินค้า และการลงทุนระยะยาว",
+          "ที่ดินในพื้นที่ EEC ต้องตรวจข้อกำหนดและการอนุญาตก่อนพัฒนา",
       },
       {
         title: "การเดินทางและโลจิสติกส์",
@@ -142,7 +139,6 @@ export const propertyDetails: PropertyDetail[] = [
     shortTitle: "37 ไร่ EEC ระยอง",
     location: "ระยอง",
     size: "36 ไร่ 3 งาน 67.3 ตร.ว. (36.91825 ไร่)",
-    zoning: "ผังสีม่วง",
     pricePerRai: "2.3 ล้านบาท/ไร่",
     referralReward: "ค่าแนะนำสูงสุด 1,200,000 บาท",
     frontage: "ประมาณ 240 เมตร",
@@ -154,7 +150,7 @@ export const propertyDetails: PropertyDetail[] = [
     },
     keyHighlights: [
       "เนื้อที่จริง 36 ไร่ 3 งาน 67.3 ตร.ว. (36.91825 ไร่)",
-      "ผังสีม่วง เหมาะสำหรับอุตสาหกรรม",
+      "ตรวจข้อกำหนดการใช้ประโยชน์ที่ดินกับหน่วยงานที่เกี่ยวข้อง",
       "หน้ากว้างประมาณ 240 เมตร",
       "ติดถนน 2026 เข้าออกสะดวก",
       "ด้านหลังติดแหล่งน้ำ",
@@ -163,7 +159,6 @@ export const propertyDetails: PropertyDetail[] = [
       { label: "ขนาดที่ดิน", value: "36 ไร่ 3 งาน 67.3 ตร.ว. (36.91825 ไร่)" },
       { label: "ราคารวมทั้งแปลง", value: "84,911,975 บาท" },
       { label: "ทำเล", value: "ระยอง" },
-      { label: "ผังเมือง", value: "ผังสีม่วง" },
       { label: "หน้ากว้าง", value: "ประมาณ 240 เมตร" },
       { label: "ทางเข้าออก", value: "ติดถนน 2026" },
     ],
@@ -171,7 +166,7 @@ export const propertyDetails: PropertyDetail[] = [
       {
         title: "เหมาะสำหรับอุตสาหกรรม",
         description:
-          "ที่ดินผังสีม่วงในระยอง EEC เหมาะสำหรับโรงงาน คลังสินค้า และธุรกิจที่ต้องการพื้นที่อุตสาหกรรม",
+          "ที่ดินในระยอง EEC ต้องตรวจข้อกำหนดและการอนุญาตตามโครงการที่จะพัฒนา",
       },
       {
         title: "เดินทางสะดวก",
@@ -223,7 +218,6 @@ export const propertyDetails: PropertyDetail[] = [
     shortTitle: "101 ไร่ กบินทร์บุรี",
     location: "ต.หนองกี่, อ.กบินทร์บุรี, ปราจีนบุรี",
     size: KABIN_101.areaLabel,
-    zoning: "พื้นที่อุตสาหกรรม",
     pricePerRai: KABIN_101.priceLabel,
     referralReward: "ค่าแนะนำสูงสุด 2,275,000 บาท",
     frontage: "ประมาณ 700 เมตร",

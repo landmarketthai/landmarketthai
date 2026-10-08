@@ -101,6 +101,7 @@ function normalizeLand(value: unknown): Land {
     area_sqwa: numberOrNull(row.area_sqwa),
     usable_area_sqm: numberOrNull(row.usable_area_sqm),
     zoning: row.zoning == null ? null : (row.zoning as Land["zoning"]),
+    zoning_info: row.zoning_info == null ? null : row.zoning_info as Land["zoning_info"],
     frontage_m: numberOrNull(row.frontage_m),
     depth_min_m: numberOrNull(row.depth_min_m),
     depth_max_m: numberOrNull(row.depth_max_m),
@@ -241,6 +242,15 @@ export async function getPublicListings(opts?: {
     limit,
     offset,
   );
+}
+
+/** Authenticated callers only; no seed fallback or public cache in the editor. */
+export async function getZoningManagementListings(): Promise<Land[]> {
+  const sql = getSqlIfConfigured();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  const rows = await sql.query(`${LAND_SELECT}
+    where l.deleted_at is null group by l.id, p.id order by l.updated_at desc, l.id`, []);
+  return rows.map(normalizeLand);
 }
 
 export async function getFeaturedListings(limit = 6): Promise<Land[]> {

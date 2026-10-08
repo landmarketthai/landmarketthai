@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
+import ZoningBadges from "./ZoningBadges";
 import { BadgeCheck, Ruler } from "lucide-react";
 import type { Land } from "@/lib/types/database";
 import { propertySizeLabel } from "@/lib/marketplace/presentation";
 import ListingTrust from "./ListingTrust";
 import {
   LAND_TYPE_LABELS,
-  ZONING_LABELS,
   formatMoney,
   formatMoneyFull,
   listingFacts,
@@ -23,7 +23,6 @@ interface Props {
   soldOut?: boolean;
   featured?: boolean;
   ctaLabel?: string;
-  metaTagLabel?: string;
   rewardLabel?: string;
   pricePerRaiLabel?: string;
 }
@@ -60,7 +59,6 @@ export default function ListingCard({
   soldOut,
   featured,
   ctaLabel = "ดูรายละเอียดแปลง",
-  metaTagLabel,
   rewardLabel,
   pricePerRaiLabel,
 }: Props) {
@@ -76,12 +74,10 @@ export default function ListingCard({
   const area = exactAreaLabel(land);
   const location = locationLabel(land);
   const typeLabel = propertyTypeLabel(land);
-  const zoningLabel = metaTagLabel ?? (land.zoning ? ZONING_LABELS[land.zoning] : null);
   const totalPrice = land.total_price;
   const perRaiText = pricePerRaiLabel ?? (land.price_per_rai != null ? `฿${formatMoney(land.price_per_rai)}` : null);
-  // Override labels (seed presentation) win over stored zoning; fall back to the type when there is no zoning.
   const facts = listingFacts({ ...land, zoning: null }, area);
-  facts.splice(area ? 1 : 0, 0, zoningLabel ?? typeLabel);
+  facts.splice(area ? 1 : 0, 0, typeLabel);
 
   return (
     <article
@@ -168,6 +164,7 @@ export default function ListingCard({
           )}
         </Link>
         <ListingTrust land={land} className="mt-3" />
+        <ZoningBadges land={land} />
 
         <Link
           href={href}

@@ -24,7 +24,7 @@ test("seed inventory has accurate asking-price statistics and explicit scope", (
   assert.equal(result.byProvince.find((group) => group.key === SEED_37_RAI_LAND.province_id)?.pricePerRai.median, 2_300_000);
   assert.equal(result.byLandType[0].key, "industrial");
   assert.equal(result.byLandType[0].listingCount, 2);
-  assert.equal(result.byZoning.find((group) => group.key === "unknown")?.listingCount, 1);
+  assert.equal(result.byZoning.find((group) => group.key === "green")?.listingCount, 1);
 });
 
 test("inactive/deleted listings are excluded and invalid prices never become observations", () => {

@@ -13,6 +13,19 @@ export interface NewLeadInput {
   consentAt?: string | null;
 }
 
+/** Only call after server admin authorization; the timestamp prevents stale overwrites. */
+export async function updateLandZoning(id: string, expectedUpdatedAt: string, info: import("@/lib/zoning").ZoningInfo): Promise<string | null> {
+  const rows = await getSql().query(`with changed as (
+    update lands set zoning_info = $3::jsonb, updated_at = now()
+    where id = $1 and updated_at = $2::timestamptz and deleted_at is null
+    returning id, slug, zoning_info
+  ), synced as (
+    update property_submissions s set zoning_info = c.zoning_info, updated_at = now()
+    from changed c where s.linked_land_id = c.id returning s.id
+  ) select slug from changed`, [id, expectedUpdatedAt, JSON.stringify(info)]);
+  return rows[0]?.slug ? String(rows[0].slug) : null;
+}
+
 export async function resolveActivePartner(referralCode: string): Promise<string | null> {
   const sql = getSql();
   const rows = await sql.query(

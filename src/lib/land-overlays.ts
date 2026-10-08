@@ -1,3 +1,4 @@
+import { zoningColors } from "@/lib/zoning";
 import { EEC_PROVINCES } from "@/lib/constants/provinces";
 import type { Land, ZoningColor } from "@/lib/types/database";
 import { ZONING_COLORS, ZONING_LABELS } from "@/lib/utils";
@@ -53,6 +54,7 @@ export const LAND_OVERLAY_METADATA: readonly LandOverlayMetadata[] = [
 
 export interface LandOverlayContext {
   zoning: ZoningMetadata | null;
+  zones: ZoningMetadata[];
   eec: {
     reportedByListing: boolean;
     provinceContext: boolean | null;
@@ -67,10 +69,11 @@ export interface LandOverlayContext {
 }
 
 export function getLandOverlayContext(
-  land: Pick<Land, "zoning" | "is_eec" | "land_type" | "province" | "nearby_landmarks">,
+  land: Pick<Land, "zoning" | "zoning_info" | "is_eec" | "land_type" | "province" | "nearby_landmarks">,
 ): LandOverlayContext {
   return {
-    zoning: land.zoning ? ZONING_METADATA[land.zoning] ?? null : null,
+    zoning: zoningColors(land).length === 1 ? ZONING_METADATA[zoningColors(land)[0]] : null,
+    zones: zoningColors(land).map(color => ZONING_METADATA[color]),
     eec: {
       reportedByListing: land.is_eec,
       provinceContext: land.province

@@ -1,5 +1,6 @@
 import type { Land, PropertySubmission } from "@/lib/types/database";
-import { ZONING_LABELS, formatUpdatedDate } from "@/lib/utils";
+import { formatUpdatedDate } from "@/lib/utils";
+import { getZoning, zoningSummary, type ZoningInfo } from "@/lib/zoning";
 
 // Each dimension only reports "ok" when a dedicated stored field actually backs the claim.
 // The schema only has the generic listing review (verification_status). There are no
@@ -21,6 +22,7 @@ export interface VerificationInput {
   lng: number | null;
   location_precision: Land["location_precision"];
   zoning: Land["zoning"];
+  zoning_info?: ZoningInfo | null;
   price: number | null;
   updated_at: string;
   title_deed_on_file: boolean;
@@ -84,8 +86,8 @@ export function verificationDimensions(input: VerificationInput, now: Date = new
     {
       key: "zoning",
       title: VERIFICATION_TITLES.zoning,
-      state: input.zoning ? "partial" : "missing",
-      label: input.zoning ? `${ZONING_LABELS[input.zoning]} (ตามข้อมูลประกาศ ยังไม่ได้ตรวจกับผังเมือง)` : "ยังไม่ระบุผังเมือง",
+      state: getZoning(input).status === "document_verified" ? "ok" : getZoning(input).zones.length ? "partial" : "missing",
+      label: zoningSummary(input),
     },
     {
       key: "price",
@@ -110,6 +112,7 @@ export function landVerification(land: Land, now?: Date): VerificationDimension[
     lng: land.lng,
     location_precision: land.location_precision,
     zoning: land.zoning,
+    zoning_info: land.zoning_info,
     price: land.total_price,
     updated_at: land.updated_at,
     title_deed_on_file: Boolean(land.title_deed_on_file),
@@ -123,6 +126,7 @@ export function submissionVerification(submission: PropertySubmission, now?: Dat
     lng: submission.lng,
     location_precision: submission.location_precision,
     zoning: submission.zoning,
+    zoning_info: submission.zoning_info,
     price: submission.sale_price,
     updated_at: submission.updated_at,
     title_deed_on_file: Boolean(submission.media?.some((media) => media.media_kind === "document" && media.doc_type === "title_deed")),
