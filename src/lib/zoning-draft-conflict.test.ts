@@ -7,22 +7,26 @@ import ts from "typescript";
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const compile = (code: string) => ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-// Route handler with injected next/server, schema and data layer (no Next runtime needed).
-function loadRoute(save: () => Promise<unknown>) {
+// Route handler with injected next/server, schema and data layer; the real body-cap reader runs (no Next runtime needed).
+const nextServer = { NextResponse: { json: (body: unknown, init?: { status?: number }) => ({ status: init?.status ?? 200, body }) } };
+function load(path: string, modules: Record<string, unknown>) {
   const exports: Record<string, (...args: never[]) => Promise<{ status: number; body: unknown }>> = {};
+  runInNewContext(compile(read(path)), { exports, Buffer, console: { error() {} }, require: (name: string) => modules[name] });
+  return exports;
+}
+function loadRoute(save: () => Promise<unknown>) {
+  const http = load("src/lib/security/http.ts", { "next/server": nextServer });
   const modules: Record<string, unknown> = {
-    "next/server": { NextResponse: { json: (body: unknown, init?: { status?: number }) => ({ status: init?.status ?? 200, body }) } },
+    "next/server": nextServer,
     "@/lib/marketplace/schemas": { draftSchema: { safeParse: (data: unknown) => ({ success: true, data }) } },
     "@/lib/neon/marketplace": { getPropertyDraft: async () => null, savePropertyDraft: save },
+    "@/lib/security/http": http,
   };
-  runInNewContext(compile(read("src/app/api/property-submissions/[id]/route.ts")), {
-    exports, console: { error() {} }, require: (name: string) => modules[name],
-  });
-  return exports;
+  return load("src/app/api/property-submissions/[id]/route.ts", modules);
 }
 const patch = (handler: (...args: never[]) => Promise<{ status: number; body: unknown }>) =>
   (handler as unknown as (request: unknown, context: unknown) => Promise<{ status: number; body: unknown }>)(
-    { json: async () => ({ token: "t" }) }, { params: Promise.resolve({ id: "d" }) });
+    new Request("http://local/api/property-submissions/d", { method: "PATCH", body: JSON.stringify({ token: "t" }) }), { params: Promise.resolve({ id: "d" }) });
 
 test("draft PATCH maps trigger SQLSTATE LZ409 (direct or nested cause) to 409 with a reload message", async () => {
   for (const error of [Object.assign(new Error("zoning conflict"), { code: "LZ409" }), new Error("wrapped", { cause: { code: "LZ409" } })]) {
@@ -30,6 +34,14 @@ test("draft PATCH maps trigger SQLSTATE LZ409 (direct or nested cause) to 409 wi
     assert.equal(response.status, 409);
     assert.match((response.body as { error: string }).error, /รีโหลด/);
   }
+});
+
+test("draft PATCH body cap (security) runs before the save, so oversized bodies never reach the 409 path", async () => {
+  let saves = 0;
+  const big = new Request("http://local/api/property-submissions/d", { method: "PATCH", body: JSON.stringify({ token: "t", description: "ก".repeat(30_000) }) });
+  const response = await (loadRoute(async () => { saves++; }).PATCH as unknown as (r: unknown, c: unknown) => Promise<{ status: number }>)(big, { params: Promise.resolve({ id: "d" }) });
+  assert.equal(response.status, 413);
+  assert.equal(saves, 0);
 });
 
 test("draft PATCH keeps other database errors as 500", async () => {

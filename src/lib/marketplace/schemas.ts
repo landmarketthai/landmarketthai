@@ -76,6 +76,9 @@ export const submissionUploadSchema = z.object({
   mime_type: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
   size_bytes: z.coerce.number().int().positive().max(20 * 1024 * 1024),
   doc_type: z.enum(["title_deed", "map", "brochure", "other"]).optional(),
+}).refine((upload) => upload.media_kind !== "image" || upload.mime_type.startsWith("image/"), {
+  // images/ objects are public-read; keep PDFs out of the public prefix.
+  path: ["mime_type"],
 });
 
 export const buyerRequirementSchema = z.object({

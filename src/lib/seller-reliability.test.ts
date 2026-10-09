@@ -79,6 +79,7 @@ test("initialization preserves credentials on failed restore, restores local val
   await init(); assert.equal(closed, true); assert.equal(env.frozen.current, true); assert.equal(nextForm, undefined);
   restored = null; await init(); assert.equal(creates, 0, "a missing draft is not recreated on view");
   assert.equal(stored.has("credentials"), false, "dead credentials are dropped on a definitive 404");
+  assert.equal(stored.has("local:draft-a"), false, "the dead draft's local form is dropped with it");
 });
 
 test("corrupt credentials are removed with only their identifiable local draft without creating a draft", async () => {
@@ -203,7 +204,8 @@ test("submit freezes first, waits for every upload and queued save, then saves o
     cancelMapsLookup: () => events.push("cancel lookup"), setSubmitting: () => {}, setError: () => {},
     uploadBatches: { current: new Set([a.promise, b.promise]) }, failedUploads: { current: new Map() }, saveQueue: { current: pendingSave.promise },
     saveDraft: async (force: boolean) => { assert.equal(force, true); events.push("save latest"); return true; },
-    fetch: async () => { events.push("submit"); return response(200); }, setSubmitted: () => events.push("submitted"),
+    turnstile: { headers: () => ({ "x-turnstile-token": "uat-token" }), reset: () => events.push("reset challenge") },
+    fetch: async (_url: string, init: { headers: Record<string, string> }) => { assert.equal(init.headers["x-turnstile-token"], "uat-token"); events.push("submit"); return response(200); }, setSubmitted: () => events.push("submitted"),
     localStorage: { removeItem: () => {} }, DRAFT_STORAGE_KEY: "draft", localFormKey: (id: string) => id,
   });
   const done = submit();
@@ -213,7 +215,7 @@ test("submit freezes first, waits for every upload and queued save, then saves o
   b.resolve(true); await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(events, ["cancel lookup"]);
   pendingSave.resolve(true); await done;
-  assert.deepEqual(events, ["cancel lookup", "save latest", "submit", "submitted"]);
+  assert.deepEqual(events, ["cancel lookup", "save latest", "submit", "reset challenge", "submitted"]);
 });
 
 test("overlapping upload batches remain tracked until both complete and keep both media lists", async () => {
@@ -235,6 +237,64 @@ test("overlapping upload batches remain tracked until both complete and keep bot
   b.resolve(true); await Promise.all([...uploadBatches.current]); await Promise.resolve();
   assert.equal(count, 0); assert.equal(uploadBatches.current.size, 0);
   assert.deepEqual(draft.media?.map((item) => item.id), ["a", "b"]);
+});
+
+test("upload or submit before any draft exists creates it through ensureDraft and targets the new id", async () => {
+  // Upload first: files go to the created draft; a failed create keeps them retryable instead of dropping them.
+  const failedUploads = { current: new Map<string, string>() };
+  const uploaded: string[] = []; let creates = 0; let createFails = false;
+  const uploadBatch = handler("uploadBatch", {
+    frozen: { current: false }, draftId: null, token: null, uploadBatches: { current: new Set() }, failedUploads,
+    setError: () => {}, setUploadBatchCount: () => {}, mergeDraft, setDraft: () => {},
+    ensureDraft: async () => { creates++; if (createFails) throw new Error("create failed"); return { id: "draft-new", token: "tok" }; },
+    upload: async (file: string, _kind: string, target: { id: string; token: string }) => { uploaded.push(`${file}->${target.id}:${target.token}`); return true; },
+    loadSellerDraft: async (id: string) => ({ ...submission, id, media: [] }),
+  });
+  uploadBatch(["a.jpg"], "image");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(creates, 1);
+  assert.deepEqual(uploaded, ["a.jpg->draft-new:tok"]);
+  createFails = true;
+  uploadBatch(["b.pdf"], "document");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(uploaded, ["a.jpg->draft-new:tok"], "nothing uploads without a draft");
+  assert.equal(failedUploads.current.get("b.pdf"), "document", "files stay queued for the retry button");
+
+  // Submit first: the forced save creates the draft; submit reuses it and still carries the Turnstile token.
+  const calls: { url: string; headers: Record<string, string>; body: { token: string } }[] = [];
+  const submit = handler("submit", {
+    validate: () => ({}), setFieldErrors: () => {}, consent: true, frozen: { current: false }, draftId: null, token: null,
+    cancelMapsLookup: () => {}, setSubmitting: () => {}, setError: (message: unknown) => assert.equal(message, null), buyerDemandSlug: undefined,
+    uploadBatches: { current: new Set() }, failedUploads: { current: new Map() }, saveQueue: { current: Promise.resolve(true) },
+    saveDraft: async () => true, ensureDraft: async () => ({ id: "draft-new", token: "tok" }),
+    turnstile: { headers: () => ({ "x-turnstile-token": "uat-token" }), reset: () => {} },
+    fetch: async (url: string, init: { headers: Record<string, string>; body: string }) => { calls.push({ url, headers: init.headers, body: JSON.parse(init.body) }); return response(200); },
+    setSubmitted: () => {}, localStorage: { removeItem: () => {} }, DRAFT_STORAGE_KEY: "draft", localFormKey: (id: string) => id,
+  });
+  await submit();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/api/property-submissions/draft-new/submit");
+  assert.equal(calls[0].body.token, "tok");
+  assert.equal(calls[0].headers["x-turnstile-token"], "uat-token");
+});
+
+test("submit resets the single-use Turnstile token on network failure and on a rejected response", async () => {
+  for (const outcome of ["offline", "403"] as const) {
+    let resets = 0; let error: unknown = null; let submitted = false;
+    const submit = handler("submit", {
+      validate: () => ({}), setFieldErrors: () => {}, frozen: { current: false }, draftId: "draft-a", token: "token", buyerDemandSlug: undefined,
+      cancelMapsLookup: () => {}, setSubmitting: () => {}, setError: (message: unknown) => { error = message; },
+      uploadBatches: { current: new Set() }, failedUploads: { current: new Map() }, saveQueue: { current: Promise.resolve(true) },
+      saveDraft: async () => true, ensureDraft: async () => { throw new Error("draft already exists"); },
+      turnstile: { headers: () => ({ "x-turnstile-token": "used" }), reset: () => { resets++; } },
+      fetch: async () => { if (outcome === "offline") throw new Error("offline"); return response(403, { error: "verification failed" }); },
+      setSubmitted: () => { submitted = true; }, localStorage: { removeItem: () => {} }, DRAFT_STORAGE_KEY: "draft", localFormKey: (id: string) => id,
+    });
+    await submit();
+    assert.equal(resets, 1, `${outcome}: challenge reset exactly once`);
+    assert.equal(submitted, false);
+    assert.ok(error, `${outcome}: seller sees an error`);
+  }
 });
 
 test("old Maps responses cannot overwrite a manual pin or newer lookup", async () => {
@@ -327,15 +387,20 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
   const pristine = JSON.stringify({ title: "" });
   const start = wizard.indexOf("  // No draft exists until");
   const end = wizard.indexOf("  // Restored local edits", start);
-  const run = (formSnapshot: string, saveState = "saved") => {
+  const run = (formSnapshot: string, saveState = "saved", overrides: Record<string, unknown> = {}) => {
     const timers: unknown[] = []; const effects: (() => void)[] = [];
-    const env = { useEffect: (callback: () => void) => { effects.push(callback); }, loading: false, submitting: false, submitted: false, draftId: null, initFailed: false, saveState, formSnapshot, savedForm: { current: pristine }, AUTOSAVE_DELAY_MS: 1500, saveDraftRef: { current: () => {} }, setTimeout: (fn: unknown) => { timers.push(fn); }, clearTimeout: () => {} };
+    const env = { useEffect: (callback: () => void) => { effects.push(callback); }, loading: false, submitting: false, submitted: false, draftId: null, initFailed: false, saveState, formSnapshot, savedForm: { current: pristine }, AUTOSAVE_DELAY_MS: 1500, saveDraftRef: { current: () => {} }, setTimeout: (fn: unknown) => { timers.push(fn); }, clearTimeout: () => {}, ...overrides };
     new Function(...Object.keys(env), stripTypeScriptTypes(wizard.slice(start, end)))(...Object.values(env));
     effects[0](); return timers.length;
   };
   assert.equal(run(pristine), 0);
   assert.equal(run(JSON.stringify({ title: "edited" })), 1);
   assert.equal(run(JSON.stringify({ title: "edited" }), "error"), 0, "failed create waits for the retry timer instead of looping");
+  const edited = JSON.stringify({ title: "edited" });
+  assert.equal(run(edited, "saved", { loading: true }), 0, "nothing is created while the restore is loading");
+  assert.equal(run(edited, "saved", { initFailed: true }), 0, "a failed restore never falls through to creating a new draft");
+  assert.equal(run(edited, "saved", { submitted: true }), 0);
+  assert.equal(run(edited, "saved", { draftId: "existing" }), 0, "an existing draft uses normal autosave, not create");
 
   // ensureDraft: concurrent callers share one POST, a failed POST is retryable, credentials and local edits are stored on success.
   let calls = 0; let fail = true;

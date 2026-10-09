@@ -12,6 +12,21 @@ interface Props {
   initial?: { property_type?: string; province?: string; min_size_rai?: string; max_size_rai?: string; min_usable_area_sqm?: string; max_usable_area_sqm?: string; max_price?: string; max_price_per_rai?: string; zoning?: string };
 }
 
+// Turnstile is wired without extra imports/hooks (existing tests load this file with a minimal React mock).
+// Inert unless NEXT_PUBLIC_TURNSTILE_SITE_KEY is set; the widget injects a hidden cf-turnstile-response input into the form.
+// Next inlines the NEXT_PUBLIC_ value at build time; the catch only matters outside Next (isolated tests).
+const TURNSTILE_SITE_KEY = (() => { try { return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || ""; } catch { return ""; } })();
+const TURNSTILE_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+function mountTurnstile(el: HTMLDivElement | null) {
+  if (!el || el.childElementCount) return;
+  const render = () => { if (!el.childElementCount) window.turnstile?.render(el, { sitekey: TURNSTILE_SITE_KEY, appearance: "interaction-only", action: "buyer-requirement" }); };
+  if (window.turnstile) return render();
+  let script = document.querySelector<HTMLScriptElement>('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+  if (!script) { script = document.createElement("script"); script.src = TURNSTILE_SRC; script.async = true; document.head.appendChild(script); }
+  script.addEventListener("load", render, { once: true });
+}
+const resetTurnstile = () => { if (TURNSTILE_SITE_KEY) window.turnstile?.reset(); };
+
 export default function BuyerRequirementForm({ provinces, initial = {} }: Props) {
   const initialProvince = provinces.find((province) => province.slug === initial.province)?.id ?? "";
   const initialForm = {
@@ -60,10 +75,13 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
         target?.focus();
         return;
       }
+      const humanToken = TURNSTILE_SITE_KEY ? formElement.querySelector<HTMLInputElement>('[name="cf-turnstile-response"]')?.value ?? "" : "";
+      if (TURNSTILE_SITE_KEY && !humanToken) { setError("กรุณารอการยืนยันว่าคุณไม่ใช่บอท แล้วลองอีกครั้ง"); return; }
       const response = await fetch("/api/buyer-requirements", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json", ...(humanToken ? { "x-turnstile-token": humanToken } : {}) },
         body: JSON.stringify(parsed.data),
       });
+      resetTurnstile();
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         setError(typeof body?.error === "string" ? body.error : "บันทึกความต้องการไม่สำเร็จ กรุณาลองใหม่");
@@ -81,6 +99,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
       }
       setMatches(body.matches);
     } catch {
+      resetTurnstile();
       setError("การเชื่อมต่อขัดข้อง ไม่สามารถยืนยันผลการบันทึกได้ กรุณาติดต่อทีมงานก่อนส่งซ้ำ");
     } finally { saving.current = false; setBusy(false); }
   }
@@ -125,6 +144,7 @@ export default function BuyerRequirementForm({ provinces, initial = {} }: Props)
         <label><span className="label">LINE ID</span><input name="line_id" {...invalid("line_id")} maxLength={100} className="input" value={form.line_id} onChange={(e) => set("line_id", e.target.value)} /></label>
       </div>
       <label className="mt-5 flex items-start gap-3 text-sm text-slate-600"><input name="consent_pdpa" {...invalid("consent_pdpa")} required type="checkbox" className="mt-1" checked={form.consent_pdpa} onChange={(e) => set("consent_pdpa", e.target.checked)} /><span>ยินยอมให้เก็บและใช้ข้อมูลเพื่อติดต่อและจับคู่ทรัพย์ตาม<Link href="/privacy" className="underline">นโยบายความเป็นส่วนตัว</Link></span></label>
+      {TURNSTILE_SITE_KEY ? <div ref={mountTurnstile} className="mt-5" /> : null}
       <button disabled={busy || !provinces.length || Boolean(initial.province && !initialProvince && !form.province_ids.length)} className="btn-green mt-5 w-full text-base">{busy ? "กำลังค้นหา..." : "บันทึกและค้นหาที่ดินที่ตรง"}</button>
       <p className="mt-3 text-center text-xs text-slate-500">ทีมงานตรวจสอบทุกคำขอก่อน และไม่เผยแพร่ข้อมูลติดต่อของคุณ</p>
     </form>}
