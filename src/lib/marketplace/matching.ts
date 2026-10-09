@@ -1,5 +1,6 @@
 import type { Land, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
+import { zoningColors } from "@/lib/zoning";
 
 export interface BuyerMatchCriteria {
   property_type?: PropertyType | null;
@@ -44,7 +45,7 @@ export function classifyBuyerMatch(property: Land, input: BuyerMatchCriteria): B
   const sizeOk = matchesSizeCriteria(property, input);
   const budgetOk = input.max_price == null || (property.total_price != null && property.total_price <= input.max_price);
   const perRaiOk = isUsableAreaOnly(property) || input.max_price_per_rai == null || (property.price_per_rai != null && property.price_per_rai <= input.max_price_per_rai);
-  const zoningOk = input.zoning == null || property.zoning === input.zoning;
+  const zoningOk = input.zoning == null || zoningColors(property).includes(input.zoning);
 
   return sizeOk && budgetOk && perRaiOk && zoningOk ? "full" : "near";
 }

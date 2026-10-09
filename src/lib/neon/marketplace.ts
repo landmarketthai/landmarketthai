@@ -65,6 +65,7 @@ function normalizeSubmission(value: unknown): PropertySubmission {
     road_name: str(row.road_name),
     road_width_m: num(row.road_width_m),
     zoning: (row.zoning as ZoningColor | null) ?? null,
+    zoning_info: row.zoning_info as PropertySubmission["zoning_info"],
     sale_price: num(row.sale_price),
     price_per_rai: num(row.price_per_rai),
     description: str(row.description),
@@ -132,6 +133,7 @@ export interface SubmissionDraftInput {
   road_name?: string | null;
   road_width_m?: number | null;
   zoning?: ZoningColor | null;
+  zoning_info?: import("@/lib/zoning").ZoningInfo;
   sale_price?: number | null;
   price_per_rai?: number | null;
   description?: string | null;
@@ -180,9 +182,10 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
        location_precision = case when $10::numeric is not null and $11::numeric is not null then 'exact' else 'approx' end,
        area_rai = $12, area_ngan = $13, area_sqwa = $14, total_rai = $15,
        frontage_m = $16, depth_min_m = $17, depth_max_m = $18, road_name = $19, road_width_m = $20,
-       zoning = $21, sale_price = $22, price_per_rai = $23,
+       zoning = case when $32::boolean then $21 else zoning end, sale_price = $22, price_per_rai = $23,
        description = $24, contact_name = $25, contact_phone = case when $29::boolean then $26 else contact_phone end,
-       contact_line = $27, usable_area_sqm = $28, updated_at = now()
+       contact_line = $27, usable_area_sqm = $28, updated_at = now(),
+       zoning_info = case when $30::boolean then $31::jsonb else zoning_info end
      where id = $1 and draft_token = $2 and status = 'draft'
      returning *`,
     [
@@ -195,6 +198,8 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
       input.description ?? null, input.contact_name ?? null, input.contact_phone ?? null, input.contact_line ?? null,
       input.usable_area_sqm ?? null,
       input.contact_phone !== undefined,
+      input.zoning_info !== undefined, JSON.stringify(input.zoning_info ?? null),
+      input.zoning !== undefined,
     ],
   );
   return rows[0] ? normalizeSubmission(rows[0]) : null;
@@ -340,10 +345,10 @@ export async function publishSubmission(id: string): Promise<string | null> {
        title_th, slug, province_id, district, subdistrict, address, land_type, property_type, transaction_type,
        size_rai, area_rai, area_ngan, area_sqwa, zoning, frontage_m, depth_min_m, depth_max_m, road_name, road_width_m,
        price_per_rai, total_price, is_eec, description, lat, lng, location_precision,
-       status, verification_status, is_featured, owner_lead_id, published_at, usable_area_sqm
+       status, verification_status, is_featured, owner_lead_id, published_at, usable_area_sqm, zoning_info
        ) select
        $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-       false,$23,$24,$25,$26,'active','verified',false,$27,now(),$28
+       false,$23,$24,$25,$26,'active','verified',false,$27,now(),$28,$29::jsonb
        from source returning id
      ), inserted_images as (
        insert into land_images (land_id, storage_key, url_or_cdn_path, alt_th, sort_order, is_cover)
@@ -369,6 +374,8 @@ export async function publishSubmission(id: string): Promise<string | null> {
       str(source.zoning), num(source.frontage_m), num(source.depth_min_m), num(source.depth_max_m), str(source.road_name), num(source.road_width_m),
       num(source.price_per_rai), num(source.sale_price), str(source.description), num(source.lat), num(source.lng),
       source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id), num(source.usable_area_sqm),
+      // Owner source/evidence stay private on property_submissions until an admin applies them via /manage/zoning.
+      (info => info ? JSON.stringify(info) : null)((await import("@/lib/zoning")).publicOwnerZoning(source.zoning_info)),
     ],
   );
   const landId = rows[0]?.id ? String(rows[0].id) : null;

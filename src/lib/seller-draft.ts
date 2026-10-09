@@ -1,4 +1,13 @@
-import type { PropertySubmission } from "./types/database";
+import type { PropertySubmission, ZoningColor } from "./types/database";
+import { getZoning, isZoningEmpty, zoningSchema, type ZoningInfo } from "@/lib/zoning";
+
+/** Drafts saved before structured zoning carry only the legacy color; fold it in without claiming provenance. */
+export function reconcileZoning<T extends { zoning: ZoningColor | null; zoning_info?: ZoningInfo | null }>(form: T): T & { zoning: ZoningColor | null; zoning_info: ZoningInfo } {
+  const info = getZoning({ zoning: null, zoning_info: form.zoning_info ?? null });
+  const color = info.zones.find(zone => zone.color)?.color ?? form.zoning ?? null;
+  const zones = color && !info.zones.some(zone => zone.color) ? [{ color, type_code: "", type_name: "" }, ...info.zones] : info.zones;
+  return { ...form, zoning: color, zoning_info: isZoningEmpty(info) && !color ? info : zoningSchema.parse({ ...info, zones }) };
+}
 
 export function phoneLooksValid(value: string): boolean {
   return /^0\d{8,9}$/.test(value.replace(/[\s\-().]/g, "").replace(/^\+?66(?=\d{9}$)/, "0"));

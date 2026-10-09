@@ -55,7 +55,7 @@ const propertyTypes: ReadonlyArray<readonly [string, string]> = [["", "ทั้
 
 const zoningOptions = [
   ["", "ทุกผังเมือง"],
-  ["purple", "ม่วง (อุตสาหกรรม)"],
+  ["purple", "ม่วง"],
   ["purple_light", "ม่วงอ่อน"],
   ["brown", "น้ำตาล"],
   ["orange", "ส้ม"],

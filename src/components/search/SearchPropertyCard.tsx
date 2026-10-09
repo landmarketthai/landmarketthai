@@ -7,6 +7,7 @@ import type { Land } from "@/lib/types/database";
 import { formatMoney, formatUpdatedDate, listingFacts, listingStatusLabel } from "@/lib/utils";
 import { verificationBadges } from "@/lib/marketplace/verification";
 import { PROPERTY_TYPE_LABELS, propertySizeLabel } from "@/lib/marketplace/presentation";
+import ZoningBadges from "@/components/listings/ZoningBadges";
 
 interface Props {
   property: Land;
@@ -24,7 +25,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
   const perRai = property.transaction_type === "sale" ? property.price_per_rai : null;
   const updatedLabel = formatUpdatedDate(property.updated_at);
   const badges = verificationBadges(property);
-  const facts = listingFacts(property, propertySizeLabel(property));
+  const facts = listingFacts({ ...property, zoning: null }, propertySizeLabel(property));
   const location = [property.subdistrict, property.district, property.province?.name_th].filter(Boolean).join(", ");
 
   return (
@@ -84,6 +85,7 @@ export default function SearchPropertyCard({ property, selected, onSelect, onHov
                 ))}
               </p>
             )}
+            <ZoningBadges land={property} />
             <p className="mt-2 text-xs text-slate-400">
               {[
                 updatedLabel && `อัปเดต ${updatedLabel}`,

@@ -1,4 +1,4 @@
-﻿import test from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { runInNewContext } from "node:vm";
@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import type { Land } from "./types/database.ts";
 import { canonicalSiteUrl } from "./constants/site.ts";
 import * as seo from "./public-seo.ts";
+import { listingMetadataDescription } from "./zoning.ts";
 import { SEED_PUBLIC_LISTINGS, SEED_101_KABIN_LAND, SEED_109_RAI_LAND } from "./seed-listings.ts";
 import { getPropertyDetail, propertyHref } from "./property-detail-data.ts";
 import { KABIN_101 } from "./flagship-facts.ts";
@@ -48,7 +49,7 @@ test("listing metadata uses its own canonical, OG fields and cover image for see
     assert.doesNotMatch(og.title, /\| LandmarketThai$/);
     assert.equal(listingHref(land.public_ref, land.slug), propertyHref(land.slug));
   }
-  assert.equal(seo.listingMetadata(dynamic).description, "รายละเอียดบ้าน");
+  assert.equal(seo.listingMetadata(dynamic).description, listingMetadataDescription(dynamic));
 });
 
 test("canonical route renders future inventory, rejects unknown slugs and redirects the duplicate route", async () => {
@@ -65,7 +66,7 @@ test("canonical route renders future inventory, rejects unknown slugs and redire
     "@/lib/utils": await import("./utils.ts"),
   };
   for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyMobileActions", "properties/PropertyVideos", "ui/LineButton",
-    "listings/ListingCard", "listings/VerificationSummary", "properties/ReferralCallout",
+    "listings/ListingCard", "listings/ZoningBadges", "listings/VerificationSummary", "properties/ReferralCallout",
     "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
   const page = load<{ default: (props: unknown) => Promise<{ type: unknown; props: { property: Land } }>; generateMetadata: (props: unknown) => Promise<Metadata> }>("../app/property/[slug]/page.tsx", modules);
   const props = { params: Promise.resolve({ slug: dynamic.slug }) };
@@ -241,7 +242,7 @@ test("legacy listing redirects resolved ref and rejects invalid or missing refs"
   await assert.rejects(page.default({ params: Promise.resolve({ slug: "999-missing" }) }), /404/);
 });
 
-test("flagship canonical page and metadata survive inventory outage", async () => {
+test("flagship canonical page and metadata survive inventory outage", async (t) => {
   const modules: Record<string, unknown> = {
     "react/jsx-runtime": runtime, react: { cache: (fn: unknown) => fn },
     "next/navigation": { notFound: () => { throw new Error("404"); } }, "next/image": "image", "next/link": "link", "lucide-react": {},
@@ -252,12 +253,34 @@ test("flagship canonical page and metadata survive inventory outage", async () =
     "@/lib/property-detail-data": { getPropertyDetail, propertyDetails: [] }, "@/lib/marketplace/verification": { landVerification: () => [] },
     "@/lib/utils": await import("./utils.ts"),
   };
-  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyMobileActions", "properties/PropertyVideos", "ui/LineButton", "listings/ListingCard", "listings/VerificationSummary", "properties/ReferralCallout", "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
+  for (const name of ["forms/LeadForm", "properties/PropertyGallery", "properties/PropertyMobileActions", "properties/PropertyVideos", "ui/LineButton", "listings/ListingCard", "listings/ZoningBadges", "listings/VerificationSummary", "properties/ReferralCallout", "intelligence/PropertyIntelligence"]) modules[`@/components/${name}`] = {};
   const page = load<{ default: (props: unknown) => Promise<unknown>; generateMetadata: (props: unknown) => Promise<Metadata> }>("../app/property/[slug]/page.tsx", modules);
   for (const land of SEED_PUBLIC_LISTINGS) {
     const props = { params: Promise.resolve({ slug: land.slug }) };
-    assert.ok(await page.default(props));
+    const rendered = await page.default(props);
+    assert.ok(rendered);
     assert.equal((await page.generateMetadata(props)).alternates?.canonical, propertyHref(land.slug));
+    await t.test(`${land.slug}: one accessible zoning detail on mobile and desktop`, () => {
+      type Node = { type: unknown; props: { children?: unknown; className?: string; detail?: boolean; land?: Land; id?: string; "aria-labelledby"?: string } };
+      const details: { node: Node; ancestors: Node[] }[] = [];
+      function visit(value: unknown, ancestors: Node[] = []) {
+        if (Array.isArray(value)) { value.forEach(child => visit(child, ancestors)); return; }
+        if (!value || typeof value !== "object" || !("props" in value)) return;
+        const node = value as Node;
+        if (node.type === modules["@/components/listings/ZoningBadges"] && node.props.detail) details.push({ node, ancestors });
+        visit(node.props.children, [...ancestors, node]);
+      }
+      visit(rendered);
+      assert.equal(details.length, 1, "full zoning evidence must appear exactly once");
+      assert.equal(details[0].node.props.land, land);
+      for (const node of [...details[0].ancestors, details[0].node]) {
+        assert.doesNotMatch(node.props.className ?? "", /(?:^|\s)(?:\S+:)?hidden(?:\s|$)/, "detail must be visible at every breakpoint");
+      }
+      const section = details[0].ancestors.find(node => node.type === "section" && node.props["aria-labelledby"]);
+      assert.ok(section, "zoning detail must have a named section");
+      const heading = (section.props.children as Node[]).find(node => node.type === "h2" && node.props.id === section.props["aria-labelledby"]);
+      assert.ok(heading?.props.children, "section label must reference a visible heading");
+    });
   }
 });
 

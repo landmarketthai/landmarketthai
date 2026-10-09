@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from "next";
 import type { Land, LandType } from "@/lib/types/database";
+import { listingMetadataDescription } from "@/lib/zoning";
 import { getPropertyDetail, propertyHref } from "@/lib/property-detail-data";
 import { matchesLandFilters } from "@/lib/land-search";
 import { LAND_CATEGORY_TYPES, landTypeSlug } from "@/lib/utils";
@@ -7,8 +8,7 @@ import { LAND_CATEGORY_TYPES, landTypeSlug } from "@/lib/utils";
 export function listingMetadata(land: Land): Metadata {
   const detail = getPropertyDetail(land.slug);
   const title = (land.seo_title || land.title_th).replace(/\s*[|–-]\s*LandmarketThai\s*$/, "");
-  const description = land.seo_description || land.description || detail?.keyHighlights.join(" · ") ||
-    [land.title_th, land.province?.name_th, land.district].filter(Boolean).join(" · ");
+  const description = listingMetadataDescription(land);
   const image = land.images?.find(image => image.is_cover)?.url_or_cdn_path ||
     land.images?.[0]?.url_or_cdn_path || detail?.heroImage.src;
   const url = propertyHref(land.slug);
@@ -16,6 +16,7 @@ export function listingMetadata(land: Land): Metadata {
     title, description,
     alternates: { canonical: url },
     openGraph: { url, title, description, ...(image ? { images: [image] } : {}) },
+    twitter: { title, description, ...(image ? { images: [image] } : {}) },
   };
 }
 

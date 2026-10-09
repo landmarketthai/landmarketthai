@@ -1,5 +1,6 @@
 import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
 import type { Land, LandType, ZoningColor } from "@/lib/types/database";
+import { zoningColors } from "@/lib/zoning";
 import { ZONING_LABELS, slugToLandType } from "@/lib/utils";
 
 export interface LandFilters {
@@ -90,6 +91,6 @@ export function matchesLandFilters(land: Land, filters: LandFilters = {}): boole
     && matchesSizeCriteria(land, { min_size_rai: filters.size_min, max_size_rai: filters.size_max })
     && (isUsableAreaOnly(land) || ((filters.price_min === undefined || land.price_per_rai != null && land.price_per_rai >= filters.price_min)
       && (filters.price_max === undefined || land.price_per_rai != null && land.price_per_rai <= filters.price_max)))
-    && (!filters.zoning || land.zoning === filters.zoning)
+    && (!filters.zoning || zoningColors(land).includes(filters.zoning))
     && (filters.is_eec === undefined || land.is_eec === filters.is_eec);
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizePhone } from "@/lib/validations";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
+import { ownerZoningSchema } from "@/lib/zoning";
 
 const MAX_PRICE = 99_999_999_999_999.99;
 const optionalNumber = z.preprocess(
@@ -24,6 +25,7 @@ const optionalThaiPhone = z.string().trim().max(32).transform(normalizePhone).re
 );
 
 export const draftSchema = z.object({
+  zoning_info: ownerZoningSchema.optional(),
   token: z.string().uuid(),
   property_type: z.enum(PROPERTY_TYPES).nullable().optional(),
   transaction_type: z.literal("sale").nullable().optional(),

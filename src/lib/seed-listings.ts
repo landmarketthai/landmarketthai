@@ -1,5 +1,6 @@
 import { KABIN_101 } from "@/lib/flagship-facts";
 import type { Land, LandType, Province } from "@/lib/types/database";
+import { zoningSchema } from "@/lib/zoning";
 import { propertyHref } from "@/lib/property-detail-data";
 
 export const SEED_37_RAI_SLUG = "37-rai-eec-rayong";
@@ -163,7 +164,8 @@ export const SEED_101_KABIN_LAND: Land = {
   area_rai: KABIN_101.area_rai,
   area_ngan: KABIN_101.area_ngan,
   area_sqwa: KABIN_101.area_sqwa,
-  zoning: null,
+  zoning: "green",
+  zoning_info: zoningSchema.parse({ zones: [{ color: "green" }], status: "owner_reported", source: "พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ" }),
   frontage_m: 700,
   price_per_rai: KABIN_101.price_per_rai,
   total_price: KABIN_101.total_price,
@@ -262,7 +264,6 @@ export function resolveListingPresentation(land: Land) {
     hrefOverride: getSeedListingHref(land),
     soldOut: land.status === "sold",
     featured,
-    metaTagLabel: land.zoning == null && land.slug === SEED_37_RAI_SLUG ? SEED_37_RAI_META.zoningLabel : undefined,
     pricePerRaiLabel: land.price_per_rai == null && land.slug === SEED_109_RAI_SLUG ? "2.75 ล้าน ฿" : undefined,
     rewardLabel:
       land.slug === SEED_37_RAI_SLUG

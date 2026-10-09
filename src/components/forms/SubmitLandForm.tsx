@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { CheckCircle2, AlertCircle, Loader2, Upload, X } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
+import ZoningFields from "@/components/forms/ZoningFields";
+import { zoningFromForm } from "@/lib/zoning";
 import { THAI_PROVINCES, EEC_PROVINCES } from "@/lib/constants/provinces";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -113,6 +115,7 @@ export default function SubmitLandForm() {
           size_rai: Number(data.size_rai),
           asking_price: data.asking_price ? Number(data.asking_price) : undefined,
           deed_type: data.deed_type || undefined,
+          zoning_info: zoningFromForm(new FormData(form)),
           notes: data.notes || undefined,
           consent_pdpa: data.consent_pdpa === "on" ? true : undefined,
           source: window.location.pathname,
@@ -306,6 +309,8 @@ export default function SubmitLandForm() {
       </div>
 
       <div>
+        <ZoningFields />
+        <FieldError id="err-owner-zoning" errors={fieldErrors.zoning_info} />
         <label className="label" htmlFor="owner-notes">รายละเอียดเพิ่มเติม</label>
         <textarea
           id="owner-notes"

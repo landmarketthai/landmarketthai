@@ -1,5 +1,7 @@
 "use server";
 
+import { zoningFromForm } from "@/lib/zoning";
+
 import {
   insertLead,
   insertReferralAttribution,
@@ -174,6 +176,7 @@ export async function submitOwnerLead(
     size_rai: num(formData, "size_rai"),
     asking_price: num(formData, "asking_price"),
     deed_type: str(formData, "deed_type"),
+    zoning_info: zoningFromForm(formData),
     notes: str(formData, "notes"),
     referral_code: str(formData, "referral_code"),
     consent_pdpa: formData.get("consent_pdpa") === "on",
@@ -197,6 +200,7 @@ export async function submitOwnerLead(
       size_rai: result.data.size_rai,
       asking_price: result.data.asking_price,
       deed_type: result.data.deed_type,
+      zoning_info: result.data.zoning_info,
       notes: result.data.notes,
     };
 

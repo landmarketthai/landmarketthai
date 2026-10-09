@@ -2,6 +2,7 @@ import type { Land, LandType, PropertyType } from "@/lib/types/database";
 import type { PropertySort } from "@/lib/marketplace/search-sort";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 import { slugToLandType } from "@/lib/utils";
+import { zoningColors } from "@/lib/zoning";
 export const PROPERTY_SORTS: readonly PropertySort[] = ["newest", "price_asc", "price_desc", "price_per_rai_asc", "size_desc"];
 const ZONINGS = ["purple", "purple_light", "brown", "orange", "yellow", "green", "other"] as const;
 
@@ -174,7 +175,7 @@ export function propertyMatchesSearchFilters(property: Land, filters: PropertySe
   if (!atLeast(property.frontage_m, filters.min_frontage_m)) return false;
   if (!atLeast(propertyDepth(property), filters.min_depth_m)) return false;
   if (!atLeast(property.road_width_m, filters.min_road_width_m)) return false;
-  if (filters.zoning && property.zoning !== filters.zoning) return false;
+  if (filters.zoning && !zoningColors(property).some(color => color === filters.zoning)) return false;
   if (filters.eec != null && property.is_eec !== filters.eec) return false;
   if (filters.location_precision === "exact" && (property.location_precision !== "exact" || property.lat == null || property.lng == null)) return false;
 
@@ -302,7 +303,11 @@ export function propertySearchSqlClauses(
   range("l.frontage_m", filters.min_frontage_m);
   range(`coalesce(${v2Number("depth_max_m")}, ${v2Number("depth_min_m")})`, filters.min_depth_m);
   range(v2Number("road_width_m"), filters.min_road_width_m);
-  if (filters.zoning) clauses.push(`l.zoning::text = ${add(filters.zoning)}`);
+  if (filters.zoning) {
+    const color = add(filters.zoning);
+    // to_jsonb preserves reads before the migration adds the optional column.
+    clauses.push(`(case when to_jsonb(l)->'zoning_info' is null or to_jsonb(l)->'zoning_info' = 'null'::jsonb then l.zoning::text = ${color} else coalesce(to_jsonb(l)->'zoning_info'->'zones', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('color', ${color}::text)) end)`);
+  }
   if (filters.eec != null) clauses.push(`l.is_eec = ${add(filters.eec)}`);
 
   const seedOr = (clause: string) => seedSlugs.length ? `(${clause} or l.slug = any(${add([...seedSlugs])}::text[]))` : clause;

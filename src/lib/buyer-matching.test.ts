@@ -33,7 +33,7 @@ test("extended criteria score reported zoning, EEC and frontage without treating
   assert.equal(matches[0].land.id, SEED_37_RAI_LAND.id);
   assert.equal(matches[0].score, 45);
   assert.equal(matches[0].requiresHumanApproval, true);
-  const unknown = rankBuyerMatches({ listing_id: SEED_101_KABIN_LAND.slug, zoning: "purple" }, SEED_ACTIVE_LISTINGS)[0];
+  const unknown = rankBuyerMatches({ listing_id: SEED_101_KABIN_LAND.slug, zoning: "purple" }, [{ ...SEED_101_KABIN_LAND, zoning: null, zoning_info: null }])[0];
   assert.equal(unknown.score, 100);
   assert.ok(unknown.missingData.some((reason) => reason.includes("ผังสี")));
   assert.ok(!unknown.reasons.some((reason) => reason.includes("ผังสี")));
