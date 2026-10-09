@@ -70,7 +70,7 @@ const dbModule = { getSql: () => sql, getSqlIfConfigured: () => sql };
 const marketplace = load('../src/lib/neon/marketplace.ts', {
   '@/lib/neon/server': dbModule, '@/lib/marketplace/buyer-demand-workflow': buyerWorkflow,
   '@/lib/neon/queries': {}, '@/lib/marketplace/matching': matching,
-  '@/lib/marketplace/listing-workflow': workflow, '@/lib/marketplace/verification': verification,
+  '@/lib/marketplace/listing-workflow': workflow, '@/lib/marketplace/verification': verification, '@/lib/zoning': zoning,
 });
 const drafts = load('../src/app/api/property-submissions/[id]/route.ts', {
   'next/server': nextServer, '@/lib/marketplace/schemas': schemas, '@/lib/neon/marketplace': marketplace,
@@ -97,7 +97,7 @@ const province = (await query("insert into provinces(name_th,name_en,slug) value
 await query('insert into site_stats(id) values(1)');
 const created = await marketplace.createPropertyDraft();
 const context = { params: Promise.resolve({ id: created.id }) };
-const info = zoning.ownerZoningSchema.parse({ zones: [{ color: 'green' }, { color: 'yellow', type_code: 'ย.1' }, { color: null }], status: 'owner_reported', source: "UAT O'Brien" });
+const info = zoning.ownerZoningSchema.parse({ zones: [{ color: 'green' }, { color: 'yellow', type_code: 'ย.1' }, { color: null }], status: 'owner_reported', source: "UAT O'Brien", evidence_url: 'https://owner.example/private-proof' });
 const body = { token: created.token, property_type: 'land', title: 'UAT zoning', province_id: province, area_rai: 2,
   sale_price: 2000000, contact_name: 'UAT owner', contact_phone: '0812345678', zoning_info: info };
 const patch = payload => ({ json: async () => payload });
@@ -115,8 +115,13 @@ assert.equal((await drafts.PATCH(patch(body), context)).status, 404); pass('subm
 assert.ok(await marketplace.reviewSubmission(created.id, 'approve'));
 const landId = await marketplace.publishSubmission(created.id); assert.ok(landId);
 let land = (await query('select * from lands where id=$1', [landId]))[0];
-assert.deepEqual(land.zoning_info, info); assert.equal(land.zoning, 'green');
-pass('existing approve/publish pipeline retains canonical zoning in lands');
+const publicInfo = { ...info, source: '', evidence_url: '' };
+assert.deepEqual(land.zoning_info, publicInfo); assert.equal(land.zoning, 'green');
+pass('existing approve/publish pipeline retains canonical zoning in lands, minus owner source/evidence');
+const leaks = text => /Brien|owner.example|private-proof/.test(text);
+assert.ok(!leaks(JSON.stringify(land.zoning_info)) && !leaks(renderToStaticMarkup(badges({ land, detail: true }))) && !leaks(JSON.stringify(listingMetadata(land))));
+assert.deepEqual((await query('select zoning_info from property_submissions where id=$1', [created.id]))[0].zoning_info, info);
+pass('owner source/evidence never reach lands, badges or metadata; submission keeps the owner original');
 for (const color of ['green','yellow']) {
   const params = []; const clauses = search.propertySearchSqlClauses({ zoning: color }, v => { params.push(v); return `$${params.length}`; });
   assert.ok((await query(`select l.id from lands l join provinces p on p.id=l.province_id where ${clauses.join(' and ')}`, params)).some(row => row.id === landId));
@@ -148,10 +153,18 @@ assert.equal((await admin.PATCH(request(token), adminContext)).status, 200);
 assert.equal(invalidated, 1);
 land = (await query('select * from lands where id=$1', [landId]))[0];
 assert.deepEqual(land.zoning_info, reviewed); assert.equal(land.verification_status, 'pending');
-assert.deepEqual((await marketplace.getPropertyDraft(created.id, created.token)).zoning_info, reviewed);
-pass('admin save/reload synchronizes linked submission, invalidates pages, rejects stale/cross-origin writes and resets generic Verified');
+assert.deepEqual((await query('select zoning_info from property_submissions where id=$1', [created.id]))[0].zoning_info, info, 'admin save must not overwrite the owner original');
+pass('admin save/reload changes lands only, invalidates pages, rejects stale/cross-origin writes and resets generic Verified');
 assert.ok(renderToStaticMarkup(badges({ land, detail: true })).includes('มีเอกสารยืนยัน'));
 assert.ok(listingMetadata(land).description.includes('มีเอกสารยืนยัน')); pass('reviewed zoning stays consistent after reload across detail and metadata');
+const managed = (await queries.getZoningManagementListings()).find(row => row.id === landId);
+assert.deepEqual(managed.owner_submitted_zoning, info); assert.deepEqual(managed.zoning_info, reviewed);
+const applied = { ...reviewed, status: 'owner_reported', checked_at: '', source: managed.owner_submitted_zoning.source, evidence_url: managed.owner_submitted_zoning.evidence_url };
+const applyRequest = { nextUrl: new URL('http://127.0.0.1:3100/api/admin/zoning'), headers: new Headers({ origin: 'http://127.0.0.1:3100' }), json: async () => ({ zoning_info: applied, expected_updated_at: managed.updated_at }) };
+assert.equal((await admin.PATCH(applyRequest, adminContext)).status, 200);
+land = (await query('select * from lands where id=$1', [landId]))[0];
+assert.deepEqual(land.zoning_info, applied); assert.ok(renderToStaticMarkup(badges({ land, detail: true })).includes('owner.example/private-proof'));
+pass('getZoningManagementListings exposes the owner original; it goes public only when the admin saves it');
 const detailHtml = row => renderToStaticMarkup(badges({ land: row, detail: true }));
 const zoningDimension = row => verification.verificationDimensions({ ...row, price: null, title_deed_on_file: false }).find(d => d.key === 'zoning');
 for (const [label, zoningInfo] of [['omitted', undefined], ['empty form default', zoning.zoningSchema.parse({})]]) {

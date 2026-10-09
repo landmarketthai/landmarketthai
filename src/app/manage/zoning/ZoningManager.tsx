@@ -10,6 +10,7 @@ import { resolveListingPresentation } from "@/lib/seed-listings";
 
 function Editor({ land }: { land: Land }) {
   const [info, setInfo] = useState(getZoning(land));
+  const owner = land.owner_submitted_zoning ? zoningSchema.safeParse(land.owner_submitted_zoning).data : undefined;
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const parsed = zoningSchema.safeParse(info);
@@ -25,7 +26,13 @@ function Editor({ land }: { land: Land }) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "บันทึกไม่สำเร็จ"); setSaving(false); }
   }
   return <div className="space-y-5">
-    <ZoningFields initial={info} onChange={setInfo} review />
+    {owner && <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm" aria-label="ข้อมูลจากผู้ประกาศ">
+      <h2 className="font-bold">ข้อมูลที่ผู้ประกาศส่งมา (ยังไม่ผ่านการตรวจ ไม่แสดงสาธารณะ)</h2>
+      <dl className="mt-2 space-y-1"><div><dt className="inline font-medium">แหล่งข้อมูล: </dt><dd className="inline break-all">{owner.source || "-"}</dd></div>
+        <div><dt className="inline font-medium">ลิงก์หลักฐาน (ข้อความเท่านั้น อย่าเปิดจนกว่าจะตรวจ): </dt><dd className="inline break-all">{owner.evidence_url || "-"}</dd></div></dl>
+      <button type="button" className="btn-outline mt-3" disabled={!owner.source && !owner.evidence_url} onClick={() => setInfo({ ...info, source: owner.source || info.source, evidence_url: owner.evidence_url || info.evidence_url })}>คัดลอกลงฟอร์ม (จะเผยแพร่เมื่อกดบันทึก)</button>
+    </section>}
+    <ZoningFields value={info} onChange={setInfo} review />
     {!parsed.success && <p role="alert" className="text-sm text-red-700">{parsed.error.issues.map(issue => issue.message).join(" · ")}</p>}
     {parsed.success && <>
       <h2 className="font-bold">ตัวอย่างหน้ารายละเอียด</h2><ZoningBadges land={preview} detail />

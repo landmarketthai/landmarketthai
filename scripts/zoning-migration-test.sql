@@ -7,7 +7,7 @@ CREATE TABLE public.lands (
   verification_status text NOT NULL DEFAULT 'pending',
   updated_at timestamptz DEFAULT now(), deleted_at timestamptz
 );
-CREATE TABLE public.property_submissions (id integer PRIMARY KEY, zoning text, verification_status text DEFAULT 'pending');
+CREATE TABLE public.property_submissions (id integer PRIMARY KEY, zoning text, verification_status text DEFAULT 'pending', updated_at timestamptz DEFAULT now());
 INSERT INTO public.lands (slug,zoning,verification_status) VALUES
   ('legacy-purple','purple','verified'),
   ('unknown',null,'pending'), ('101-rai-kabin-buri',null,'pending');
@@ -41,8 +41,7 @@ BEGIN
   BEGIN
     UPDATE public.lands SET zoning = 'purple' WHERE slug = 'unknown';
     RAISE EXCEPTION 'legacy-only edit unexpectedly allowed';
-  EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM = 'legacy-only edit unexpectedly allowed' THEN RAISE; END IF;
+  EXCEPTION WHEN SQLSTATE 'LZ409' THEN NULL;
   END;
 
   UPDATE public.lands SET verification_status = 'verified' WHERE slug = 'unknown';
@@ -54,18 +53,76 @@ BEGIN
   ASSERT (SELECT zoning_info->>'status' = 'document_verified' FROM public.lands WHERE slug = 'unknown'), 'valid evidence accepted';
 END;
 $test$;
+-- B1: legacy-only writes (stale bundle / pre-zoning_info server) on both tables.
+INSERT INTO public.lands (slug) VALUES ('b1-null'), ('b1-empty'), ('b1-multi'), ('b1-doc');
+INSERT INTO public.property_submissions (id) VALUES (1), (2), (3), (4);
+UPDATE public.lands SET zoning_info = '{"zones":[],"status":"unknown","plan_name":"","source":"","checked_at":"","evidence_url":""}' WHERE slug = 'b1-empty';
+UPDATE public.property_submissions SET zoning_info = '{"zones":[],"status":"unknown","plan_name":"","source":"","checked_at":"","evidence_url":""}' WHERE id = 2;
+UPDATE public.lands SET zoning_info = '{"zones":[{"color":"green","type_code":"","type_name":""},{"color":"yellow","type_code":"ย.1","type_name":""}],"status":"owner_reported","plan_name":"","source":"s","checked_at":"","evidence_url":""}' WHERE slug = 'b1-multi';
+UPDATE public.property_submissions SET zoning_info = '{"zones":[{"color":"green","type_code":"","type_name":""},{"color":"yellow","type_code":"ย.1","type_name":""}],"status":"owner_reported","plan_name":"","source":"s","checked_at":"","evidence_url":""}' WHERE id = 3;
+UPDATE public.lands SET zoning_info = '{"zones":[{"color":"green","type_code":"","type_name":""}],"status":"document_verified","plan_name":"","source":"doc","checked_at":"2026-10-08","evidence_url":"https://example.com/e.pdf"}', verification_status = 'verified' WHERE slug = 'b1-doc';
+UPDATE public.property_submissions SET zoning_info = '{"zones":[{"color":"green","type_code":"","type_name":""}],"status":"document_verified","plan_name":"","source":"doc","checked_at":"2026-10-08","evidence_url":"https://example.com/e.pdf"}' WHERE id = 4;
+
+DO $test$
+DECLARE t text; k text; keys text[]; before jsonb; after jsonb; code text; canon jsonb;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['lands','property_submissions'] LOOP
+    keys := CASE t WHEN 'lands' THEN ARRAY['slug=''b1-null''','slug=''b1-empty''','slug=''b1-multi''','slug=''b1-doc'''] ELSE ARRAY['id=1','id=2','id=3','id=4'] END;
+    -- NULL info + legacy write (old-server shape: no zoning_info in SET) converts, status unknown.
+    EXECUTE format('UPDATE public.%s SET zoning = %L, updated_at = now() WHERE %s', t, 'purple', keys[1]) ;
+    EXECUTE format('SELECT zoning_info FROM public.%s WHERE %s', t, keys[1]) INTO after;
+    canon := '{"zones":[{"color":"purple","type_code":"","type_name":""}],"status":"unknown","plan_name":"","source":"","checked_at":"","evidence_url":""}';
+    ASSERT after = canon, t || ': NULL info converted to canonical unknown';
+    -- converted row stays convertible; legacy -> NULL clears the colour
+    EXECUTE format('UPDATE public.%s SET zoning = %L WHERE %s', t, 'brown', keys[1]);
+    EXECUTE format('SELECT zoning_info #>> %L FROM public.%s WHERE %s', '{zones,0,color}', t, keys[1]) INTO k;
+    ASSERT k = 'brown', t || ': converted row re-converts';
+    EXECUTE format('UPDATE public.%s SET zoning = NULL WHERE %s', t, keys[1]);
+    EXECUTE format('SELECT jsonb_array_length(zoning_info->%L) = 0 AND zoning IS NULL FROM public.%s WHERE %s', 'zones', t, keys[1]) INTO k;
+    ASSERT k::boolean, t || ': legacy NULL on convertible info clears zones';
+    -- legacy NULL on NULL info is a no-op
+    EXECUTE format('UPDATE public.%s SET zoning_info = NULL, zoning = NULL WHERE %s', t, keys[1]);
+    EXECUTE format('UPDATE public.%s SET zoning = NULL WHERE %s', t, keys[1]);
+    EXECUTE format('SELECT zoning_info IS NULL FROM public.%s WHERE %s', t, keys[1]) INTO k;
+    ASSERT k::boolean, t || ': NULL -> NULL fine';
+    -- empty info + legacy write converts
+    EXECUTE format('UPDATE public.%s SET zoning = %L, updated_at = now() WHERE %s', t, 'orange', keys[2]);
+    EXECUTE format('SELECT zoning_info FROM public.%s WHERE %s', t, keys[2]) INTO after;
+    ASSERT after = jsonb_set(canon, '{zones,0,color}', '"orange"'), t || ': empty info converted';
+    -- structured multi-colour: legacy change raises LZ409, row unchanged
+    FOR k IN SELECT unnest(ARRAY[keys[3], keys[4]]) LOOP
+      EXECUTE format('SELECT to_jsonb(x) FROM public.%s x WHERE %s', t, k) INTO before;
+      code := NULL;
+      BEGIN
+        EXECUTE format('UPDATE public.%s SET zoning = %L, updated_at = now() WHERE %s', t, 'purple', k);
+      EXCEPTION WHEN OTHERS THEN code := SQLSTATE;
+      END;
+      ASSERT code = 'LZ409', t || ' ' || k || ': structured legacy write raises LZ409, got ' || coalesce(code, 'none');
+      EXECUTE format('SELECT to_jsonb(x) FROM public.%s x WHERE %s', t, k) INTO after;
+      ASSERT after = before, t || ' ' || k || ': row unchanged (evidence intact)';
+      -- same colour as derived first colour is not a change
+      EXECUTE format('UPDATE public.%s SET zoning = %L, updated_at = now() WHERE %s', t, 'green', k);
+      EXECUTE format('SELECT to_jsonb(x) FROM public.%s x WHERE %s', t, k) INTO after;
+      ASSERT (after - 'updated_at') = (before - 'updated_at'), t || ' ' || k || ': same-colour legacy write no change';
+    END LOOP;
+  END LOOP;
+  -- INSERT paths unaffected (legacy-only insert, and structured insert)
+  INSERT INTO public.lands (slug, zoning) VALUES ('b1-insert-legacy', 'green');
+  ASSERT (SELECT zoning_info IS NULL AND zoning = 'green' FROM public.lands WHERE slug = 'b1-insert-legacy'), 'legacy insert untouched';
+  INSERT INTO public.property_submissions (id, zoning_info) VALUES (5, '{"zones":[{"color":"yellow","type_code":"","type_name":""}],"status":"unknown","plan_name":"","source":"","checked_at":"","evidence_url":""}');
+  ASSERT (SELECT zoning = 'yellow' FROM public.property_submissions WHERE id = 5), 'structured insert derives colour';
+END;
+$test$;
+-- Admin-reviewed Kabin: re-applying the migration must skip with a NOTICE, not abort.
 UPDATE public.lands SET zoning_info = zoning_info || '{"status":"map_checked","source":"existing reviewed source","checked_at":"2026-10-08","evidence_url":"https://example.com/map"}'
 WHERE slug = '101-rai-kabin-buri';
--- Expected failure: the migration must preserve existing reviewed evidence.
-\set ON_ERROR_STOP off
 \ir ../neon/migrations/202610080001_zoning_info.sql
-\set ON_ERROR_STOP on
 DO $test$
 BEGIN
   ASSERT (SELECT zoning_info->>'status' = 'map_checked' AND zoning_info->>'source' = 'existing reviewed source' FROM public.lands WHERE slug = '101-rai-kabin-buri'), 'migration must not replace reviewed evidence';
 END;
 $test$;
--- Expected failure: a conflicting legacy color on Kabin Buri also stops the correction.
+-- Expected failure: legacy zoning with no structured facts is unknown territory and still stops the correction.
 UPDATE public.lands SET zoning_info = NULL, zoning = 'purple' WHERE slug = '101-rai-kabin-buri';
 \set ON_ERROR_STOP off
 \ir ../neon/migrations/202610080001_zoning_info.sql

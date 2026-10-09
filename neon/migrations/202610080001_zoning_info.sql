@@ -1,5 +1,7 @@
 -- Prepared only. Review and test on an isolated PostgreSQL database before production.
 BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
 
 ALTER TABLE public.lands ADD COLUMN IF NOT EXISTS zoning_info jsonb;
 ALTER TABLE public.property_submissions ADD COLUMN IF NOT EXISTS zoning_info jsonb;
@@ -52,10 +54,31 @@ ALTER TABLE public.property_submissions ADD CONSTRAINT submissions_zoning_info_v
 -- Keep the existing single-color column compatible; structured data is canonical.
 CREATE OR REPLACE FUNCTION public.sync_land_zoning_info()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $fn$
+DECLARE derived text; empty boolean;
 BEGIN
-  IF TG_OP = 'UPDATE' THEN
-    IF new.zoning IS DISTINCT FROM old.zoning AND new.zoning_info IS NOT DISTINCT FROM old.zoning_info THEN
-      RAISE EXCEPTION 'Update zoning_info together with zoning; legacy-only edits could erase multiple colors and evidence';
+  IF TG_OP = 'UPDATE' AND new.zoning IS DISTINCT FROM old.zoning AND new.zoning_info IS NOT DISTINCT FROM old.zoning_info THEN
+    -- Legacy-only write (stale browser bundle or pre-zoning_info server code).
+    derived := (SELECT value->>'color' FROM jsonb_array_elements(coalesce(old.zoning_info->'zones', '[]')) WITH ORDINALITY AS zones(value, position)
+      WHERE value->>'color' IS NOT NULL ORDER BY position LIMIT 1);
+    IF new.zoning::text IS DISTINCT FROM derived THEN
+      -- "Empty" = at most one colour-only zone, status unknown, no plan/source/evidence: a legacy value in structured clothing.
+      empty := old.zoning_info IS NULL OR (
+        old.zoning_info->>'status' = 'unknown'
+        AND old.zoning_info->>'plan_name' = '' AND old.zoning_info->>'source' = ''
+        AND old.zoning_info->>'checked_at' = '' AND old.zoning_info->>'evidence_url' = ''
+        AND jsonb_array_length(old.zoning_info->'zones') <= 1
+        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(old.zoning_info->'zones') AS z(value)
+          WHERE z.value->>'type_code' <> '' OR z.value->>'type_name' <> ''));
+      IF NOT empty THEN
+        RAISE EXCEPTION 'zoning conflict: legacy zoning edit would erase structured zoning_info; reload and edit zoning_info'
+          USING ERRCODE = 'LZ409';
+      END IF;
+      IF new.zoning IS NOT NULL THEN
+        new.zoning_info := jsonb_build_object('zones', jsonb_build_array(jsonb_build_object('color', new.zoning::text, 'type_code', '', 'type_name', '')),
+          'status', 'unknown', 'plan_name', '', 'source', '', 'checked_at', '', 'evidence_url', '');
+      ELSIF old.zoning_info IS NOT NULL THEN
+        new.zoning_info := jsonb_set(old.zoning_info, '{zones}', '[]');
+      END IF;
     END IF;
   END IF;
   IF new.zoning_info IS NOT NULL THEN
@@ -86,12 +109,15 @@ DO $fn$
 DECLARE correction jsonb := '{"zones":[{"color":"green","type_code":"","type_name":""}],"status":"owner_reported","plan_name":"","source":"พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ","checked_at":"","evidence_url":""}';
 BEGIN
   IF EXISTS (SELECT 1 FROM public.lands WHERE slug = '101-rai-kabin-buri'
-    AND deleted_at IS NULL AND zoning_info IS DISTINCT FROM correction
-    AND (zoning_info IS NOT NULL OR zoning IS NOT NULL)) THEN
-    RAISE EXCEPTION 'Kabin Buri has existing zoning facts; reconcile before applying this correction';
+    AND deleted_at IS NULL AND zoning_info IS NULL AND zoning IS NOT NULL) THEN
+    RAISE EXCEPTION 'Kabin Buri has legacy zoning without structured facts; reconcile before applying this correction';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.lands WHERE slug = '101-rai-kabin-buri'
+    AND deleted_at IS NULL AND zoning_info IS NOT NULL AND zoning_info IS DISTINCT FROM correction) THEN
+    RAISE NOTICE 'Kabin Buri zoning_info already set (correction applied or admin-reviewed); skipping';
   END IF;
   UPDATE public.lands SET zoning_info = correction, updated_at = now()
-  WHERE slug = '101-rai-kabin-buri' AND deleted_at IS NULL AND zoning_info IS DISTINCT FROM correction;
+  WHERE slug = '101-rai-kabin-buri' AND deleted_at IS NULL AND zoning_info IS NULL AND zoning IS NULL;
 END;
 $fn$;
 

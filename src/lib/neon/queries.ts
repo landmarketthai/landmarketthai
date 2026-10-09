@@ -246,11 +246,14 @@ export async function getPublicListings(opts?: {
 
 /** The driver parses timestamptz to ms; the zoning save compares in SQL, so carry full microseconds as the token. */
 export const ZONING_LISTINGS_SELECT = LAND_SELECT.replace("l.*,", `l.*,
-    to_char(l.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at_token,`);
+    to_char(l.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at_token,
+    (select s.zoning_info from property_submissions s where s.linked_land_id = l.id order by s.updated_at desc limit 1) as owner_submitted_zoning,`);
 
 export function normalizeZoningLand(row: unknown): Land {
-  const land = normalizeLand(row);
+  const base = normalizeLand(row);
   const token = (row as { updated_at_token?: unknown }).updated_at_token;
+  const owner = (row as { owner_submitted_zoning?: unknown }).owner_submitted_zoning;
+  const land = owner == null ? base : { ...base, owner_submitted_zoning: owner as Land["zoning_info"] };
   return typeof token === "string" && token ? { ...land, updated_at: token } : land;
 }
 

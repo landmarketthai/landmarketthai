@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getZoning, zoningSchema, zoningColors, zoningSummary, listingMetadataDescription, zoningFromForm, ZONING_NOTICE } from "@/lib/zoning";
+import { getZoning, zoningSchema, zoningColors, zoningSummary, listingMetadataDescription, zoningFromForm, publicOwnerZoning, ZONING_NOTICE } from "@/lib/zoning";
 import { draftSchema } from "@/lib/marketplace/schemas";
 import { SEED_101_KABIN_LAND, SEED_37_RAI_LAND } from "@/lib/seed-listings";
 import { matchesLandFilters } from "@/lib/land-search";
@@ -77,4 +77,12 @@ test("listing meta description never renders null/undefined area", () => {
   const none = listingMetadataDescription({ ...SEED_37_RAI_LAND, size_rai: null, usable_area_sqm: null });
   for (const d of [building, none]) assert.doesNotMatch(d, /null|undefined|\s{2,}/);
   assert.match(listingMetadataDescription(SEED_37_RAI_LAND), /36.91825 ไร่/);
+});
+
+test("publicOwnerZoning blanks owner source/evidence and never exceeds owner statuses", () => {
+  const owner = { zones: [{ color: "green" as const, type_code: "", type_name: "" }], status: "owner_reported" as const, plan_name: "p", source: "me", checked_at: "", evidence_url: "https://x.example/p" };
+  assert.deepEqual(publicOwnerZoning(owner), { ...owner, source: "", evidence_url: "" });
+  assert.equal(publicOwnerZoning(null), null);
+  assert.equal(publicOwnerZoning({ nonsense: 1 }), null);
+  assert.equal(publicOwnerZoning({ ...owner, status: "document_verified", checked_at: "2026-10-01" })?.status, "unknown");
 });

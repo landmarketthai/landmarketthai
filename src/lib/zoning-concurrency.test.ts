@@ -19,3 +19,8 @@ test("zoning editor token keeps microseconds that the driver would truncate to m
 test("updateLandZoning compares updated_at exactly against the token", () => {
   assert.match(mutations, /updated_at = \$2::timestamptz/);
 });
+
+test("admin zoning save never rewrites the owner's original submission", () => {
+  const fn = mutations.slice(mutations.indexOf("export async function updateLandZoning"));
+  assert.doesNotMatch(fn.slice(0, fn.indexOf("\n}\n")), /property_submissions/);
+});

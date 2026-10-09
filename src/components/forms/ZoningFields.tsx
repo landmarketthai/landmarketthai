@@ -25,7 +25,7 @@ export default function ZoningFields({ initial, value, onChange, review = false 
       {Object.entries(ZONING_STATUS_LABELS).filter(([value]) => review || value === "unknown" || value === "owner_reported").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select></label>
     {(["plan_name", "source", "checked_at", "evidence_url"] as const).map(field => <label key={field} className="block text-sm">
-      {{ plan_name: "ชื่อผัง", source: "แหล่งข้อมูล (จะแสดงสาธารณะ)", checked_at: "วันที่ตรวจข้อมูล", evidence_url: "ลิงก์แผนที่ / เอกสารยืนยัน (สาธารณะ)" }[field]}
+      {{ plan_name: "ชื่อผัง", source: review ? "แหล่งข้อมูล (จะแสดงสาธารณะ)" : "แหล่งข้อมูล (ทีมงานตรวจก่อนเผยแพร่)", checked_at: "วันที่ตรวจข้อมูล", evidence_url: review ? "ลิงก์แผนที่ / เอกสารยืนยัน (สาธารณะ)" : "ลิงก์แผนที่ / เอกสารยืนยัน (ทีมงานตรวจก่อนเผยแพร่)" }[field]}
       <input className="input mt-1" type={field === "checked_at" ? "date" : field === "evidence_url" ? "url" : "text"} maxLength={field === "evidence_url" ? 2000 : 500} value={info[field]} onChange={event => update({ ...info, [field]: event.target.value })} />
     </label>)}
     <p className="text-xs text-slate-600">{ZONING_NOTICE} {review ? "สถานะตรวจจากแผนที่หรือมีเอกสารยืนยันต้องระบุแหล่งข้อมูล วันที่ตรวจ และลิงก์หลักฐาน" : "หลักฐานที่ส่งเป็นข้อมูลจากผู้ประกาศ ทีมงานต้องตรวจสอบก่อนยกระดับสถานะ"}</p>

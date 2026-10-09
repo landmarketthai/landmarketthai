@@ -90,6 +90,8 @@ export interface Land {
   usable_area_sqm?: number | null;
   zoning: ZoningColor | null;
   zoning_info?: import("@/lib/zoning").ZoningInfo | null;
+  /** Admin editor only: the owner's original, unreviewed submission value. Never selected by public queries. */
+  owner_submitted_zoning?: import("@/lib/zoning").ZoningInfo | null;
   frontage_m: number | null;
   depth_min_m: number | null;
   depth_max_m: number | null;

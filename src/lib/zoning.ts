@@ -35,6 +35,14 @@ export const ownerZoningSchema = zoningSchema.refine(
   info => info.status === "unknown" || info.status === "owner_reported",
   "ผู้ประกาศส่งข้อมูลได้เฉพาะสถานะยังไม่ทราบหรือผู้ประกาศแจ้ง ต้องให้ผู้ดูแลตรวจหลักฐานก่อนยืนยัน",
 );
+/** Owner-supplied zoning as it may appear on the public row: provenance (source/evidence) is admin-reviewed only. */
+export function publicOwnerZoning(info: unknown): ZoningInfo | null {
+  if (info == null) return null;
+  const parsed = zoningSchema.safeParse(info);
+  if (!parsed.success) return null;
+  const owner = parsed.data.status === "owner_reported" ? "owner_reported" : "unknown";
+  return { ...parsed.data, status: owner, source: "", evidence_url: "" };
+}
 export type ZonedLand = Pick<Land, "zoning" | "zoning_info">;
 
 export function getZoning(land: ZonedLand): ZoningInfo {

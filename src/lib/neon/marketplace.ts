@@ -182,7 +182,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
        location_precision = case when $10::numeric is not null and $11::numeric is not null then 'exact' else 'approx' end,
        area_rai = $12, area_ngan = $13, area_sqwa = $14, total_rai = $15,
        frontage_m = $16, depth_min_m = $17, depth_max_m = $18, road_name = $19, road_width_m = $20,
-       zoning = $21, sale_price = $22, price_per_rai = $23,
+       zoning = case when $32::boolean then $21 else zoning end, sale_price = $22, price_per_rai = $23,
        description = $24, contact_name = $25, contact_phone = case when $29::boolean then $26 else contact_phone end,
        contact_line = $27, usable_area_sqm = $28, updated_at = now(),
        zoning_info = case when $30::boolean then $31::jsonb else zoning_info end
@@ -199,6 +199,7 @@ export async function savePropertyDraft(id: string, token: string, input: Submis
       input.usable_area_sqm ?? null,
       input.contact_phone !== undefined,
       input.zoning_info !== undefined, JSON.stringify(input.zoning_info ?? null),
+      input.zoning !== undefined,
     ],
   );
   return rows[0] ? normalizeSubmission(rows[0]) : null;
@@ -373,7 +374,8 @@ export async function publishSubmission(id: string): Promise<string | null> {
       str(source.zoning), num(source.frontage_m), num(source.depth_min_m), num(source.depth_max_m), str(source.road_name), num(source.road_width_m),
       num(source.price_per_rai), num(source.sale_price), str(source.description), num(source.lat), num(source.lng),
       source.location_precision === "exact" ? "exact" : "approx", str(source.owner_lead_id), num(source.usable_area_sqm),
-      source.zoning_info == null ? null : JSON.stringify(source.zoning_info),
+      // Owner source/evidence stay private on property_submissions until an admin applies them via /manage/zoning.
+      (info => info ? JSON.stringify(info) : null)((await import("@/lib/zoning")).publicOwnerZoning(source.zoning_info)),
     ],
   );
   const landId = rows[0]?.id ? String(rows[0].id) : null;
