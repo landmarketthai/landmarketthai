@@ -65,6 +65,14 @@ function leadsRoute() {
   return { state, POST: route.POST };
 }
 
+test("sell wizard forwards the live Turnstile token and resets hook/widget together", () => {
+  const wizard = readFileSync(new URL("../../components/forms/SellWizard.tsx", import.meta.url), "utf8");
+  assert.match(wizard, /headers:\s*\{\s*"content-type":\s*"application\/json",\s*\.\.\.turnstile\.headers\(\)/);
+  assert.match(wizard, /turnstile\.reset\(\)/);
+  assert.match(wizard, /<TurnstileWidget[^>]*resetKey=\{turnstile\.resetKey\}/);
+  assert.doesNotMatch(wizard, /cf-turnstile-response/, "must not depend on an injected hidden input");
+});
+
 test("leads: over-limit clients get 429 + Retry-After before any DB write or n8n webhook", async () => {
   const { state, POST } = leadsRoute();
   assert.equal((await POST(post(validLead))).status, 200);

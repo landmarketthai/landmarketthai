@@ -489,12 +489,10 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       if (failedUploads.current.size > 0 || uploads.some((ok) => !ok)) throw new Error("มีไฟล์อัปโหลดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
       await saveQueue.current;
       if (!(await saveDraft(true))) throw new Error("บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
-      // Turnstile token comes from the widget's hidden input; read via globalThis so this handler needs no extra scope (tests run it in isolation).
-      const humanToken = (globalThis as { document?: Document }).document?.querySelector<HTMLInputElement>('[name="cf-turnstile-response"]')?.value;
       const response = await fetch(`/api/property-submissions/${draftId}/submit`, {
-        method: "POST", headers: { "content-type": "application/json", ...(humanToken ? { "x-turnstile-token": humanToken } : {}) }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
+        method: "POST", headers: { "content-type": "application/json", ...turnstile.headers() }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
       });
-      (globalThis as { turnstile?: { reset: () => void } }).turnstile?.reset();
+      turnstile.reset();
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "ส่งข้อมูลไม่สำเร็จ");
       setSubmitted(true);
@@ -689,7 +687,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
             </div>
           )}
           {saveState === "error" && saveError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>}
-          <TurnstileWidget onToken={turnstile.onToken} action="property-submit" />
+          <TurnstileWidget onToken={turnstile.onToken} action="property-submit" resetKey={turnstile.resetKey} />
           <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button type="button" onClick={() => void saveDraft()} disabled={submitting} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold text-slate-500"><Save size={16}/>{saveState === "saving" ? "กำลังบันทึก..." : "บันทึกแบบร่าง"}</button>
             <button type="button" onClick={() => void submit()} disabled={submitting || (turnstile.enabled && !turnstile.token)} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "กำลังส่ง..." : "ส่งให้ทีมงานตรวจสอบ"} <Check size={17}/></button>

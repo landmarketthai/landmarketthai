@@ -1,9 +1,9 @@
 # Public Write Endpoint Hardening (operator runbook)
 
 Status: **NOT enabled in production until the operator completes the deploy steps below.**
-Code can ship dark: the DB limiter needs the migration, and human verification is off until
-`HUMAN_VERIFICATION_REQUIRED=true`. Nothing in this document has been applied to Vercel, Neon,
-Cloudflare or DigitalOcean. Audit basis: HEAD 3d49c2b plus uncommitted workstream A/B changes.
+The app limiter is **not dark**: once new code is deployed it limits requests immediately, using a per-instance fallback until its Neon migration runs. Human verification remains off until `HUMAN_VERIFICATION_REQUIRED=true`.
+**Release blocker:** without enabled Turnstile (or effective upstream anti-bot protection), a botnet can exhaust a shared route cap and deny legitimate leads. Verify Preview with real site/secret keys and end-to-end form submits first; do not deploy this code to Production with an unprotected 300-leads-per-10-minute global ceiling.
+No production Neon migration, Vercel firewall change, or Cloudflare Turnstile activation was performed by this workstream. Audit basis: `fe057c8` plus follow-up tests and reviewed SellWizard token handling.
 
 ## 1. Threat model
 
