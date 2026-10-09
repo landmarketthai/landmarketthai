@@ -178,6 +178,9 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const savedForm = useRef(JSON.stringify(emptyForm));
   const storageId = useRef<string | null>(null);
   const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [initFailed, setInitFailed] = useState(false);
+  const credentials = useRef<{ id: string; token: string } | null>(null);
+  const creating = useRef<Promise<{ id: string; token: string }> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [consent, setConsent] = useState(false);
@@ -307,23 +310,22 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           setSaveState(JSON.stringify(next) === savedForm.current ? "saved" : "unsaved"); setLoading(false);
           return;
         }
+        // Definitively gone (404): drop the dead credentials so a later first edit starts a fresh draft.
+        localStorage.removeItem(DRAFT_STORAGE_KEY); localStorage.removeItem(localFormKey(parsed.id));
       } else if (saved) {
         const id = saved.match(/"id"\s*:\s*"([^"]+)"/)?.[1];
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         if (id) localStorage.removeItem(localFormKey(id));
       }
-      const response = await fetch("/api/property-submissions", { method: "POST" });
-      if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
-      const created = (await response.json()) as { id: string; token: string };
-      if (cancelled) return;
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
-      storageId.current = created.id;
+      // Viewing the page never creates a draft; ensureDraft() does that on the first intentional edit, save, upload or submit.
+      storageId.current = null;
       savedForm.current = JSON.stringify(emptyForm);
       savedPayload.current = null;
       formRef.current = emptyForm;
-      setFormState(emptyForm); setDraftId(created.id); setToken(created.token); setLoading(false);
+      setFormState(emptyForm); setLoading(false);
     }
-    void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setLoading(false); } });
+    setInitFailed(false);
+    void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setInitFailed(true); setLoading(false); } });
     return () => { cancelled = true; };
   }, [restoreAttempt]);
 
@@ -343,15 +345,36 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const payload = useMemo(() => draftPatch(form, derivedPricePerRai), [form, derivedPricePerRai]);
   const formSnapshot = JSON.stringify(form);
 
+  /** Creates the draft once, on first intentional use; concurrent callers share one POST and a failed create can be retried. */
+  function ensureDraft(): Promise<{ id: string; token: string }> {
+    const existing = credentials.current ?? (draftId && token ? { id: draftId, token } : null);
+    if (existing) return Promise.resolve(existing);
+    creating.current ??= (async () => {
+      const response = await fetch("/api/property-submissions", { method: "POST" });
+      if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้ ข้อมูลที่กรอกยังอยู่ในหน้านี้");
+      const created = (await response.json()) as { id: string; token: string };
+      if (!created?.id || !created.token) throw new Error("ไม่สามารถสร้างแบบร่างได้ ข้อมูลที่กรอกยังอยู่ในหน้านี้");
+      credentials.current = created;
+      storageId.current = created.id;
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
+        localStorage.setItem(localFormKey(created.id), JSON.stringify(formRef.current));
+      } catch { setError("เก็บข้อมูลในเครื่องไม่สำเร็จ กรุณาบันทึกแบบร่างก่อนปิดหน้านี้"); }
+      setDraftId(created.id); setToken(created.token);
+      return created;
+    })().finally(() => { creating.current = null; });
+    return creating.current;
+  }
+
   async function persist(body: string, snapshot: string): Promise<boolean> {
-    if (!draftId || !token) return false;
     let retryable = true;
     setSaveState("saving"); setSaveError(null);
     try {
-      const response = await fetch(`/api/property-submissions/${draftId}`, {
+      const target = draftId && token ? { id: draftId, token } : await ensureDraft();
+      const response = await fetch(`/api/property-submissions/${target.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, ...JSON.parse(body) }),
+        body: JSON.stringify({ token: target.token, ...JSON.parse(body) }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -384,6 +407,13 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   }
   const saveDraftRef = useRef(saveDraft);
   useEffect(() => { saveDraftRef.current = saveDraft; });
+
+  // No draft exists until the seller edits something; the first edit creates it, then normal autosave takes over.
+  useEffect(() => {
+    if (loading || submitting || submitted || draftId || initFailed || saveState === "error" || formSnapshot === savedForm.current) return;
+    const timer = setTimeout(() => void saveDraftRef.current(), AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [formSnapshot, loading, submitting, submitted, draftId, initFailed, saveState]);
 
   // Restored local edits are dirty. Re-check after saves so reverting an in-flight edit is saved too.
   useEffect(() => {
@@ -422,9 +452,9 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     }
   }
 
-  async function upload(file: File, mediaKind: "image" | "document") {
-    if (!draftId || !token) return false;
+  async function upload(file: File, mediaKind: "image" | "document", target: { id: string; token: string }) {
     try {
+      const { id: draftId, token } = target;
       const metadata = { token, media_kind: mediaKind, file_name: file.name, mime_type: file.type, size_bytes: file.size, doc_type: mediaKind === "document" ? "other" : undefined };
       const presign = await fetch(`/api/property-submissions/${draftId}/uploads/presign`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(metadata) });
       const signed = await presign.json();
@@ -443,12 +473,19 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   }
 
   function uploadBatch(files: File[], mediaKind: "image" | "document") {
-    if (frozen.current || !files.length || !draftId || !token) return;
+    if (frozen.current || !files.length) return;
     setError(null); setUploadBatchCount((count) => count + 1);
     const batch = (async () => {
-      const results = await Promise.all(files.map((file) => upload(file, mediaKind)));
+      let target: { id: string; token: string };
+      try { target = draftId && token ? { id: draftId, token } : await ensureDraft(); }
+      catch (reason) {
+        for (const file of files) failedUploads.current.set(file, mediaKind);
+        setError(reason instanceof Error ? reason.message : "สร้างแบบร่างไม่สำเร็จ");
+        return false;
+      }
+      const results = await Promise.all(files.map((file) => upload(file, mediaKind, target)));
       try {
-        const refreshed = await loadSellerDraft(draftId, token);
+        const refreshed = await loadSellerDraft(target.id, target.token);
         if (!refreshed) throw new Error("เปิดแบบร่างหลังอัปโหลดไม่สำเร็จ");
         setDraft((current) => ({ ...mergeDraft(current, refreshed), media: [...new Map([...(current?.media ?? []), ...(refreshed.media ?? [])].map((media) => [media.id, media])).values()] }));
         return results.every(Boolean);
@@ -485,7 +522,6 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sell-field="${first}"]`)?.focus());
       return;
     }
-    if (!draftId || !token) return;
     frozen.current = true;
     cancelMapsLookup();
     setSubmitting(true); setError(null);
@@ -494,13 +530,14 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       if (failedUploads.current.size > 0 || uploads.some((ok) => !ok)) throw new Error("มีไฟล์อัปโหลดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
       await saveQueue.current;
       if (!(await saveDraft(true))) throw new Error("บันทึกข้อมูลล่าสุดไม่สำเร็จ กรุณาตรวจสอบแล้วลองอีกครั้ง");
-      const response = await fetch(`/api/property-submissions/${draftId}/submit`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
+      const target = draftId && token ? { id: draftId, token } : await ensureDraft();
+      const response = await fetch(`/api/property-submissions/${target.id}/submit`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: target.token, consent_pdpa: true, buyer_demand_slug: buyerDemandSlug }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "ส่งข้อมูลไม่สำเร็จ");
       setSubmitted(true);
-      try { localStorage.removeItem(DRAFT_STORAGE_KEY); localStorage.removeItem(localFormKey(draftId)); }
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); localStorage.removeItem(localFormKey(target.id)); }
       catch { /* A later restore checks status and keeps this submission closed. */ }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "ส่งข้อมูลไม่สำเร็จ"); }
     finally { frozen.current = false; setSubmitting(false); }
@@ -526,7 +563,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   );
 
   if (loading) return <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">กำลังเปิดแบบร่าง...</div>;
-  if (!draftId && !submitted) return <div role="alert" className="rounded-3xl border border-red-200 bg-white p-8"><p>{error}</p><button type="button" className="btn-green mt-4" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>ลองเปิดแบบร่างอีกครั้ง</button></div>;
+  if (initFailed) return <div role="alert" className="rounded-3xl border border-red-200 bg-white p-8"><p>{error}</p><button type="button" className="btn-green mt-4" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>ลองเปิดแบบร่างอีกครั้ง</button></div>;
   if (submitted) return (
     <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-10 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white"><Check size={28} /></div>
@@ -537,7 +574,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
 
   const errorCount = Object.keys(fieldErrors).length;
   const pinFromLink = mapsStatus.state === "ok" && form.lat === mapsStatus.lat && form.lng === mapsStatus.lng;
-  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก";
+  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? (draftId ? "บันทึกแล้ว" : "แบบร่างจะถูกสร้างเมื่อเริ่มกรอก") : "ยังไม่ได้บันทึก";
 
   return (
     <div className="-mx-4 border-b border-slate-200 bg-white sm:mx-0 sm:rounded-3xl sm:border sm:shadow-sm">
