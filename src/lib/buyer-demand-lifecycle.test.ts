@@ -167,7 +167,7 @@ test("all admin API handlers return JSON 401 for no session and 403 for a forbid
 
 test("middleware preserves admin page login redirect while letting API handlers return JSON", () => {
   let redirects = 0;
-  const middleware = loadSource<{ default: (request: unknown) => string }>("../../middleware.ts", {
+  const middleware = loadSource<{ default: (request: unknown) => string }>("../middleware.ts", {
     "next/server": { NextResponse: { next: () => "next" } },
     "@/lib/auth/server": { auth: { middleware: () => () => { redirects++; return "login"; } } },
   });
