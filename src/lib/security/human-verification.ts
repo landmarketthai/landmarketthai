@@ -23,6 +23,11 @@ export function humanVerificationRequired(): boolean {
 }
 
 export async function verifyHuman(headers: Headers, remoteIp: string): Promise<HumanCheck> {
+  return verifyHumanToken(headers.get(HUMAN_TOKEN_HEADER), remoteIp);
+}
+
+/** Same check with an explicit token: Server Actions read it from FormData, not a header. */
+export async function verifyHumanToken(rawToken: unknown, remoteIp: string): Promise<HumanCheck> {
   if (!humanVerificationRequired()) return { ok: true };
 
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
@@ -34,7 +39,7 @@ export async function verifyHuman(headers: Headers, remoteIp: string): Promise<H
     return unavailable();
   }
 
-  const token = headers.get(HUMAN_TOKEN_HEADER)?.trim();
+  const token = typeof rawToken === "string" ? rawToken.trim() : "";
   if (!token || token.length > MAX_TOKEN_LENGTH) return failed();
 
   const payload: Record<string, string> = { secret, response: token, idempotency_key: crypto.randomUUID() };

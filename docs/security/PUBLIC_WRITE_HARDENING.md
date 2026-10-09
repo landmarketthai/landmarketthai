@@ -22,6 +22,7 @@ Body cap: "app" = enforced in code (413); "platform" = only Vercel's request bod
 | Route | Method | Auth | App rate limit (per client / global, window) | Human check | Body cap |
 |---|---|---|---|---|---|
 | /api/leads | POST | none (honeypot `_hp`) | 5 / 300, 10 min | Turnstile when enabled | app 10 KB |
+| Server Actions submitPartnerLead / submitOwnerLead / submitBuyerLead (`src/app/actions/leads.ts`, used by PartnerForm) | POST (Next action) | none (honeypot `_hp`) | shares the `leads` bucket: 5 / 300, 10 min | Turnstile when enabled (FormData `turnstile_token`) | Next.js Server Action default (1 MB) |
 | /api/buyer-requirements | POST | none | 6 / 300, 10 min | Turnstile when enabled | app 20 KB |
 | /api/property-submissions | POST | none (returns id + draft token) | 10 / 500, 1 h | none | n/a |
 | /api/property-submissions/[id] | GET | x-draft-token | none | none | n/a |
