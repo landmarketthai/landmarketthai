@@ -96,6 +96,13 @@ const pass = label => { checks.push(label); console.log(`PASS ${label}`); };
 const province = (await query("insert into provinces(name_th,name_en,slug) values('ทดสอบ','Test','zoning-uat') returning id"))[0].id;
 await query('insert into site_stats(id) values(1)');
 const created = await marketplace.createPropertyDraft();
+const preflight = readFileSync(new URL('./zoning-preflight.sql', import.meta.url), 'utf8').split('-- Catalog snapshot for the record (not a pass/fail check).');
+const nullKabin = await query(`BEGIN; UPDATE lands SET zoning_info = NULL, zoning = NULL WHERE slug = '101-rai-kabin-buri'; ${preflight[0]} ROLLBACK;`);
+assert.equal(nullKabin.find(row => row.check === 'Kabin Buri (101-rai-kabin-buri) state').result, 'PASS');
+const snapshot = (await query(preflight[1]))[0].zoning_catalog_snapshot;
+assert.equal(snapshot.submissions.length, 1);
+assert.equal(snapshot.submissions[0].zoning_info_present, false);
+pass('actual preflight accepts existing SQL NULL zoning and reports NULL submission facts absent');
 const context = { params: Promise.resolve({ id: created.id }) };
 const info = zoning.ownerZoningSchema.parse({ zones: [{ color: 'green' }, { color: 'yellow', type_code: 'ย.1' }, { color: null }], status: 'owner_reported', source: "UAT O'Brien", evidence_url: 'https://owner.example/private-proof' });
 const body = { token: created.token, property_type: 'land', title: 'UAT zoning', province_id: province, area_rai: 2,

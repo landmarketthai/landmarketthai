@@ -1,5 +1,6 @@
 -- Zoning migration PREFLIGHT. Read-only. Run BEFORE applying 202610080001_zoning_info.sql:
---   PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/zoning-preflight.sql
+--   PGOPTIONS='-c default_transaction_read_only=on' psql -X -v ON_ERROR_STOP=1 -f scripts/zoning-preflight.sql
+-- Use the operator's verified direct/unpooled libpq connection configuration (see neon/README.md).
 -- Any STOP row => do not migrate. REVIEW rows need a human decision. Run again after a failed
 -- migration to prove nothing changed. Save the output with the restore-point record.
 -- Result 1: PASS/STOP/REVIEW/INFO table. Result 2: catalog snapshot (JSON) for the record.
@@ -22,7 +23,7 @@ legacy AS (
     count(*) FILTER (WHERE zoning IS NOT NULL AND zoning::text NOT IN ('purple','purple_light','brown','orange','yellow','green','other'))
   FROM public.property_submissions),
 kb AS (SELECT count(*) AS n,
-    count(*) FILTER (WHERE zoning IS NULL AND to_jsonb(l)->'zoning_info' IS NULL) AS clean,
+    count(*) FILTER (WHERE zoning IS NULL AND coalesce(to_jsonb(l)->'zoning_info', 'null'::jsonb) = 'null'::jsonb) AS clean,
     count(*) FILTER (WHERE to_jsonb(l)->'zoning_info'->>'status' = 'owner_reported'
       AND to_jsonb(l)->'zoning_info'#>>'{zones,0,color}' = 'green' AND zoning::text = 'green') AS corrected,
     count(*) FILTER (WHERE to_jsonb(l)->'zoning_info' IS NOT NULL AND to_jsonb(l)->'zoning_info' <> 'null'::jsonb) AS has_info,
@@ -105,5 +106,5 @@ SELECT jsonb_build_object(
     'verification_status',l.verification_status,'deleted',l.deleted_at IS NOT NULL,
     'zoning_info',to_jsonb(l)->'zoning_info') ORDER BY l.slug) FROM public.lands l),
   'submissions', (SELECT jsonb_agg(jsonb_build_object('status',s.status,'verification_status',s.verification_status,
-    'zoning_info_present',to_jsonb(s)->'zoning_info' IS NOT NULL)) FROM public.property_submissions s)
+    'zoning_info_present',coalesce(to_jsonb(s)->'zoning_info', 'null'::jsonb) <> 'null'::jsonb)) FROM public.property_submissions s)
 ) AS zoning_catalog_snapshot;

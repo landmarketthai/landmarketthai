@@ -1,5 +1,6 @@
 -- Zoning migration POSTFLIGHT. Read-only. Run right after the migration, BEFORE deploying the app:
---   PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/zoning-postflight.sql
+--   PGOPTIONS='-c default_transaction_read_only=on' psql -X -v ON_ERROR_STOP=1 -f scripts/zoning-postflight.sql
+-- Use the operator's verified direct/unpooled libpq connection configuration (see neon/README.md).
 -- FAIL => go to the recovery matrix in neon/README.md. REVIEW => human decision. INFO => compare with preflight.
 -- Count expectations use the SAVED preflight state, never a +0/+1 tolerance:
 -- lands, live, submissions, legacy_zoning_submissions: unchanged.
