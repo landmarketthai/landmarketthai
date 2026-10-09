@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, FileText, ImagePlus, Link2, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
@@ -175,6 +175,10 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const savedForm = useRef(JSON.stringify(emptyForm));
   const storageId = useRef<string | null>(null);
   const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [createFailure, setCreateFailure] = useState<{ count: number; message: string } | null>(null);
+  const creatingDraft = useRef<Promise<boolean> | null>(null);
+  const pendingFiles = useRef<{ files: File[]; mediaKind: "image" | "document" }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [consent, setConsent] = useState(false);
@@ -271,7 +275,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      setLoading(true); setError(null);
+      setLoading(true); setError(null); setRestoreFailed(false);
       const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
       let parsed: { id: string; token: string } | null = null;
       if (saved) {
@@ -302,23 +306,22 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           setSaveState(JSON.stringify(next) === savedForm.current ? "saved" : "unsaved"); setLoading(false);
           return;
         }
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(localFormKey(parsed.id));
       } else if (saved) {
         const id = saved.match(/"id"\s*:\s*"([^"]+)"/)?.[1];
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         if (id) localStorage.removeItem(localFormKey(id));
       }
-      const response = await fetch("/api/property-submissions", { method: "POST" });
-      if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
-      const created = (await response.json()) as { id: string; token: string };
+      // Nothing to restore: show an empty form. The draft row is created on the first intentional edit, never on view.
       if (cancelled) return;
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
-      storageId.current = created.id;
+      storageId.current = null;
       savedForm.current = JSON.stringify(emptyForm);
       savedPayload.current = null;
       formRef.current = emptyForm;
-      setFormState(emptyForm); setDraftId(created.id); setToken(created.token); setLoading(false);
+      setFormState(emptyForm); setDraftId(null); setToken(null); setLoading(false);
     }
-    void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setLoading(false); } });
+    void init().catch((reason) => { if (!cancelled) { setError(reason instanceof Error ? reason.message : "เริ่มแบบฟอร์มไม่สำเร็จ"); setRestoreFailed(true); setLoading(false); } });
     return () => { cancelled = true; };
   }, [restoreAttempt]);
 
@@ -337,6 +340,40 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   // A half-typed phone number would fail server validation on every autosave; keep it local until valid.
   const payload = useMemo(() => draftPatch(form, derivedPricePerRai), [form, derivedPricePerRai]);
   const formSnapshot = JSON.stringify(form);
+
+  /** Creates the server draft once; concurrent callers share one POST. Edits made meanwhile stay in formRef. */
+  const ensureDraft = useCallback((): Promise<boolean> => {
+    if (creatingDraft.current) return creatingDraft.current;
+    const run = (async () => {
+      try {
+        const response = await fetch("/api/property-submissions", { method: "POST" });
+        if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้");
+        const created = (await response.json()) as { id: string; token: string };
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
+        storageId.current = created.id;
+        try { localStorage.setItem(localFormKey(created.id), JSON.stringify(formRef.current)); } catch { /* Autosave still sends the form. */ }
+        setCreateFailure(null); setDraftId(created.id); setToken(created.token);
+        return true;
+      } catch (reason) {
+        const message = reason instanceof Error ? reason.message : "ไม่สามารถสร้างแบบร่างได้";
+        setCreateFailure((current) => ({ count: (current?.count ?? 0) + 1, message }));
+        return false;
+      } finally { creatingDraft.current = null; }
+    })();
+    creatingDraft.current = run;
+    return run;
+  }, []);
+
+  const pristine = formSnapshot === JSON.stringify(emptyForm);
+  // The first edit (or a queued upload) creates the draft; failures keep the local form and retry.
+  useEffect(() => {
+    if (loading || submitted || draftId || restoreFailed || (pristine && !pendingFiles.current.length)) return;
+    const create = () => void ensureDraft();
+    if (!createFailure) { create(); return; }
+    const timer = setTimeout(create, 5000);
+    window.addEventListener("online", create);
+    return () => { clearTimeout(timer); window.removeEventListener("online", create); };
+  }, [loading, submitted, draftId, restoreFailed, pristine, createFailure, ensureDraft]);
 
   async function persist(body: string, snapshot: string): Promise<boolean> {
     if (!draftId || !token) return false;
@@ -456,6 +493,20 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     void batch.finally(() => { uploadBatches.current.delete(batch); setUploadBatchCount((count) => count - 1); });
   }
 
+  // Files picked before the draft exists are kept and uploaded as soon as it is created.
+  function addFiles(files: File[], mediaKind: "image" | "document") {
+    if (!files.length) return;
+    if (draftId && token) { uploadBatch(files, mediaKind); return; }
+    pendingFiles.current.push({ files, mediaKind });
+    setError(null);
+    void ensureDraft();
+  }
+  useEffect(() => {
+    if (!draftId || !token || !pendingFiles.current.length) return;
+    const queued = pendingFiles.current.splice(0);
+    for (const { files, mediaKind } of queued) uploadBatch(files, mediaKind);
+  });
+
   function validate(): Partial<Record<FieldKey, string>> {
     const errors: Partial<Record<FieldKey, string>> = {};
     if (!form.property_type) errors.property_type = "กรุณาเลือกประเภททรัพย์";
@@ -480,7 +531,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sell-field="${first}"]`)?.focus());
       return;
     }
-    if (!draftId || !token) return;
+    if (!draftId || !token) { setError("กำลังสร้างแบบร่าง กรุณากดส่งอีกครั้งในอีกสักครู่"); void ensureDraft(); return; }
     frozen.current = true;
     cancelMapsLookup();
     setSubmitting(true); setError(null);
@@ -522,7 +573,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   );
 
   if (loading) return <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">กำลังเปิดแบบร่าง...</div>;
-  if (!draftId && !submitted) return <div role="alert" className="rounded-3xl border border-red-200 bg-white p-8"><p>{error}</p><button type="button" className="btn-green mt-4" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>ลองเปิดแบบร่างอีกครั้ง</button></div>;
+  if (restoreFailed && !draftId && !submitted) return <div role="alert" className="rounded-3xl border border-red-200 bg-white p-8"><p>{error}</p><button type="button" className="btn-green mt-4" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>ลองเปิดแบบร่างอีกครั้ง</button></div>;
   if (submitted) return (
     <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-10 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white"><Check size={28} /></div>
@@ -533,7 +584,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
 
   const errorCount = Object.keys(fieldErrors).length;
   const pinFromLink = mapsStatus.state === "ok" && form.lat === mapsStatus.lat && form.lng === mapsStatus.lng;
-  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก";
+  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : !draftId && createFailure ? "สร้างแบบร่างไม่สำเร็จ — จะลองใหม่" : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก";
 
   return (
     <div className="-mx-4 border-b border-slate-200 bg-white sm:mx-0 sm:rounded-3xl sm:border sm:shadow-sm">
@@ -545,6 +596,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       </div>
 
       <fieldset disabled={submitting} className="min-w-0 divide-y divide-slate-100">
+        {!draftId && createFailure && <div role="alert" className="m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:mx-8">{createFailure.message} ข้อมูลที่กรอกยังอยู่ในหน้านี้ ระบบจะลองบันทึกใหม่อัตโนมัติ <button type="button" className="font-bold underline" onClick={() => void ensureDraft()}>ลองอีกครั้งตอนนี้</button></div>}
         {error && <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-8">{error}</div>}
 
         <section id="sell-type" className="scroll-mt-20 px-4 py-6 sm:p-8">
@@ -650,8 +702,8 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
         <section id="sell-media" className="scroll-mt-20 px-4 py-6 sm:p-8">
           {heading("media","ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private")}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "image"); e.target.value = ""; }}/></label>
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "document"); e.target.value = ""; }}/></label>
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={submitting} onChange={(e) => { addFiles(Array.from(e.target.files ?? []), "image"); e.target.value = ""; }}/></label>
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={submitting} onChange={(e) => { addFiles(Array.from(e.target.files ?? []), "document"); e.target.value = ""; }}/></label>
           </div>
           {uploading && <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><UploadCloud size={16}/>กำลังอัปโหลด...</div>}
           {failedUploads.current.size > 0 && <button type="button" className="mt-3 text-sm font-bold text-red-700" disabled={submitting || uploading} onClick={() => { for (const kind of ["image", "document"] as const) uploadBatch([...failedUploads.current].filter(([, mediaKind]) => mediaKind === kind).map(([file]) => file), kind); }}>ลองอัปโหลดไฟล์ที่ไม่สำเร็จอีกครั้ง</button>}
