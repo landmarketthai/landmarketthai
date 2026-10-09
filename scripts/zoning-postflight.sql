@@ -1,6 +1,13 @@
 -- Zoning migration POSTFLIGHT. Read-only. Run right after the migration, BEFORE deploying the app:
 --   PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/zoning-postflight.sql
 -- FAIL => go to the recovery matrix in neon/README.md. REVIEW => human decision. INFO => compare with preflight.
+-- Count expectations use the SAVED preflight state, never a +0/+1 tolerance:
+-- lands, live, submissions, legacy_zoning_submissions: unchanged.
+-- legacy_zoning_lands: exactly +1 only if this run corrects the one live Kabin Buri
+-- from zoning NULL AND zoning_info NULL; exactly +0 if it already has zoning_info
+-- (including a previous correction or admin-reviewed data, even with no color).
+-- Compare all other lands with the preflight catalog snapshot: offsetting unrelated
+-- changes can leave the global count correct and must not be accepted.
 WITH
 colchk(tbl, col) AS (VALUES ('lands','zoning_info'),('property_submissions','zoning_info')),
 colres AS (SELECT c.tbl || '.' || c.col AS name, i.data_type FROM colchk c
@@ -50,7 +57,7 @@ UNION ALL SELECT 7, 'active lands, owner_reported, with source/evidence_url text
 UNION ALL SELECT 8, 'zoning_info coverage', 'INFO',
   'lands_with_zoning_info=' || (SELECT count(*) FROM public.lands WHERE zoning_info IS NOT NULL)
   || ' submissions_with_zoning_info=' || (SELECT count(*) FROM public.property_submissions WHERE zoning_info IS NOT NULL)
-UNION ALL SELECT 50, 'row counts (compare with preflight: must be equal)', 'INFO',
+UNION ALL SELECT 50, 'row counts (saved preflight: legacy_zoning_lands +1 only for initial NULL-to-green correction, otherwise +0; all other counts unchanged)', 'INFO',
   'lands=' || (SELECT count(*) FROM public.lands) || ' live=' || (SELECT count(*) FROM public.lands WHERE deleted_at IS NULL)
   || ' legacy_zoning_lands=' || (SELECT count(*) FROM public.lands WHERE zoning IS NOT NULL)
   || ' submissions=' || (SELECT count(*) FROM public.property_submissions)

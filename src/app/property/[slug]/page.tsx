@@ -164,7 +164,7 @@ export default async function PropertyDetailPage({
           <div className="pt-4">
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">{property.location}</span>
-              <ZoningBadges land={land} detail />
+              <ZoningBadges land={land} />
               {isSoldOut && <span className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-bold text-red-700">ขายแล้ว</span>}
             </div>
             <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title}</h1>
@@ -215,6 +215,11 @@ export default async function PropertyDetailPage({
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section className="card p-4 sm:p-6" aria-labelledby="zoning-heading">
+              <h2 id="zoning-heading" className="mb-5 text-xl font-bold text-slate-900">ข้อมูลผังเมือง</h2>
+              <ZoningBadges land={land} detail />
             </section>
 
             <section>

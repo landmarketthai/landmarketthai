@@ -42,7 +42,7 @@ npm test
 npm run lint
 npx tsc --noEmit
 npm run build
-psql -v ON_ERROR_STOP=1 -d <disposable_database> -f scripts/zoning-migration-test.sql
+psql -v ON_ERROR_STOP=1 -d <disposable_database> -f scripts/zoning-migration-test.sql  # exact postflight count deltas and unrelated-change rejection
 # UAT: fresh database named zoning_uat_*, on 127.0.0.1:55438 user zoning_test
 psql -v ON_ERROR_STOP=1 -d zoning_uat_run -f scripts/zoning-uat-fixture.sql
 ZONING_TEST_DATABASE=zoning_uat_run node --import ./scripts/register-ts-paths.mjs --experimental-strip-types scripts/zoning-uat.mjs
@@ -62,7 +62,11 @@ All SQL below runs from the repo root with the production `DATABASE_URL` from yo
    - `REVIEW` rows (zoning_info already exists, Kabin Buri has a different `zoning_info`, other triggers) need a human decision. If zoning_info already exists, skip to step 3.
    - Note the `INFO` counts.
 2. **Apply.** `psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f neon/migrations/202610080001_zoning_info.sql`. It is one `BEGIN`/`COMMIT` with `lock_timeout 5s` / `statement_timeout 60s`; any error rolls everything back. After a failure rerun step 1: the result must equal the earlier run (no `zoning_info` column). Retry only after the cause is understood (usually a lock timeout: wait for the blocking transaction).
-3. **Postflight (read-only).** `PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/zoning-postflight.sql`. Required: no `FAIL` row (an SQL error also counts as FAIL). `REVIEW` rows need a person to look. Compare the `INFO` row counts with preflight: `lands`, `live` and legacy counts must be identical; only Kabin Buri's `verification_status` may move to `pending`.
+3. **Postflight (read-only).** `PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/zoning-postflight.sql`. Required: no `FAIL` row (an SQL error also counts as FAIL). `REVIEW` rows need a person to look. Compare with the **saved preflight for this run**:
+   - `lands`, `live`, `submissions`, and `legacy_zoning_submissions` must be identical.
+   - On the initial correction, when the one live Kabin Buri row had both `zoning` and `zoning_info` NULL (or the column was absent), `legacy_zoning_lands` must increase by **exactly 1**: the trigger derives legacy `green` from the correction. Only that row may change; its `verification_status` becomes `pending`.
+   - On a rerun or post-admin check where Kabin Buri already had any `zoning_info`, including the earlier correction or admin-reviewed data, `legacy_zoning_lands` must be **unchanged** against that run's preflight. This also applies if an admin cleared its zones and legacy zoning is now NULL. The migration preserves its data and verification status.
+   - Choose the exact expected delta from the recorded preflight state; never accept either +0 or +1 as a tolerance or infer the baseline from postflight. Compare every other land's zoning and verification state with the saved preflight catalog snapshot as well: unrelated or offsetting changes are a failed comparison even when global counts match. If intervening writes occurred, reconcile them and capture a fresh baseline; do not attribute them to the correction.
 4. **Deploy the app** (merge `develop` to `main` / Vercel production). The old app keeps working against the migrated DB until then.
 5. **Smoke tests.** `BASE_URL=https://<domain> [SMOKE_SLUG=...] [SMOKE_FORBIDDEN_TEXT='owner source text|evidence url'] node scripts/zoning-smoke.mjs` (read-only GETs: home, listing detail, search API, unauthenticated `/manage/zoning`). Then, manually: an **authorised admin signs in with real Google OAuth and saves zoning** on `/manage/zoning`, publishes a draft with and without zoning, and confirms the public page shows no owner source/evidence. The smoke script cannot do this.
    - `node scripts/zoning-smoke.mjs --self-test` only checks the script's own assertions.

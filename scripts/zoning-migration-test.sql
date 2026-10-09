@@ -5,14 +5,48 @@ CREATE TABLE public.lands (
   id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug text UNIQUE NOT NULL, zoning zoning_enum,
   verification_status text NOT NULL DEFAULT 'pending',
-  updated_at timestamptz DEFAULT now(), deleted_at timestamptz
+  updated_at timestamptz DEFAULT now(), deleted_at timestamptz, status text DEFAULT 'active'
 );
 CREATE TABLE public.property_submissions (id integer PRIMARY KEY, zoning text, verification_status text DEFAULT 'pending', updated_at timestamptz DEFAULT now());
 INSERT INTO public.lands (slug,zoning,verification_status) VALUES
   ('legacy-purple','purple','verified'),
-  ('unknown',null,'pending'), ('101-rai-kabin-buri',null,'pending');
+  ('unknown',null,'pending'), ('count-unknown',null,'pending'), ('101-rai-kabin-buri',null,'pending');
+
+-- The postflight comparison is exact and based on this run's saved preflight.
+CREATE TEMP VIEW zoning_counts AS SELECT
+  (SELECT count(*) FROM public.lands) AS lands,
+  (SELECT count(*) FROM public.lands WHERE deleted_at IS NULL) AS live,
+  (SELECT count(*) FROM public.lands WHERE zoning IS NOT NULL) AS legacy_zoning_lands,
+  (SELECT count(*) FROM public.property_submissions) AS submissions,
+  (SELECT count(*) FROM public.property_submissions WHERE zoning IS NOT NULL) AS legacy_zoning_submissions,
+  (SELECT jsonb_agg(to_jsonb(l) || jsonb_build_object('zoning_info', to_jsonb(l)->'zoning_info') ORDER BY id)
+    FROM public.lands l WHERE slug <> '101-rai-kabin-buri') AS other_lands;
+CREATE TEMP TABLE zoning_baseline AS SELECT * FROM zoning_counts;
+CREATE FUNCTION pg_temp.zoning_counts_match(delta integer) RETURNS boolean LANGUAGE sql AS $test$
+  SELECT c.lands = b.lands AND c.live = b.live
+    AND c.legacy_zoning_lands = b.legacy_zoning_lands + delta
+    AND c.submissions = b.submissions AND c.legacy_zoning_submissions = b.legacy_zoning_submissions
+    AND c.other_lands IS NOT DISTINCT FROM b.other_lands
+  FROM zoning_counts c CROSS JOIN zoning_baseline b;
+$test$;
+
 \ir ../neon/migrations/202610080001_zoning_info.sql
+DO $test$
+BEGIN
+  ASSERT pg_temp.zoning_counts_match(1), 'initial correction: exactly +1 legacy land, all unrelated data unchanged';
+  ASSERT NOT pg_temp.zoning_counts_match(0), 'initial correction must not accept unchanged legacy count';
+END;
+$test$;
+\ir zoning-postflight.sql
+TRUNCATE zoning_baseline;
+INSERT INTO zoning_baseline SELECT * FROM zoning_counts;
 \ir ../neon/migrations/202610080001_zoning_info.sql
+DO $test$
+BEGIN
+  ASSERT pg_temp.zoning_counts_match(0), 'rerun: all counts and unrelated data unchanged';
+  ASSERT NOT pg_temp.zoning_counts_match(1), 'rerun must not accept an extra legacy land';
+END;
+$test$;
 
 DO $test$
 DECLARE info jsonb; invalid jsonb;
@@ -116,10 +150,35 @@ $test$;
 -- Admin-reviewed Kabin: re-applying the migration must skip with a NOTICE, not abort.
 UPDATE public.lands SET zoning_info = zoning_info || '{"status":"map_checked","source":"existing reviewed source","checked_at":"2026-10-08","evidence_url":"https://example.com/map"}'
 WHERE slug = '101-rai-kabin-buri';
+TRUNCATE zoning_baseline;
+INSERT INTO zoning_baseline SELECT * FROM zoning_counts;
 \ir ../neon/migrations/202610080001_zoning_info.sql
 DO $test$
 BEGIN
   ASSERT (SELECT zoning_info->>'status' = 'map_checked' AND zoning_info->>'source' = 'existing reviewed source' FROM public.lands WHERE slug = '101-rai-kabin-buri'), 'migration must not replace reviewed evidence';
+  ASSERT pg_temp.zoning_counts_match(0), 'post-admin rerun: exact zero count delta';
+END;
+$test$;
+-- Admin can clear the color; an existing zoning_info still makes the rerun a no-op.
+UPDATE public.lands SET zoning_info = jsonb_set(zoning_info, '{zones}', '[]')
+WHERE slug = '101-rai-kabin-buri';
+UPDATE public.lands SET verification_status = 'verified' WHERE slug = '101-rai-kabin-buri';
+CREATE TEMP TABLE reviewed_kabin AS SELECT to_jsonb(l) AS row FROM public.lands l WHERE slug = '101-rai-kabin-buri';
+TRUNCATE zoning_baseline;
+INSERT INTO zoning_baseline SELECT * FROM zoning_counts;
+\ir ../neon/migrations/202610080001_zoning_info.sql
+\ir zoning-postflight.sql
+DO $test$
+BEGIN
+  ASSERT (SELECT zoning IS NULL FROM public.lands WHERE slug = '101-rai-kabin-buri'), 'reviewed Kabin can have no legacy color';
+  ASSERT pg_temp.zoning_counts_match(0), 'post-admin color removal: rerun still requires exact zero delta';
+  ASSERT (SELECT to_jsonb(l) = (SELECT row FROM reviewed_kabin) FROM public.lands l WHERE slug = '101-rai-kabin-buri'), 'rerun preserves reviewed Kabin and verification';
+  -- Negative controls: unrelated changes cannot consume the correction allowance.
+  UPDATE public.lands SET zoning = 'green' WHERE slug = 'count-unknown';
+  ASSERT NOT pg_temp.zoning_counts_match(1), 'unrelated +1 must fail even with a +1 allowance';
+  UPDATE public.lands SET zoning = NULL WHERE slug = 'legacy-purple';
+  ASSERT (SELECT legacy_zoning_lands FROM zoning_counts) = (SELECT legacy_zoning_lands FROM zoning_baseline), 'negative control has offsetting counts';
+  ASSERT NOT pg_temp.zoning_counts_match(0), 'offsetting unrelated changes must fail the snapshot comparison';
 END;
 $test$;
 -- Expected failure: legacy zoning with no structured facts is unknown territory and still stops the correction.
