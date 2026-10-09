@@ -70,3 +70,11 @@ test("owner submission preserves structured zoning and validates on server bound
   assert.equal(ownerLeadSchema.parse({ ...owner, verified_at: "2026-10-08", verified_by: "admin" }).zoning_info?.status, "owner_reported");
 });
 
+
+test("listing meta description never renders null/undefined area", () => {
+  const building = listingMetadataDescription({ ...SEED_37_RAI_LAND, size_rai: null, usable_area_sqm: 1200 });
+  assert.match(building, /1,200 ตร\.ม\./);
+  const none = listingMetadataDescription({ ...SEED_37_RAI_LAND, size_rai: null, usable_area_sqm: null });
+  for (const d of [building, none]) assert.doesNotMatch(d, /null|undefined|\s{2,}/);
+  assert.match(listingMetadataDescription(SEED_37_RAI_LAND), /36.91825 ไร่/);
+});

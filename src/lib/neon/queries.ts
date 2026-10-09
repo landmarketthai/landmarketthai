@@ -244,13 +244,23 @@ export async function getPublicListings(opts?: {
   );
 }
 
+/** The driver parses timestamptz to ms; the zoning save compares in SQL, so carry full microseconds as the token. */
+export const ZONING_LISTINGS_SELECT = LAND_SELECT.replace("l.*,", `l.*,
+    to_char(l.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at_token,`);
+
+export function normalizeZoningLand(row: unknown): Land {
+  const land = normalizeLand(row);
+  const token = (row as { updated_at_token?: unknown }).updated_at_token;
+  return typeof token === "string" && token ? { ...land, updated_at: token } : land;
+}
+
 /** Authenticated callers only; no seed fallback or public cache in the editor. */
 export async function getZoningManagementListings(): Promise<Land[]> {
   const sql = getSqlIfConfigured();
   if (!sql) throw new Error("DATABASE_URL is not configured");
-  const rows = await sql.query(`${LAND_SELECT}
+  const rows = await sql.query(`${ZONING_LISTINGS_SELECT}
     where l.deleted_at is null group by l.id, p.id order by l.updated_at desc, l.id`, []);
-  return rows.map(normalizeLand);
+  return rows.map(normalizeZoningLand);
 }
 
 export async function getFeaturedListings(limit = 6): Promise<Land[]> {

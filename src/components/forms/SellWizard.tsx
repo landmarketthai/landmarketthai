@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCircle2, FileText, ImagePlus, Link2, MapPin, Save, UploadCloud } from "lucide-react";
 import type { PropertySubmission, Province, PropertyType, TransactionType, ZoningColor } from "@/lib/types/database";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
-import { draftPatch, loadSellerDraft, mergeDraft, phoneLooksValid } from "@/lib/seller-draft";
+import { draftPatch, loadSellerDraft, mergeDraft, phoneLooksValid, reconcileZoning } from "@/lib/seller-draft";
 import LocationPicker, { type MapFocus } from "./LocationPicker";
 import ZoningFields from "./ZoningFields";
 import { getZoning, zoningSchema, type ZoningInfo } from "@/lib/zoning";
@@ -125,7 +125,7 @@ const DRAFT_STORAGE_KEY = "landmarketthai:sell-draft";
 const localFormKey = (id: string) => `${DRAFT_STORAGE_KEY}:${id}:form`;
 
 function fromDraft(draft: PropertySubmission): DraftForm {
-  return {
+  return reconcileZoning({
     property_type: draft.property_type,
     transaction_type: "sale",
     title: draft.title ?? "",
@@ -152,7 +152,7 @@ function fromDraft(draft: PropertySubmission): DraftForm {
     contact_name: draft.contact_name ?? "",
     contact_phone: draft.contact_phone ?? "",
     contact_line: draft.contact_line ?? "",
-  };
+  });
 }
 
 type SaveState = "unsaved" | "saving" | "saved" | "error";
@@ -296,6 +296,8 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           let local: Partial<DraftForm> = {};
           try { local = JSON.parse(localStorage.getItem(localFormKey(parsed.id)) ?? "{}") ?? {}; }
           catch { setError("อ่านข้อมูลที่ยังไม่บันทึกในเครื่องไม่สำเร็จ"); }
+          // Pre-structured local edits carry only a legacy color: keep the seller's newer choice and mirror it into zoning_info.
+          if (local.zoning_info === undefined && local.zoning !== undefined && local.zoning !== baseline.zoning) local.zoning_info = { ...baseline.zoning_info, zones: local.zoning ? [{ color: local.zoning, type_code: "", type_name: "" }] : [] };
           const next = { ...baseline, ...local };
           storageId.current = parsed.id;
           formRef.current = next;

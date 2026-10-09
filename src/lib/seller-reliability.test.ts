@@ -281,3 +281,25 @@ test("location ordering, native radios, invalid-field focus, restore lock and si
   assert.match(picker, /fill="currentColor"/);
   assert.match(picker, /\[lat, lng, mapReady\]/);
 });
+
+test("restore keeps a pre-structured local zoning color and mirrors it into zoning_info", async () => {
+  const empty = { zones: [], status: "unknown", plan_name: "", source: "", checked_at: "", evidence_url: "" };
+  for (const [local, expected] of [
+    [{ zoning: "purple", title: "local" }, { zoning: "purple", zones: [{ color: "purple", type_code: "", type_name: "" }] }],
+    [{ zoning: "brown", title: "local" }, { zoning: "brown", zones: [{ color: "brown", type_code: "", type_name: "" }] }],
+    [{ title: "local" }, { zoning: "brown", zones: [{ color: "brown", type_code: "", type_name: "" }] }],
+  ] as const) {
+    let nextForm: Record<string, unknown> = {};
+    const stored = new Map([["credentials", JSON.stringify({ id: "draft-a", token: "t" })], ["local:draft-a", JSON.stringify(local)]]);
+    await handler("init", {
+      cancelled: false, setLoading: () => {}, setError: () => {}, DRAFT_STORAGE_KEY: "credentials", localFormKey: (id: string) => `local:${id}`,
+      localStorage: { getItem: (key: string) => stored.get(key), setItem: () => {} }, loadSellerDraft: async () => submission,
+      fetch: async () => { throw new Error("must restore"); }, setDraft: () => {}, setSubmitted: () => {}, frozen: { current: false },
+      fromDraft: () => ({ title: "server", zoning: "brown", zoning_info: { ...empty, zones: [{ color: "brown", type_code: "", type_name: "" }] } }),
+      storageId: { current: null }, formRef: { current: null }, savedForm: { current: null }, savedPayload: { current: null },
+      setDraftId: () => {}, setToken: () => {}, setFormState: (value: Record<string, unknown>) => { nextForm = value; }, setSaveState: () => {}, emptyForm: {},
+    })();
+    assert.equal(nextForm.zoning, expected.zoning);
+    assert.deepEqual((nextForm.zoning_info as { zones: unknown }).zones, expected.zones);
+  }
+});

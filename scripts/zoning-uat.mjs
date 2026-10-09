@@ -78,6 +78,11 @@ const drafts = load('../src/app/api/property-submissions/[id]/route.ts', {
 let session = null;
 const auth = load('../src/lib/auth/admin.ts', { '@/lib/auth/server': { auth: { getSession: async () => ({ data: { user: session } }) } } });
 const mutations = load('../src/lib/neon/mutations.ts', { '@/lib/neon/server': dbModule });
+const queries = load('../src/lib/neon/queries.ts', {
+  '@/lib/neon/server': dbModule, 'next/cache': { unstable_cache: fn => fn }, '@/lib/marketplace/presentation': await import('../src/lib/marketplace/presentation.ts'),
+  '@/lib/seed-listings': await import('../src/lib/seed-listings.ts'), '@/lib/marketplace/search-sort': await import('../src/lib/marketplace/search-sort.ts'),
+  '@/lib/marketplace/verification': verification, '@/lib/marketplace/search-filters': search,
+});
 let invalidated = 0;
 const admin = load('../src/app/api/admin/zoning/[id]/route.ts', {
   'next/server': nextServer, 'next/cache': { revalidatePath: () => invalidated++ }, zod,
@@ -135,7 +140,11 @@ assert.equal(queryCount, calls); pass('unauthenticated and non-admin requests st
 session = { id: crypto.randomUUID(), email: 'admin@example.test', emailVerified: true };
 assert.equal((await admin.PATCH(request(undefined, 'https://foreign.example'), adminContext)).status, 403);
 assert.equal((await admin.PATCH(request('2000-01-01T00:00:00Z'), adminContext)).status, 409);
-assert.equal((await admin.PATCH(request(), adminContext)).status, 200);
+const msVersion = new Date(version(land.updated_at)).toISOString(); // millisecond Date the Neon driver hands the editor
+if (/\.\d{4,}/.test(land.updated_at)) assert.equal((await admin.PATCH(request(msVersion), adminContext)).status, 409);
+const token = (await queries.getZoningManagementListings()).find(row => row.id === landId).updated_at;
+assert.match(token, /\.\d{6}Z$/);
+assert.equal((await admin.PATCH(request(token), adminContext)).status, 200);
 assert.equal(invalidated, 1);
 land = (await query('select * from lands where id=$1', [landId]))[0];
 assert.deepEqual(land.zoning_info, reviewed); assert.equal(land.verification_status, 'pending');

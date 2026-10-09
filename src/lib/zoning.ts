@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Land, ZoningColor } from "@/lib/types/database";
 import { ZONING_LABELS } from "@/lib/utils";
+import { propertySizeLabel } from "@/lib/marketplace/presentation";
 
 export const ZONING_STATUS_LABELS = {
   unknown: "ยังไม่ทราบ",
@@ -69,7 +70,7 @@ export function zoningSummary(land: ZonedLand): string {
 }
 
 export function listingMetadataDescription(land: Land): string {
-  return `${land.title_th} ${land.province?.name_th ?? ""} ${land.size_rai} ไร่ · ${zoningSummary(land)} · ${ZONING_NOTICE}`;
+  return `${[land.title_th, land.province?.name_th, propertySizeLabel(land)].filter(Boolean).join(" ")} · ${zoningSummary(land)} · ${ZONING_NOTICE}`;
 }
 
 export function zoningFromForm(form: FormData): unknown {
