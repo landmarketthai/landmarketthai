@@ -235,7 +235,11 @@ test("deal creation keeps nonnegative finite commission validation", () => {
 
 test("anonymous events cannot forge audit events and analytics metadata is sanitized", async () => {
   const { state, modules } = harness();
-  const { POST } = load<{ POST: Handler }>("../../app/api/events/route.ts", { ...modules, zod });
+  let eventsAllowed = true;
+  const { POST } = load<{ POST: Handler }>("../../app/api/events/route.ts", { ...modules, zod,
+    "@/lib/security/rate-limit": { checkRateLimit: async () => ({ allowed: eventsAllowed, retryAfterSeconds: eventsAllowed ? 0 : 60, degraded: false }) },
+    "@/lib/security/http": { readJsonBody: async (req: { json: () => Promise<unknown> }) => ({ tooLarge: false, body: await req.json().catch(() => null) }) },
+  });
   const send = async (body: unknown) => {
     const response = await POST(request(body), {});
     assert.equal(response.status, 200);
@@ -264,6 +268,10 @@ test("anonymous events cannot forge audit events and analytics metadata is sanit
   await send({ event_type: "search", meta: { query: { admin_id: "admin" } } });
   await send({ event_type: "search", meta: { query: "x".repeat(201) } });
   assert.equal(state.events.length, count);
+  eventsAllowed = false;
+  await send({ event_type: "page_view" });
+  assert.equal(state.events.length, count, "rate-limited analytics events are dropped, not written");
+  eventsAllowed = true;
   const response = await POST({ json: async () => { throw new Error("bad JSON"); } }, {});
   assert.equal(response.body.ok, true);
   assert.equal(response.headers["Cache-Control"], "no-store");

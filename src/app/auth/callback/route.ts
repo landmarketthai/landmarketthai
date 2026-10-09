@@ -5,9 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const requestedNext = url.searchParams.get("next") ?? "/";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//")
-    ? requestedNext
-    : "/";
+  // Resolve first, then compare origins: "/\t/evil.com" passes a prefix check but resolves off-site.
+  const target = requestedNext.startsWith("/") ? new URL(requestedNext, url.origin) : null;
 
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(target?.origin === url.origin ? target : new URL("/", url.origin));
 }

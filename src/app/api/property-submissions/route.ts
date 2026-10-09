@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPropertyDraft } from "@/lib/neon/marketplace";
-
-const buckets = new Map<string, { count: number; resetAt: number }>();
+import { guardPublicWrite } from "@/lib/security/http";
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const now = Date.now();
-  const bucket = buckets.get(ip);
-  if (bucket && bucket.resetAt > now && bucket.count >= 10) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-  buckets.set(ip, bucket && bucket.resetAt > now ? { ...bucket, count: bucket.count + 1 } : { count: 1, resetAt: now + 60_000 });
+  const blocked = await guardPublicWrite(request, "property_draft_create");
+  if (blocked) return blocked;
 
   try {
     const draft = await createPropertyDraft();
