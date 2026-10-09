@@ -204,7 +204,8 @@ test("submit freezes first, waits for every upload and queued save, then saves o
     cancelMapsLookup: () => events.push("cancel lookup"), setSubmitting: () => {}, setError: () => {},
     uploadBatches: { current: new Set([a.promise, b.promise]) }, failedUploads: { current: new Map() }, saveQueue: { current: pendingSave.promise },
     saveDraft: async (force: boolean) => { assert.equal(force, true); events.push("save latest"); return true; },
-    fetch: async () => { events.push("submit"); return response(200); }, setSubmitted: () => events.push("submitted"),
+    turnstile: { headers: () => ({ "x-turnstile-token": "uat-token" }), reset: () => events.push("reset challenge") },
+    fetch: async (_url: string, init: { headers: Record<string, string> }) => { assert.equal(init.headers["x-turnstile-token"], "uat-token"); events.push("submit"); return response(200); }, setSubmitted: () => events.push("submitted"),
     localStorage: { removeItem: () => {} }, DRAFT_STORAGE_KEY: "draft", localFormKey: (id: string) => id,
   });
   const done = submit();
@@ -214,7 +215,7 @@ test("submit freezes first, waits for every upload and queued save, then saves o
   b.resolve(true); await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(events, ["cancel lookup"]);
   pendingSave.resolve(true); await done;
-  assert.deepEqual(events, ["cancel lookup", "save latest", "submit", "submitted"]);
+  assert.deepEqual(events, ["cancel lookup", "save latest", "submit", "reset challenge", "submitted"]);
 });
 
 test("overlapping upload batches remain tracked until both complete and keep both media lists", async () => {

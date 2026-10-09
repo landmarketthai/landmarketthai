@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { submissionUploadSchema } from "@/lib/marketplace/schemas";
 import { insertSubmissionMedia, propertyDraftExists } from "@/lib/neon/marketplace";
 import { getStorageObjectMetadata, storagePublicUrl } from "@/lib/storage/provider";
+import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  const blocked = await guardPublicWrite(request, "submission_upload");
+  if (blocked) return blocked;
+  const read = await readJsonBody(request, 4_000);
+  if (read.tooLarge) return tooLargeResponse();
+  const body = read.body as Record<string, unknown> | null;
   const parsed = submissionUploadSchema.safeParse(body);
   const storageKey = typeof body?.storage_key === "string" ? body.storage_key : "";
   if (!parsed.success || !storageKey) return NextResponse.json({ error: "ข้อมูลไฟล์ไม่ถูกต้อง" }, { status: 400 });

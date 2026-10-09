@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { submissionUploadSchema } from "@/lib/marketplace/schemas";
 import { propertyDraftExists } from "@/lib/neon/marketplace";
 import { generatePresignedUpload } from "@/lib/storage/provider";
+import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
+  const blocked = await guardPublicWrite(request, "submission_upload");
+  if (blocked) return blocked;
+  const { tooLarge, body } = await readJsonBody(request, 4_000);
+  if (tooLarge) return tooLargeResponse();
   const parsed = submissionUploadSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "ไฟล์ไม่ถูกต้อง" }, { status: 400 });
 
