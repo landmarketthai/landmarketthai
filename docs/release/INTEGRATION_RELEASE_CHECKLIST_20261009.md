@@ -133,7 +133,7 @@ Why the flag is on from the first release: with it off, `/api/leads` (300 / 10 m
 ### Preview browser UAT
 
 - Public: `/`, `/land`, a `/property/<slug>` for 37 Rai EEC Rayong and 101 Rai Kabin Buri (zoning shown, no invented official facts), `/sitemap.xml`, `/robots.txt`.
-- Lead flow: LeadForm, SubmitLandForm, PartnerForm (Server Action path, real browser), BuyerRequirementForm submit end-to-end; n8n test sink receives each lead (BLOCKED until a sink exists).
+- Lead flow: LeadForm and SubmitLandForm (API), PartnerForm (Server Action path, real browser) and BuyerRequirementForm submit end-to-end on isolated Preview. A test n8n sink is expected to receive events **only for the lead API and lead Server Actions**, not for buyer requirements or seller submissions (their lead rows are instead verified in Neon UAT and the Admin queue). Real webhook delivery is BLOCKED until a dedicated test sink exists; whether those other lead types should notify n8n is a product decision.
 - Seller: open `/sell`, confirm no draft row created on view; edit one field, confirm exactly one draft (POST carries `x-turnstile-token`; status shows verifying until the token arrives); upload to DO Spaces test bucket (BLOCKED until one exists); submit with Turnstile (separate second token).
 - Redirect: logged in, open `/login?next=%2F%5Cevil.example`, `/login?next=%2F%2Fevil.example`, `/login?next=%2Fmanage%2Fzoning`; expect `/`, `/`, `/manage/zoning`.
 - Turnstile failure: block `challenges.cloudflare.com`, confirm alert text appears.

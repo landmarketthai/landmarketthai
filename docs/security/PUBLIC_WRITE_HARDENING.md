@@ -119,26 +119,21 @@ change over time; confirm in the Vercel dashboard before relying on them. Start 
   interfere with crawlers and API clients. Turn it off when the incident ends.
 - WAF rules run before the function, so they are the only control that avoids billable invocations.
 
-### Step 5. Verification checklist (use a preview URL, never hammer production)
+### Step 5. Verification checklist (Preview only; never hammer Production)
+With `HUMAN_VERIFICATION_REQUIRED=true`, public write routes verify the Turnstile token **before** parsing the body or consuming a rate-limit bucket. A tokenless request must return **403**, not 422, 413 or 429.
 ```bash
 BASE=https://<preview-url>
-# 429: more than the per-client limit in the window (leads: 5 per 10 min)
-for i in $(seq 1 7); do curl -s -o /dev/null -w "%{http_code}\n" -X POST $BASE/api/leads \
-  -H 'content-type: application/json' -d '{"lead_type":"buyer"}'; done   # expect 422 x5 then 429 + Retry-After
-# 413: oversized body
-head -c 20000 /dev/zero | tr '\0' a | curl -s -o /dev/null -w "%{http_code}\n" -X POST $BASE/api/leads \
-  -H 'content-type: application/json' --data-binary @-                   # expect 413
-# 403: Turnstile required, no token (after Step 3.4)
-curl -s -w "\n%{http_code}\n" -X POST $BASE/api/leads -H 'content-type: application/json' \
-  -d '{"lead_type":"buyer"}'                                            # expect 403 human_verification_failed
-# spoofed XFF must not reset the limit: repeat the first loop with -H 'x-forwarded-for: 1.2.3.N'
-# admin without cookie
-curl -s -o /dev/null -w "%{http_code}\n" $BASE/api/admin/leads         # expect 401
-# open redirect (must not leave the site)
+# 403: missing Turnstile token. Must NOT consume a rate-limit row.
+curl -s -w "\n%{http_code}\n" -X POST "$BASE/api/leads" -H 'content-type: application/json' \
+  -d '{"lead_type":"buyer"}'
+# 401: admin without a session.
+curl -s -o /dev/null -w "%{http_code}\n" "$BASE/api/admin/leads"
+# Redirect must stay on this host.
 curl -s -o /dev/null -w "%{redirect_url}\n" "$BASE/auth/callback?next=/%09/example.org"
 ```
-Also check `select bucket, count(*) from public_write_rate_limits group by 1;` shows rows, and runtime
-logs have no repeated `[rate-limit] database limiter unavailable`.
+Test **422** (invalid payload), **413** (oversized body) and **429** (rate limit) in the isolated local E2E/integration harness or a dedicated test Preview with a **fresh valid single-use Turnstile token for every request**. A tokenless `curl` loop cannot reach those checks, and reusing one solved token also returns 403. Never disable human verification on Production or reset the live `leads` global bucket to make a test pass. See `scripts/uat-local-e2e.mjs`, `src/lib/security/lead-actions.test.ts` and `src/lib/security/draft-create-quota.test.ts`. For a permitted test environment, assert that a per-client rejection does not spend global quota and that spoofed forwarded headers do not create new client identities.
+
+Read-only inspect `select bucket, count(*) from public_write_rate_limits group by 1;` on the explicitly identified UAT branch and verify runtime logs have no repeated `[rate-limit] database limiter unavailable`.
 
 ## 5. Known gaps not closed by this change
 Fixed in this branch: `/auth/callback` open redirect (origin comparison), `error.message` leakage in /api/uploads/*,
