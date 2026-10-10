@@ -186,3 +186,11 @@ test("every caller of the lead server actions embeds the Turnstile token and res
   assert.match(partner, /<form action=\{submit\}/);
   assert.match(partner, /disabled=\{isPending \|\| \(turnstile\.enabled && !turnstile\.token\)\}/);
 });
+
+test("Turnstile load or challenge failure tells the user why submit stays disabled", () => {
+  const widget = readFileSync(new URL("../../components/security/TurnstileWidget.tsx", import.meta.url), "utf8");
+  assert.match(widget, /"error-callback": \(\) => \{ setFailed\(true\);/);
+  assert.match(widget, /\.catch\(\(\) => \{ setFailed\(true\);/);
+  assert.match(widget, /callback: \(token: string\) => \{ setFailed\(false\);/);
+  assert.match(widget, /\{failed && <p role="alert"/);
+});

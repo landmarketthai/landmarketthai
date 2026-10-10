@@ -15,3 +15,11 @@ test("Next.js discovers Neon Auth middleware alongside src/app", () => {
   assert.match(code, /return authMiddleware\(request\)/);
   assert.match(code, /pathname\.startsWith\("\/admin\/"\)/);
 });
+
+test("middleware only runs for admin pages and OAuth callbacks, never public or SEO routes", () => {
+  const code = readFileSync(middlewareUrl, "utf8");
+  const matcher = code.slice(code.indexOf("matcher:"));
+  assert.match(matcher, /"\/admin",\s*"\/admin\/:path\*",/);
+  assert.match(matcher, /has: \[\{ type: "query", key: "neon_auth_session_verifier" \}\]/);
+  assert.doesNotMatch(matcher, /\(\?!/, "catch-all matcher would make every public page depend on auth config");
+});

@@ -32,6 +32,7 @@ export function TurnstileWidget({ onToken, action, resetKey = 0 }: { onToken: (t
   const widgetId = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!SITE_KEY) return;
@@ -42,11 +43,11 @@ export function TurnstileWidget({ onToken, action, resetKey = 0 }: { onToken: (t
         sitekey: SITE_KEY,
         action,
         appearance: "interaction-only",
-        callback: (token: string) => onTokenRef.current(token),
+        callback: (token: string) => { setFailed(false); onTokenRef.current(token); },
         "expired-callback": () => onTokenRef.current(null),
-        "error-callback": () => onTokenRef.current(null),
+        "error-callback": () => { setFailed(true); onTokenRef.current(null); },
       });
-    }).catch(() => onTokenRef.current(null));
+    }).catch(() => { setFailed(true); onTokenRef.current(null); });
     return () => {
       cancelled = true;
       if (widgetId.current) window.turnstile?.remove(widgetId.current);
@@ -60,7 +61,12 @@ export function TurnstileWidget({ onToken, action, resetKey = 0 }: { onToken: (t
   }, [resetKey]);
 
   if (!SITE_KEY) return null;
-  return <div ref={container} role="group" aria-label="Human verification" />;
+  return (
+    <>
+      <div ref={container} role="group" aria-label="Human verification" />
+      {failed && <p role="alert" className="text-sm text-red-600">ยืนยันตัวตนไม่สำเร็จ กรุณาปิดตัวบล็อกโฆษณาแล้วรีเฟรชหน้า</p>}
+    </>
+  );
 }
 
 /** Wiring helper for forms: `enabled` is false (and everything inert) when no site key is configured. */
