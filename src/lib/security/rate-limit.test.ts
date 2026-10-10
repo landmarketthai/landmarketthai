@@ -137,6 +137,8 @@ test("migration is atomic, lock-free, uncapped, private", () => {
   assert.match(sql, /on conflict \(bucket, client_hash\)/);
   assert.equal(sql.includes("pg_advisory_xact_lock"), false);
   assert.equal(/count\(\*\)/i.test(sql), false);
+  // Cleanup must not wait on rows held by concurrent calls (reproduced deadlock on PG18 without it).
+  assert.match(sql, /limit 100\s+for update skip locked\);/);
   assert.match(sql, /enable row level security/);
   assert.match(sql, /revoke all on public_write_rate_limits from public/);
   assert.match(sql, /revoke all on function consume_rate_limit\(text, text, int, int, int\) from public/);

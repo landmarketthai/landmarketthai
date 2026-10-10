@@ -43,10 +43,12 @@ begin
     reset_at = case when t.reset_at <= v_now then v_now + make_interval(secs => p_window_seconds) else t.reset_at end
   returning request_count, reset_at into v_count, v_reset;
 
-  -- Bounded opportunistic cleanup of long-expired rows.
+  -- Bounded opportunistic cleanup of long-expired rows. skip locked: a concurrent call that is re-using an
+  -- expired client row holds it while waiting for the global row we hold; waiting on it here would deadlock.
   if random() < 0.02 then
     delete from public_write_rate_limits where ctid in (
-      select ctid from public_write_rate_limits where reset_at < clock_timestamp() - interval ''1 hour'' limit 100);
+      select ctid from public_write_rate_limits where reset_at < clock_timestamp() - interval ''1 hour'' limit 100
+      for update skip locked);
   end if;
 
   if v_count > p_global_limit then

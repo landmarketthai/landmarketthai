@@ -24,7 +24,7 @@ Body cap: "app" = enforced in code (413); "platform" = only Vercel's request bod
 | /api/leads | POST | none (honeypot `_hp`) | 5 / 300, 10 min | Turnstile when enabled | app 10 KB |
 | Server Actions submitPartnerLead / submitOwnerLead / submitBuyerLead (`src/app/actions/leads.ts`, used by PartnerForm) | POST (Next action) | none (honeypot `_hp`) | shares the `leads` bucket: 5 / 300, 10 min | Turnstile when enabled (FormData `turnstile_token`) | Next.js Server Action default (1 MB) |
 | /api/buyer-requirements | POST | none | 6 / 300, 10 min | Turnstile when enabled | app 20 KB |
-| /api/property-submissions | POST | none (returns id + draft token) | 10 / 500, 1 h | none | n/a |
+| /api/property-submissions | POST | none (returns id + draft token) | 10 / 500, 1 h | Turnstile `strict`: when enabled, and ALWAYS on Vercel Production (`VERCEL_ENV=production`) | n/a |
 | /api/property-submissions/[id] | GET | x-draft-token | none | none | n/a |
 | /api/property-submissions/[id] | PATCH | token in body | none (token-gated autosave) | none | app 64 KB |
 | /api/property-submissions/[id]/submit | POST | token in body | 5 / 200, 10 min | Turnstile when enabled | app 4 KB |
@@ -66,11 +66,16 @@ Verify:
 ```sql
 select to_regclass('public.public_write_rate_limits') as tbl,
        (select count(*) from pg_proc where proname = 'consume_rate_limit') as fn;  -- tbl not null, fn = 1
-select consume_rate_limit('leads', repeat('a',64), 1, 100, 60);  -- 0 (allowed)
-select consume_rate_limit('leads', repeat('a',64), 1, 100, 60);  -- >0 (seconds to wait)
-delete from public_write_rate_limits where bucket = 'leads' and client_hash in (repeat('a',64), '*');
+-- Use a throwaway bucket: never touch the live 'leads' global row.
+select consume_rate_limit('release_verify', repeat('a',64), 1, 100, 60);  -- 0 (allowed)
+select consume_rate_limit('release_verify', repeat('a',64), 1, 100, 60);  -- >0 (seconds to wait)
+delete from public_write_rate_limits where bucket = 'release_verify';
 ```
 Confirm the Data API roles (anon/authenticated) have no grants on the table or function.
+Run the migration AS the role in the app's `DATABASE_URL` (the table owner). The function is not
+SECURITY DEFINER and nothing is granted, so a different app role gets `permission denied` and the app
+silently uses the weak per-instance fallback (rehearsed on PostgreSQL 18). Check as the app role:
+`select has_function_privilege('consume_rate_limit(text,text,int,int,int)', 'EXECUTE') and has_table_privilege('public_write_rate_limits', 'INSERT,UPDATE,DELETE');` must be true.
 
 ### Step 2. RATE_LIMIT_SECRET (optional)
 Set a random 32+ character `RATE_LIMIT_SECRET` (Production and Preview). Otherwise it falls back to
@@ -84,7 +89,10 @@ Set a random 32+ character `RATE_LIMIT_SECRET` (Production and Preview). Otherwi
    and that submissions still succeed (flag still off).
 4. ONLY THEN set `HUMAN_VERIFICATION_REQUIRED=true` (exactly `true`) and redeploy. If the secret is
    missing the routes fail closed with 503.
-5. Rollback: unset `HUMAN_VERIFICATION_REQUIRED` and redeploy. No code change needed.
+5. Rollback: unset `HUMAN_VERIFICATION_REQUIRED` and redeploy. No code change needed for leads, buyer
+   requirements and draft submit. Draft CREATE (`/api/property-submissions`) stays verified on Vercel
+   Production regardless of the flag; there is no env-only kill switch for it. If Turnstile itself is down,
+   `/sell` cannot create drafts until Cloudflare recovers or a code change ships (accepted trade-off of P1 #2).
 
 ### Step 4. Recommended Vercel Firewall setup (described only, NOT applied)
 Availability and cost of WAF rate limiting, Bot Protection and any usage-based pricing vary by plan and

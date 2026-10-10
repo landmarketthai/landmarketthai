@@ -1,5 +1,7 @@
 # Integration Release Checklist — codex/release-integration-20261009
 
+> 2026-10-10: UAT closure, fixes and current gate results are in [LANDMARKETTHAI_UAT_CLOSURE_20261010.md](LANDMARKETTHAI_UAT_CLOSURE_20261010.md); its blocker list supersedes the one below.
+
 Scope: integration branch only. Not pushed, not merged to `main`, not deployed.
 No production database, production secret, preview, or external DB was touched.
 
