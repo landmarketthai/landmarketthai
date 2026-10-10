@@ -5,19 +5,16 @@ Preview `landmarketthai-a4b1z7784-landmarketthai.vercel.app`). Worktree `C:\GitH
 
 **Engineering: GO for this branch (local commit only). Production: NO-GO** until every item in "Blockers requiring owner" is closed.
 
-Nothing was pushed, merged, deployed or opened as a PR. No Vercel, Neon, DNS, mail or key setting was changed.
-No SQL was run against Neon (production `br-solitary-mud-az74nksn` and UAT `br-noisy-sun-az5krbgi` were both untouched).
-No real lead, n8n call, Turnstile Siteverify call or DO Spaces request was made. All database work used a throwaway
-local Docker PostgreSQL 18.6 container with synthetic rows.
+**Historical scope:** the following original Opus execution summary described the local-only run at commit `0c8faa7`. Subsequent supervisor steps pushed the Integration Branch, deployed Preview, updated **UAT Neon only**, and rehearsed rollback on a separate disposable Neon child. The latest evidence and blockers are documented in [NONPROD_CLOSEOUT_20261010.md](NONPROD_CLOSEOUT_20261010.md). The Production database, branch, secrets and deployment remain unchanged. No real lead/n8n callback/DO Spaces upload was sent.
 
 ## 0. Current state (updated after the Codex Sol 6.1 runbook audit, 2026-10-10)
 
 - Code under test: `0c8faa7`. Local gates: 308/308 `npm test`, 16/16 local E2E (§3) against disposable PostgreSQL 18; no Neon, Vercel or external call.
 - Production Vercel: real Cloudflare Turnstile keys are set in the env but **no production deployment has been built with them yet** (site key is inlined at build).
 - Preview: env points at UAT Neon `br-noisy-sun-az5krbgi`, Cloudflare dummy Turnstile keys, n8n webhook disabled.
-- UAT Neon (supervisor, read-only): `landmarketthai_owner` owns `public_write_rate_limits` and `consume_rate_limit`, and the Preview app connects as that role. UAT still has the **pre-fix** function (no `skip locked`); the patched migration must be re-applied on an isolated UAT child branch, then on UAT itself (checklist Phase A).
+- UAT Neon: `landmarketthai_owner` owns `public_write_rate_limits` and `consume_rate_limit`, and the Preview app connects as that role. The supervisor re-applied the patched migration on UAT `br-noisy-sun-az5krbgi` and verified the function includes `SKIP LOCKED`; a separate disposable child `br-bold-rain-azy4ax9e` passed the twice-idempotent zoning rollback + re-apply with unchanged land/submission fingerprints. See [NONPROD_CLOSEOUT_20261010.md](NONPROD_CLOSEOUT_20261010.md).
 - Still BLOCKED: real DO Spaces upload to a test bucket; real n8n event to a test sink.
-- **Not given:** business approval for Kabin 101 rai (verified → pending, green zoning) and explicit production release approval. Nothing in this report is production approval.
+- **Business decision received**: พี่ไกร approved green zoning reported by the owner and generic listing review `verified` for Kabin 101 rai. UAT reflects the approval, with zoning provenance `owner_reported` (NOT official document verification). **Explicit Production release approval remains NOT GIVEN**; this report is not approval to migrate/merge/deploy.
 - Release order is the phased sequence in [INTEGRATION_RELEASE_CHECKLIST_20261009.md](INTEGRATION_RELEASE_CHECKLIST_20261009.md): isolated rehearsal → Preview UAT → owner authorization → snapshot + read-only preflight → schema → app, with `HUMAN_VERIFICATION_REQUIRED=true` from the first production release.
 
 ## 1. What changed in this commit
