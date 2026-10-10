@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { draftSchema } from "@/lib/marketplace/schemas";
 import { getPropertyDraft, savePropertyDraft } from "@/lib/neon/marketplace";
+import { readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +19,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const raw = await request.json().catch(() => null);
+  // Token-gated autosave: body cap only; draft creation and submit carry the rate limits.
+  const { tooLarge, body: raw } = await readJsonBody(request, 64_000);
+  if (tooLarge) return tooLargeResponse();
   const parsed = draftSchema.safeParse(raw);
   if (!parsed.success) return NextResponse.json({ error: "Invalid draft", issues: parsed.error.flatten() }, { status: 400 });
 
@@ -28,6 +31,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!draft) return NextResponse.json({ error: "Draft not found or already submitted" }, { status: 404 });
     return NextResponse.json({ draft }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    // Trigger sync_land_zoning_info raises SQLSTATE LZ409 when a legacy-only zoning write would erase structured zoning_info.
+    const e = error as { code?: string; cause?: { code?: string } };
+    if (e?.code === "LZ409" || e?.cause?.code === "LZ409") {
+      return NextResponse.json({ error: "ข้อมูลผังเมืองมีการแก้ไขจากหน้าจออื่น กรุณารีโหลดหน้าแล้วแก้ไขอีกครั้ง" }, { status: 409 });
+    }
     console.error("Save property draft error:", error);
     return NextResponse.json({ error: "Unable to save draft" }, { status: 500 });
   }

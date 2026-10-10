@@ -14,7 +14,7 @@ import PropertyGallery from "@/components/properties/PropertyGallery";
 import PropertyMobileActions from "@/components/properties/PropertyMobileActions";
 import PropertyMap from "@/components/search/PropertyMap";
 import LineButton from "@/components/ui/LineButton";
-import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel, ZONING_LABELS } from "@/lib/utils";
+import { formatMoneyFull, formatRai, formatUpdatedDate, listingStatusLabel } from "@/lib/utils";
 import type { Land } from "@/lib/types/database";
 import { PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { PropertyIntelligence } from "@/components/intelligence/PropertyIntelligence";
@@ -23,6 +23,8 @@ import { rankSimilarProperties } from "@/lib/similar-properties";
 import { resolveListingPresentation } from "@/lib/seed-listings";
 import VerificationSummary from "@/components/listings/VerificationSummary";
 import ReferralCallout from "@/components/properties/ReferralCallout";
+import ZoningBadges from "@/components/listings/ZoningBadges";
+import { zoningSummary } from "@/lib/zoning";
 
 function legalArea(property: Land): string | null {
   if (property.area_rai != null || property.area_ngan != null || property.area_sqwa != null) {
@@ -73,7 +75,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
     usable ? ["พื้นที่ใช้สอย", usable] : null,
     property.total_price != null ? ["ราคารวม", formatMoneyFull(property.total_price)] : null,
     property.price_per_rai != null ? ["ราคา / ไร่", formatMoneyFull(property.price_per_rai)] : null,
-    property.zoning ? ["ผังเมือง", ZONING_LABELS[property.zoning]] : null,
+    ["ผังเมือง", zoningSummary(property)],
     property.is_eec ? ["เขตเศรษฐกิจ", "พื้นที่ EEC"] : null,
     property.frontage_m != null ? ["หน้ากว้าง", `${property.frontage_m.toLocaleString("th-TH")} เมตร`] : null,
     property.depth_min_m != null && property.depth_max_m != null
@@ -131,11 +133,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
                 {propertyTypeLabel(property)} · ขาย
               </span>
-              {property.zoning && (
-                <span className="rounded-full bg-purple-500/90 px-3 py-1 text-xs font-bold text-white">
-                  {ZONING_LABELS[property.zoning]}
-                </span>
-              )}
+              <ZoningBadges land={property} />
               <span className={`rounded-full px-3 py-1 text-xs font-black tracking-wide text-white shadow-sm ${isSoldOut ? "bg-red-600" : "bg-emerald-600"}`}>
                 {listingStatusLabel(property)}
               </span>
@@ -274,6 +272,7 @@ export default async function DynamicPropertyDetail({ property, inventory }: { p
               </section>
             )}
 
+            <ZoningBadges land={property} detail />
             <div className="hidden md:block"><VerificationSummary land={property} /></div>
 
             {inventory ? <PropertyIntelligence land={property} inventory={inventory} /> : <p role="alert">ข้อมูลประกาศเปรียบเทียบไม่พร้อมใช้งานชั่วคราว</p>}

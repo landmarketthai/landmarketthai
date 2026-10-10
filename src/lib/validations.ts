@@ -2,6 +2,7 @@ import { z } from "zod";
 import { LAND_CATEGORY_TYPES, ZONING_LABELS } from "@/lib/utils";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
 import { LOCATION_ANCHORS } from "@/lib/location-intelligence";
+import { ownerZoningSchema } from "@/lib/zoning";
 
 export const buyerRequirementsSchema = z.object({
   province: z.string().trim().min(1).max(80).optional(),
@@ -65,6 +66,7 @@ export const partnerLeadSchema = z.object({
 });
 
 export const ownerLeadSchema = z.object({
+  zoning_info: ownerZoningSchema.optional(),
   name: z.string().min(2, "กรุณากรอกชื่อ"),
   phone: thaiPhone,
   line_id: z.string().optional(),

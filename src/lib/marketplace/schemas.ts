@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizePhone } from "@/lib/validations";
 import { PROPERTY_TYPES } from "@/lib/marketplace/presentation";
+import { ownerZoningSchema } from "@/lib/zoning";
 
 const MAX_PRICE = 99_999_999_999_999.99;
 const optionalNumber = z.preprocess(
@@ -24,6 +25,7 @@ const optionalThaiPhone = z.string().trim().max(32).transform(normalizePhone).re
 );
 
 export const draftSchema = z.object({
+  zoning_info: ownerZoningSchema.optional(),
   token: z.string().uuid(),
   property_type: z.enum(PROPERTY_TYPES).nullable().optional(),
   transaction_type: z.literal("sale").nullable().optional(),
@@ -74,6 +76,9 @@ export const submissionUploadSchema = z.object({
   mime_type: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
   size_bytes: z.coerce.number().int().positive().max(20 * 1024 * 1024),
   doc_type: z.enum(["title_deed", "map", "brochure", "other"]).optional(),
+}).refine((upload) => upload.media_kind !== "image" || upload.mime_type.startsWith("image/"), {
+  // images/ objects are public-read; keep PDFs out of the public prefix.
+  path: ["mime_type"],
 });
 
 export const buyerRequirementSchema = z.object({

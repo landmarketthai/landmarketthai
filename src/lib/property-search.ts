@@ -1,8 +1,10 @@
 import { isUsableAreaOnly, matchesSizeCriteria } from "@/lib/marketplace/search-filters";
 import { sortPropertyResults } from "@/lib/marketplace/search-sort";
 import type { Land, ListingStatus } from "@/lib/types/database";
+import { zoningColors } from "@/lib/zoning";
 
 export interface PropertySearchFilters {
+  zoning?: string;
   q?: string;
   province?: string;
   type?: string;
@@ -38,6 +40,7 @@ export function searchProperties(listings: Land[], filters: PropertySearchFilter
     if (land.deleted_at || land.status !== (filters.history === "1" ? "sold" : "active")) return false;
     // Canonical inventory currently contains sale listings only.
     if (filters.transaction_type && filters.transaction_type !== "sale") return false;
+    if (filters.zoning && !zoningColors(land).some(color => color === filters.zoning)) return false;
     if (filters.province && land.province?.slug !== filters.province) return false;
     if (type && land.land_type !== type && !(type === "eec" && land.is_eec)) return false;
     if (filters.property_type && land.property_type !== filters.property_type) return false;

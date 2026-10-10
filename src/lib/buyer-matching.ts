@@ -1,4 +1,5 @@
-﻿import type { Land, Lead } from "@/lib/types/database";
+import { zoningColors } from "@/lib/zoning";
+import type { Land, Lead } from "@/lib/types/database";
 import { buyerRequirementsSchema, type BuyerRequirements } from "@/lib/validations";
 import { isUsableAreaOnly } from "@/lib/marketplace/search-filters";
 import { distanceToAnchorKm, LOCATION_ANCHORS } from "@/lib/location-intelligence";
@@ -60,8 +61,8 @@ function assess(land: Land, request: BuyerRequirements): MatchAssessment | null 
   range(land.total_price, request.budget_min, true, 10, 15, "ราคาไม่ต่ำกว่างบเริ่มต้น", "ยังไม่มีราคารวม");
   range(land.total_price, request.budget_max, false, 20, 25, "ราคาอยู่ในงบสูงสุด", "ยังไม่มีราคารวม");
   if (request.zoning) {
-    if (land.zoning === null) missingData.push("ยังไม่มีข้อมูลผังสี");
-    else criterion(land.zoning === request.zoning, 20, 20, "ผังสีตรงตามข้อมูลประกาศ ต้องตรวจสอบก่อนใช้งาน");
+    if (!zoningColors(land).length) missingData.push("ยังไม่มีข้อมูลผังสี");
+    else criterion(zoningColors(land).some(color => color === request.zoning), 20, 20, "ผังสีตรงตามข้อมูลประกาศ ต้องตรวจสอบก่อนใช้งาน");
   }
   if (request.is_eec !== undefined) {
     if (typeof land.is_eec !== "boolean") missingData.push("ยังไม่มีข้อมูล EEC");

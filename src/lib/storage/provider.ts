@@ -7,12 +7,14 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
-const ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-];
+// Extension comes from the allow-listed MIME type, never from the client file name (no "/" or ".." in keys).
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
+const ALLOWED_MIME_TYPES = Object.keys(EXTENSION_BY_MIME);
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
@@ -62,7 +64,7 @@ export async function generatePresignedUpload(opts: {
     throw new Error(`File too large: max ${MAX_FILE_SIZE / 1024 / 1024} MB`);
   }
 
-  const ext = opts.originalName.split(".").pop()?.toLowerCase() ?? "bin";
+  const ext = EXTENSION_BY_MIME[opts.mimeType];
   const uuid = generateUuid();
   const storageKey = `${opts.folder}/${uuid}.${ext}`;
   const isPrivate = isPrivateFolder(opts.folder);

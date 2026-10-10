@@ -15,7 +15,7 @@ export const LAND_TYPE_LABELS: Record<LandType, string> = {
 export const LAND_CATEGORY_TYPES = ["land", "industrial", "eec", "factory", "warehouse", "logistics", "data_center", "investment"] as const satisfies readonly LandType[];
 
 export const ZONING_LABELS: Record<ZoningColor, string> = {
-  purple: "ม่วง (อุตสาหกรรม)",
+  purple: "ม่วง",
   purple_light: "ม่วงอ่อน",
   brown: "น้ำตาล",
   orange: "ส้ม",

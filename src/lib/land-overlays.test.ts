@@ -29,7 +29,7 @@ test("EEC province context stays separate from a parcel's reported flag", () => 
 });
 
 test("industrial category and nearby landmarks never invent missing zoning or EEC status", () => {
-  const context = getLandOverlayContext(SEED_101_KABIN_LAND);
+  const context = getLandOverlayContext({ ...SEED_101_KABIN_LAND, zoning: null, zoning_info: null });
   assert.equal(context.zoning, null);
   assert.equal(context.industrial.reportedByListingCategory, true);
   assert.equal(context.eec.reportedByListing, false);

@@ -18,6 +18,12 @@ export default function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Only admin pages and OAuth callbacks need Neon Auth; public pages and SEO routes
+// must never depend on the auth module loading.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/admin",
+    "/admin/:path*",
+    { source: "/:path*", has: [{ type: "query", key: "neon_auth_session_verifier" }] },
+  ],
 };

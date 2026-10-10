@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import ZoningBadges from "@/components/listings/ZoningBadges";
 import DynamicPropertyDetail from "@/components/properties/DynamicPropertyDetail";
 import { listingMetadata } from "@/lib/public-seo";
 import Image from "next/image";
@@ -110,9 +111,7 @@ export default async function PropertyDetailPage({
               <span className="rounded-full bg-[#00A859] px-3 py-1 text-xs font-bold text-white">
                 {property.location}
               </span>
-              <span className="rounded-full bg-purple-500/90 px-3 py-1 text-xs font-bold text-white">
-                {property.zoning}
-              </span>
+              <ZoningBadges land={land} />
               {isSoldOut && (
                 <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black tracking-wide text-white shadow-sm">
                   ขายแล้ว
@@ -165,7 +164,7 @@ export default async function PropertyDetailPage({
           <div className="pt-4">
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">{property.location}</span>
-              <span className="rounded-full bg-purple-50 px-3 py-1.5 text-sm font-bold text-purple-700">{property.zoning}</span>
+              <ZoningBadges land={land} />
               {isSoldOut && <span className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-bold text-red-700">ขายแล้ว</span>}
             </div>
             <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{property.title}</h1>
@@ -216,6 +215,11 @@ export default async function PropertyDetailPage({
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section className="card p-4 sm:p-6" aria-labelledby="zoning-heading">
+              <h2 id="zoning-heading" className="mb-5 text-xl font-bold text-slate-900">ข้อมูลผังเมือง</h2>
+              <ZoningBadges land={land} detail />
             </section>
 
             <section>

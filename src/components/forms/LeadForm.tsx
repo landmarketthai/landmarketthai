@@ -6,6 +6,7 @@ import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
 import { PROPERTY_TYPES, PROPERTY_TYPE_LABELS } from "@/lib/marketplace/presentation";
 import { THAI_PROVINCES } from "@/lib/constants/provinces";
+import { TurnstileWidget, useTurnstile } from "@/components/security/TurnstileWidget";
 
 type LeadType = "buyer" | "partner" | "owner";
 type FieldErrors = Record<string, string[]>;
@@ -30,6 +31,7 @@ export default function LeadForm({
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const turnstile = useTurnstile();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,9 +64,10 @@ export default function LeadForm({
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...turnstile.headers() },
         body: JSON.stringify(payload),
       });
+      turnstile.reset();
 
       if (res.status === 422) {
         const body = await res.json();
@@ -76,13 +79,15 @@ export default function LeadForm({
       }
 
       if (!res.ok) {
-        setErrorMsg("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+        const body = [403, 413, 429, 503].includes(res.status) ? await res.json().catch(() => null) : null;
+        setErrorMsg(typeof body?.error === "string" ? body.error : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
         setState("error");
         return;
       }
 
       setState("success");
     } catch {
+      turnstile.reset();
       setErrorMsg("เกิดข้อผิดพลาด กรุณาลองใหม่");
       setState("error");
     }
@@ -201,6 +206,8 @@ export default function LeadForm({
         <FieldError id="err-lead-pdpa" errors={fieldErrors.consent_pdpa} />
       </div>
 
+      <TurnstileWidget onToken={turnstile.onToken} resetKey={turnstile.resetKey} action="lead" />
+
       {state === "error" && (
         <div
           role="alert"
@@ -213,7 +220,7 @@ export default function LeadForm({
 
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || (turnstile.enabled && !turnstile.token)}
         className="btn-green w-full justify-center text-base disabled:opacity-60"
       >
         {isLoading && <Loader2 size={16} className="animate-spin" aria-hidden />}

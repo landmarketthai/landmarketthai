@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 import { insertLeadAttachment } from "@/lib/neon/mutations";
-import { headStorageObject } from "@/lib/storage/provider";
+import { getStorageObjectMetadata } from "@/lib/storage/provider";
 import { uploadConfirmSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const blocked = await guardPublicWrite(req, "lead_upload");
+    if (blocked) return blocked;
+    const { tooLarge, body } = await readJsonBody(req, 4_000);
+    if (tooLarge) return tooLargeResponse();
     const result = uploadConfirmSchema.safeParse(body);
     if (!result.success) {
       return NextResponse.json({ error: result.error.flatten() }, { status: 422 });
@@ -17,9 +21,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Storage key mismatch" }, { status: 403 });
     }
 
-    const exists = await headStorageObject(storageKey);
-    if (!exists) {
+    const stored = await getStorageObjectMetadata(storageKey);
+    if (!stored) {
       return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
+    }
+    if (stored.sizeBytes !== fileSize || stored.contentType !== mimeType) {
+      return NextResponse.json({ error: "Uploaded file does not match" }, { status: 409 });
     }
 
     await insertLeadAttachment({
@@ -33,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Lead upload confirm error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

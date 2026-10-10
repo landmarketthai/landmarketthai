@@ -101,6 +101,7 @@ function normalizeLand(value: unknown): Land {
     area_sqwa: numberOrNull(row.area_sqwa),
     usable_area_sqm: numberOrNull(row.usable_area_sqm),
     zoning: row.zoning == null ? null : (row.zoning as Land["zoning"]),
+    zoning_info: row.zoning_info == null ? null : row.zoning_info as Land["zoning_info"],
     frontage_m: numberOrNull(row.frontage_m),
     depth_min_m: numberOrNull(row.depth_min_m),
     depth_max_m: numberOrNull(row.depth_max_m),
@@ -241,6 +242,28 @@ export async function getPublicListings(opts?: {
     limit,
     offset,
   );
+}
+
+/** The driver parses timestamptz to ms; the zoning save compares in SQL, so carry full microseconds as the token. */
+export const ZONING_LISTINGS_SELECT = LAND_SELECT.replace("l.*,", `l.*,
+    to_char(l.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at_token,
+    (select s.zoning_info from property_submissions s where s.linked_land_id = l.id order by s.updated_at desc limit 1) as owner_submitted_zoning,`);
+
+export function normalizeZoningLand(row: unknown): Land {
+  const base = normalizeLand(row);
+  const token = (row as { updated_at_token?: unknown }).updated_at_token;
+  const owner = (row as { owner_submitted_zoning?: unknown }).owner_submitted_zoning;
+  const land = owner == null ? base : { ...base, owner_submitted_zoning: owner as Land["zoning_info"] };
+  return typeof token === "string" && token ? { ...land, updated_at: token } : land;
+}
+
+/** Authenticated callers only; no seed fallback or public cache in the editor. */
+export async function getZoningManagementListings(): Promise<Land[]> {
+  const sql = getSqlIfConfigured();
+  if (!sql) throw new Error("DATABASE_URL is not configured");
+  const rows = await sql.query(`${ZONING_LISTINGS_SELECT}
+    where l.deleted_at is null group by l.id, p.id order by l.updated_at desc, l.id`, []);
+  return rows.map(normalizeZoningLand);
 }
 
 export async function getFeaturedListings(limit = 6): Promise<Land[]> {

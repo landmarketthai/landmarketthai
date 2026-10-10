@@ -1,5 +1,7 @@
 "use server";
 
+import { zoningFromForm } from "@/lib/zoning";
+
 import {
   insertLead,
   insertReferralAttribution,
@@ -11,6 +13,10 @@ import {
   ownerLeadSchema,
   partnerLeadSchema,
 } from "@/lib/validations";
+import { headers } from "next/headers";
+import { clientIp } from "@/lib/security/client-ip";
+import { verifyHumanToken } from "@/lib/security/human-verification";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export type LeadActionState =
   | { status: "idle" }
@@ -20,6 +26,18 @@ export type LeadActionState =
 function str(formData: FormData, field: string): string | undefined {
   const value = formData.get(field);
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+// Same gate as POST /api/leads: human check first (no-op unless HUMAN_VERIFICATION_REQUIRED=true) so
+// token-less bots cannot burn the shared "leads" ceiling, then the Neon-backed limiter. Runs before
+// the honeypot and before any DB write or n8n webhook. Returns an error state, or null to proceed.
+async function guardLeadAction(formData: FormData): Promise<LeadActionState | null> {
+  const requestHeaders = new Headers(await headers());
+  const human = await verifyHumanToken(formData.get("turnstile_token"), clientIp(requestHeaders));
+  if (!human.ok) return { status: "error", message: human.error };
+  const limit = await checkRateLimit("leads", requestHeaders);
+  if (!limit.allowed) return { status: "error", message: "ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่" };
+  return null;
 }
 
 function num(formData: FormData, field: string): number | undefined {
@@ -104,6 +122,8 @@ export async function submitPartnerLead(
   _prev: LeadActionState,
   formData: FormData,
 ): Promise<LeadActionState> {
+  const blocked = await guardLeadAction(formData);
+  if (blocked) return blocked;
   if (formData.get("_hp")) return { status: "success", id: "" };
 
   const raw = {
@@ -163,6 +183,8 @@ export async function submitOwnerLead(
   _prev: LeadActionState,
   formData: FormData,
 ): Promise<LeadActionState> {
+  const blocked = await guardLeadAction(formData);
+  if (blocked) return blocked;
   if (formData.get("_hp")) return { status: "success", id: "" };
 
   const raw = {
@@ -174,6 +196,7 @@ export async function submitOwnerLead(
     size_rai: num(formData, "size_rai"),
     asking_price: num(formData, "asking_price"),
     deed_type: str(formData, "deed_type"),
+    zoning_info: zoningFromForm(formData),
     notes: str(formData, "notes"),
     referral_code: str(formData, "referral_code"),
     consent_pdpa: formData.get("consent_pdpa") === "on",
@@ -197,6 +220,7 @@ export async function submitOwnerLead(
       size_rai: result.data.size_rai,
       asking_price: result.data.asking_price,
       deed_type: result.data.deed_type,
+      zoning_info: result.data.zoning_info,
       notes: result.data.notes,
     };
 
@@ -237,6 +261,8 @@ export async function submitBuyerLead(
   _prev: LeadActionState,
   formData: FormData,
 ): Promise<LeadActionState> {
+  const blocked = await guardLeadAction(formData);
+  if (blocked) return blocked;
   if (formData.get("_hp")) return { status: "success", id: "" };
 
   const raw = {
