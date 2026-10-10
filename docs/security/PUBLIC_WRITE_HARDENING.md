@@ -1,7 +1,7 @@
 # Public Write Endpoint Hardening (operator runbook)
 
 Status: **NOT enabled in production until the operator completes the deploy steps below.**
-The app limiter is **not dark**: once new code is deployed it limits requests immediately, using a per-instance fallback until its Neon migration runs. Human verification remains off until `HUMAN_VERIFICATION_REQUIRED=true`.
+The app limiter is **not dark**: once new code is deployed it limits requests immediately, using a per-instance fallback until its Neon migration runs. Human verification is off for leads / buyer requirements / draft submit until `HUMAN_VERIFICATION_REQUIRED=true`, which must be set from the first production release (Step 3); seller draft create is always verified on Vercel Production.
 **Release blocker:** without enabled Turnstile (or effective upstream anti-bot protection), a botnet can exhaust a shared route cap and deny legitimate leads. Verify Preview with real site/secret keys and end-to-end form submits first; do not deploy this code to Production with an unprotected 300-leads-per-10-minute global ceiling.
 No production Neon migration, Vercel firewall change, or Cloudflare Turnstile activation was performed by this workstream. Audit basis: `fe057c8` plus follow-up tests and reviewed SellWizard token handling.
 
@@ -85,14 +85,18 @@ Set a random 32+ character `RATE_LIMIT_SECRET` (Production and Preview). Otherwi
 1. Cloudflare dashboard: create a Turnstile widget for the production hostname(s) (and preview if wanted).
 2. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` (server only). Optionally set
    `TURNSTILE_EXPECTED_HOSTNAMES` (comma separated; without it the hostname is not checked).
-3. Deploy. Verify the widget renders on the lead form, the buyer form and the /sell submit step,
-   and that submissions still succeed (flag still off).
-4. ONLY THEN set `HUMAN_VERIFICATION_REQUIRED=true` (exactly `true`) and redeploy. If the secret is
-   missing the routes fail closed with 503.
-5. Rollback: unset `HUMAN_VERIFICATION_REQUIRED` and redeploy. No code change needed for leads, buyer
-   requirements and draft submit. Draft CREATE (`/api/property-submissions`) stays verified on Vercel
+3. Preview first (Cloudflare dummy keys allowed only there): flag on, verify the widget renders on the
+   lead form, the buyer form and the /sell steps, and that submissions succeed.
+4. Production: set `HUMAN_VERIFICATION_REQUIRED=true` (exactly `true`) together with the real keys
+   **before the first production build**. Never ship this code to Production with the flag off: leads and
+   buyer requirements would accept tokenless posts that can exhaust the global quota. If the secret is
+   missing or Siteverify is unreachable, verified routes fail closed with 503.
+   Full release order: `docs/release/INTEGRATION_RELEASE_CHECKLIST_20261009.md` (phases A–E).
+5. Rollback: unset `HUMAN_VERIFICATION_REQUIRED` and redeploy (short-term only; re-opens the tokenless
+   lockout). No code change needed for leads, buyer requirements and draft submit. Draft CREATE (`/api/property-submissions`) stays verified on Vercel
    Production regardless of the flag; there is no env-only kill switch for it. If Turnstile itself is down,
-   `/sell` cannot create drafts until Cloudflare recovers or a code change ships (accepted trade-off of P1 #2).
+   `/sell` cannot create drafts until Cloudflare recovers, the keys are fixed, or the previous known-good
+   deployment is promoted (accepted trade-off of P1 #2).
 
 ### Step 4. Recommended Vercel Firewall setup (described only, NOT applied)
 Availability and cost of WAF rate limiting, Bot Protection and any usage-based pricing vary by plan and

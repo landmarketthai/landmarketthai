@@ -50,7 +50,7 @@ No production database, production secret, preview, or external DB was touched.
   - Env gating: local / preview / development without flag = 201; Preview + flag + Cloudflare dummy secret = 403 tokenless / 201 with token; Production enforces strict routes only.
   - `seller-reliability.test.ts`: first edit schedules nothing until a token exists; real `ensureDraft` executed: no token = no fetch; tokens cf-1..cf-4 each sent once; 4 resets; 403 retryable, 429 not; 5xx keeps the Thai generic message.
   - Mutation check: against the pre-fix route, 4 of 5 quota tests fail.
-- **Residual risk (accepted):** a paid Turnstile solver farm / real browsers on 50+ IPs can still spend 500 verified drafts per hour. Later: alert on `property_draft_create` global exhaustion, check Siteverify `action`. The same lockout shape exists on `leads` (300/10 min) and `buyer_requirements` until `HUMAN_VERIFICATION_REQUIRED=true` (release step 10), and on `maps_link` (1500/10 min, no human check).
+- **Residual risk (accepted):** a paid Turnstile solver farm / real browsers on 50+ IPs can still spend 500 verified drafts per hour. Later: alert on `property_draft_create` global exhaustion, check Siteverify `action`. The same lockout shape exists on `leads` (300/10 min) and `buyer_requirements` until `HUMAN_VERIFICATION_REQUIRED=true` (now required from the first production release, step 12), and on `maps_link` (1500/10 min, no human check).
 - Independent read-only Sonnet 5.5 challenge review: no P0/P1; its P2 on the 429 retry loop was fixed here; its other P2/P3 notes are in this checklist (real keys, VERCEL_ENV exposure, leads strictness, solver farms).
 
 ## Local verification (synthetic secrets only, Node v24.16.0, Next 15.5.24)
@@ -93,51 +93,61 @@ Not verified locally: real Google OAuth round-trip, real Turnstile, Neon DB read
 
 ### Known, accepted (not fixed; low severity)
 
-- `SellWizard` draft-create failure shows a generic message and retries every 5 s regardless of status (including 429). Fix later: surface server `error`, retry only on 5xx / honour `Retry-After`.
 - `PATCH /api/property-submissions/[id]` has a 64 KB cap but no rate limit (gated by draft UUID token; deliberate).
 - `NEON_AUTH_BASE_URL` unset falls back to the production auth endpoint (`src/lib/auth/server.ts`). Preview/UAT must set it explicitly. `CLAUDE.md` mentions `NEXT_PUBLIC_NEON_AUTH_URL`, which code does not read.
-- If `HUMAN_VERIFICATION_REQUIRED=true` but the build lacked `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, every lead form returns 403 with no widget. Always set the site key and rebuild before flipping the flag.
+- If `HUMAN_VERIFICATION_REQUIRED=true` but the build lacked `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, every lead form returns 403 with no widget. The site key must be set before the production build (step 12 before step 13 below).
 - `neon/README.md` says "merge `develop` to `main`"; `neon/ZONING_RELEASE_REHEARSAL.md` evidence predates both merges (this checklist supersedes its local test numbers).
 
 ## Release sequence (owner-run; nothing here has been executed)
 
-1. Cloudflare: create a Turnstile widget for the production hostname(s).
-2. Neon: create a restore branch/snapshot of production; record its ID and timestamp.
-3. Run `scripts/zoning-preflight.sql` read-only against the explicitly identified production branch (direct connection). Any STOP row = do not migrate.
-4. Apply `neon/migrations/202610080001_zoning_info.sql`; run `scripts/zoning-postflight.sql`. Expected: Kabin Buri 101 rai becomes green / `owner_reported`, `verification_status` verified → pending (verified −1, pending +1).
-5. Apply `db/migrations/20261009_public_write_rate_limits.sql`; run the verify SQL in `docs/security/PUBLIC_WRITE_HARDENING.md` (no grants to `anonymous`/`authenticated`/`anon`).
-6. Vercel env (Preview and Production): confirm `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (≥32), `ADMIN_EMAILS`, `N8N_WEBHOOK_LEADS`, `DO_SPACES_*`; add `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAMES`, optional `RATE_LIMIT_SECRET`. Leave `HUMAN_VERIFICATION_REQUIRED` unset.
-   **Required real-key config for P1 #2 (hard gate):** Production MUST have real `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (inlined at build: redeploy after setting) and `TURNSTILE_SECRET_KEY` before deploy, or **no seller can create a draft** (503 if the secret is missing; 403 if the site key is missing, because the browser never gets a token). Confirm Vercel "Automatically expose System Environment Variables" is ON (default) so `VERCEL_ENV=production` is visible at runtime; if it is off, strict gating silently does nothing (step 9 check catches this).
-   Preview UAT without real keys: use only Cloudflare's documented dummy pair (site key `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`, always pass) with `HUMAN_VERIFICATION_REQUIRED=true`. Never put dummy keys in Production.
-7. Preview deploy of this branch; combined browser UAT (below).
-8. Merge to `main` / production deploy — only with explicit release permission.
-9. Post-deploy: `scripts/zoning-smoke.mjs`; Turnstile widget visible on lead, buyer, partner, `/sell`; Google OAuth into `/admin` and `/manage/zoning`. Tokenless `curl -X POST https://<prod>/api/property-submissions` must return 403 (not 201, not 503); a real browser edit on `/sell` creates exactly one draft. Logged in, `/login?next=%2F%5Cevil.example` must land on `/`.
-10. Set `HUMAN_VERIFICATION_REQUIRED=true`, redeploy (fresh build), confirm a no-token `POST /api/leads` returns 403 and a real browser submit succeeds.
+> Revised 2026-10-10 after the Codex Sol 6.1 runbook audit. Replaces the earlier 10-step list, which put the production
+> migration before Preview UAT and owner permission. Each phase starts only after the previous one is signed off.
+> **No production mutation (Neon DDL/DML, Vercel Production env change, merge to `main`, production deploy) before Phase C.**
+
+**Phase A — isolated migration rehearsal (non-production only, must pass 100%)**
+1. Neon: create a disposable child branch of UAT `br-noisy-sun-az5krbgi` (never of production `br-solitary-mud-az74nksn`).
+2. On it, as the app role (`landmarketthai_owner` on UAT): `scripts/zoning-preflight.sql` → `neon/migrations/202610080001_zoning_info.sql` → `scripts/zoning-postflight.sql` → **re-apply** `db/migrations/20261009_public_write_rate_limits.sql` (UAT still has the pre-fix function without `skip locked`) → `docs/security/PUBLIC_WRITE_HARDENING.md` Step 1 verify + ownership check (disposable `release_verify` bucket only).
+3. Rollback rehearsal there: `scripts/zoning-rollback.sql` twice, reapply migration, data unchanged. Any failure = stop.
+4. Re-apply the patched rate-limit migration on UAT `br-noisy-sun-az5krbgi` itself so Preview matches.
+
+**Phase B — combined Preview UAT (non-production only)**
+5. Preview env stays non-production: `DATABASE_URL` / `NEON_AUTH_BASE_URL` = UAT `br-noisy-sun-az5krbgi`; n8n webhook disabled or a test sink; DO Spaces test bucket only; Turnstile = Cloudflare dummy pair (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`, always pass) with `HUMAN_VERIFICATION_REQUIRED=true`. Never put dummy keys in Production.
+6. Preview deploy of the reviewed SHA; run "Preview browser UAT" below. Real DO Spaces upload and one real n8n event to a test sink are **BLOCKED** (no test bucket/sink yet): they must pass, or the owner must explicitly waive them.
+
+**Phase C — owner authorization (gate)**
+7. Owner signs off Phases A and B and gives **explicit production release permission**, including business approval of Kabin Buri 101 rai verified → pending with green zoning. Neither has been given as of 2026-10-10.
+
+**Phase D — production snapshot and read-only preflight**
+8. Neon: create a restore branch/snapshot of production; record ID and timestamp.
+9. `scripts/zoning-preflight.sql` read-only against explicitly identified production `br-solitary-mud-az74nksn` (direct connection). Any STOP row = stop. Confirm which role the production app `DATABASE_URL` uses; it must apply (own) the limiter objects. No writes in this phase.
+
+**Phase E — schema first, then app**
+10. Apply `neon/migrations/202610080001_zoning_info.sql` as the app role; run `scripts/zoning-postflight.sql`. Expected: Kabin 101 rai green / `owner_reported`, verified −1, pending +1.
+11. Apply `db/migrations/20261009_public_write_rate_limits.sql` as the app role; run Step 1 verify and ownership check **only with the `release_verify` bucket**. Never delete or update a live bucket (`leads`, `buyer_requirements`, …) or any global `'*'` row in production.
+12. Vercel Production env (real Cloudflare keys are already set there but no deployment has been built with them yet): confirm real `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAMES` (apex and `www` if both serve), **`HUMAN_VERIFICATION_REQUIRED=true` (exactly) from this first release**, `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (≥32), `ADMIN_EMAILS`, `N8N_WEBHOOK_LEADS`, `DO_SPACES_*`, optional `RATE_LIMIT_SECRET`; "Automatically expose System Environment Variables" ON (else `VERCEL_ENV` is missing and strict draft gating silently does nothing; step 14 catches it). The site key is inlined at build time, so it must be present before step 13.
+13. Merge to `main` and production deploy (fresh build).
+14. Post-deploy smoke (no load tests, no DB deletes): `scripts/zoning-smoke.mjs`; widget visible on lead, buyer, partner, `/sell`; tokenless `POST` to `/api/leads`, `/api/buyer-requirements`, `/api/property-submissions` each 403 (not 201, not 503); one real browser lead and one `/sell` edit succeed (exactly one draft); Google OAuth into `/admin` and `/manage/zoning`; logged in, `/login?next=%2F%5Cevil.example` lands on `/`.
+
+Why the flag is on from the first release: with it off, `/api/leads` (300 / 10 min global), `/api/buyer-requirements`, the lead Server Actions and draft submit accept tokenless requests, so a bot can exhaust the global quota and lock out real leads. Seller draft create (`human: "strict"`) is verified on Vercel Production whatever the flag says. Missing secret or Siteverify unreachable / non-200 = 503 on every verified route (fail closed; no quota spent).
 
 ### Preview browser UAT
 
 - Public: `/`, `/land`, a `/property/<slug>` for 37 Rai EEC Rayong and 101 Rai Kabin Buri (zoning shown, no invented official facts), `/sitemap.xml`, `/robots.txt`.
-- Lead flow: LeadForm, SubmitLandForm, PartnerForm, BuyerRequirementForm submit end-to-end; n8n receives each lead.
-- Seller: open `/sell`, confirm no draft row created on view; edit one field, confirm exactly one draft (POST carries `x-turnstile-token`; status shows verifying until the token arrives); upload to DO Spaces; submit with Turnstile (separate second token).
+- Lead flow: LeadForm, SubmitLandForm, PartnerForm (Server Action path, real browser), BuyerRequirementForm submit end-to-end; n8n test sink receives each lead (BLOCKED until a sink exists).
+- Seller: open `/sell`, confirm no draft row created on view; edit one field, confirm exactly one draft (POST carries `x-turnstile-token`; status shows verifying until the token arrives); upload to DO Spaces test bucket (BLOCKED until one exists); submit with Turnstile (separate second token).
 - Redirect: logged in, open `/login?next=%2F%5Cevil.example`, `/login?next=%2F%2Fevil.example`, `/login?next=%2Fmanage%2Fzoning`; expect `/`, `/`, `/manage/zoning`.
 - Turnstile failure: block `challenges.cloudflare.com`, confirm alert text appears.
 - Admin: Google OAuth login lands back authenticated (verifier param handled); non-admin account gets 403; admin edits zoning with 409 on stale edit.
 
-### Rollback (must be tested on the Neon restore branch before release)
+### Rollback (rehearsed on a Neon UAT child branch in Phase A before release)
 
-- App: promote previous Vercel production deployment.
-- Turnstile: unset `HUMAN_VERIFICATION_REQUIRED`, redeploy.
+- App: promote the previous known-good Vercel production deployment. This is the only full app rollback.
+- Turnstile: unsetting `HUMAN_VERIFICATION_REQUIRED` + redeploy turns verification off only for leads, buyer requirements, lead Server Actions and draft submit, and re-opens the tokenless global-quota lockout on them (short-term only). Seller draft **create** stays verified on Production regardless; if Turnstile config is broken, fix the keys and redeploy, or promote the previous deployment.
 - Zoning guards: `scripts/zoning-rollback.sql` (idempotent, keeps data).
-- Rate limits: leave in place (inert; app falls back to per-instance limiter), or
+- Rate limits: leave in place (unused by the old app), or
   `drop function if exists consume_rate_limit(text,text,int,int,int); drop table if exists public_write_rate_limits;`
-- Data corruption: Neon restore to the step-2 checkpoint (loses writes after it).
+- Data corruption: Neon restore to the step-8 checkpoint (loses writes after it).
 
 ## Blockers requiring owner
 
-1. Real Turnstile site + secret keys and the production hostname list. **Now a hard deploy gate:** without them Production `/sell` cannot create drafts (fail closed by design, P1 #2).
-2. Business-owner approval to change Kabin Buri 101 rai from verified → pending and show green zoning.
-3. Neon restore checkpoint created and ID recorded.
-4. Rollback (zoning-rollback.sql + app rollback) tested on a Neon branch.
-5. Preview deploy + combined browser UAT signed off.
-6. Explicit production release permission.
-7. Decide whether `leads` / `buyer_requirements` should also be `human: "strict"` (same global-lockout shape until `HUMAN_VERIFICATION_REQUIRED=true`). Not changed here, to avoid risking lead capture before keys exist.
+Superseded by [LANDMARKETTHAI_UAT_CLOSURE_20261010.md](LANDMARKETTHAI_UAT_CLOSURE_20261010.md) §7; release order is the phased sequence above.

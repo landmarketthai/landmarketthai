@@ -10,6 +10,16 @@ No SQL was run against Neon (production `br-solitary-mud-az74nksn` and UAT `br-n
 No real lead, n8n call, Turnstile Siteverify call or DO Spaces request was made. All database work used a throwaway
 local Docker PostgreSQL 18.6 container with synthetic rows.
 
+## 0. Current state (updated after the Codex Sol 6.1 runbook audit, 2026-10-10)
+
+- Code under test: `0c8faa7`. Local gates: 308/308 `npm test`, 16/16 local E2E (§3) against disposable PostgreSQL 18; no Neon, Vercel or external call.
+- Production Vercel: real Cloudflare Turnstile keys are set in the env but **no production deployment has been built with them yet** (site key is inlined at build).
+- Preview: env points at UAT Neon `br-noisy-sun-az5krbgi`, Cloudflare dummy Turnstile keys, n8n webhook disabled.
+- UAT Neon (supervisor, read-only): `landmarketthai_owner` owns `public_write_rate_limits` and `consume_rate_limit`, and the Preview app connects as that role. UAT still has the **pre-fix** function (no `skip locked`); the patched migration must be re-applied on an isolated UAT child branch, then on UAT itself (checklist Phase A).
+- Still BLOCKED: real DO Spaces upload to a test bucket; real n8n event to a test sink.
+- **Not given:** business approval for Kabin 101 rai (verified → pending, green zoning) and explicit production release approval. Nothing in this report is production approval.
+- Release order is the phased sequence in [INTEGRATION_RELEASE_CHECKLIST_20261009.md](INTEGRATION_RELEASE_CHECKLIST_20261009.md): isolated rehearsal → Preview UAT → owner authorization → snapshot + read-only preflight → schema → app, with `HUMAN_VERIFICATION_REQUIRED=true` from the first production release.
+
 ## 1. What changed in this commit
 
 | Change | Severity | Why | Test |
@@ -64,7 +74,7 @@ lines (auth upstream deliberately dead), no DB, limiter-fallback or unhandled er
 
 Limits of this E2E (be precise when quoting it):
 - Check 13's "forged cookie 401" holds because the auth upstream is unreachable (fail closed), not because a real Better Auth server rejected the cookie. Admin **403 for a real non-admin session** is covered by route tests (`admin-zoning-route.test.ts`, `operations-api.test.ts`, `admin-flow.test.ts`) with a stubbed session, not by a live login.
-- `PartnerForm` uses the Server Action in `src/app/actions/leads.ts`, not `/api/leads`; E2E posted `lead_type: partner` to `/api/leads`. The Server Action path is covered by `lead-actions.test.ts` only.
+- **Partner lead in E2E went through the API, not the real form path.** `PartnerForm` uses the Server Action in `src/app/actions/leads.ts`; E2E posted `lead_type: partner` to `/api/leads`. The Server Action path is covered by `lead-actions.test.ts` only and still needs a real-browser Preview submit.
 - Turnstile is faked at Siteverify; browser widget rendering is not exercised here (Preview Chrome UAT covered it earlier).
 - DO Spaces: presign is signed offline; confirm proves "no object → no row". A real PUT/HEAD against a bucket was **not** done (no test bucket). BLOCKED for real-storage E2E.
 
@@ -107,7 +117,7 @@ A — API/UAT: no P0/P1. Fixed: storage-key extension. Confirmed, **not fixed (o
 - P3: webhook failure logs the n8n response body.
 
 B — rollout: no P0. Fixed: cleanup deadlock, stale/unsafe doc lines. Confirmed, not fixed:
-- P1 (process): checklist step 6 must state that Preview uses a Neon **non-production** branch, a **non-production** n8n URL and a **test** bucket. The current Preview already does (per supervisor: `br-noisy-sun-az5krbgi`, `example.invalid` n8n); keep it that way and re-check before any Preview UAT that uploads.
+- P1 (process): Preview must use a Neon **non-production** branch, a **non-production** n8n URL and a **test** bucket. Now checklist Phase B step 5. The current Preview already does (per supervisor: `br-noisy-sun-az5krbgi`, n8n webhook disabled); re-check before any Preview UAT that uploads.
 - P2: `NEON_AUTH_BASE_URL` unset falls back to the production auth endpoint (`src/lib/auth/server.ts`) with no `VERCEL_ENV` guard. Already listed as accepted; owner must confirm Preview sets it.
 - P2: strict draft-create verification has no env-only kill switch on Production (documented now).
 - P2: trigger forces `verification_status = 'pending'` whenever `zoning_info` changes, overriding a same-statement admin `verified` (by design; admins re-verify after a zoning change).
@@ -116,7 +126,7 @@ B — rollout: no P0. Fixed: cleanup deadlock, stale/unsafe doc lines. Confirmed
 
 Old production app (`main`) after both migrations: rate-limit objects are unused by it; zoning column is nullable,
 no default, no rewrite. Per earlier evidence the old handler returns HTTP 500 (not 409) for a lossy legacy zoning edit
-and Kabin shows pending once migrated. Migration-first order stands. Not executed here: old SHA against a migrated DB.
+and Kabin shows pending once migrated. Schema-before-app order stands within checklist Phase E (only after rehearsal, UAT and owner authorization). Not executed here: old SHA against a migrated DB.
 
 ## 6. Prior evidence relied on, not re-tested here
 
@@ -127,16 +137,18 @@ a real non-admin account, or the Preview deployment (Vercel API returned 403 for
 
 ## 7. Blockers requiring owner (Production NO-GO until all closed)
 
-1. Real Turnstile site + secret keys for the production hostnames, set **before** the production build (site key is inlined), and `TURNSTILE_EXPECTED_HOSTNAMES` including apex and `www` if both serve. Without them Production `/sell` cannot create drafts (fail closed by design).
-2. Apply `db/migrations/20261009_public_write_rate_limits.sql` **as the app's `DATABASE_URL` role** and run the ownership check in `PUBLIC_WRITE_HARDENING.md` Step 1 as that role. Re-apply it on `br-noisy-sun-az5krbgi` too (it has the pre-fix function; harmless, but Preview should match).
-3. Neon restore point of production recorded (ID + timestamp) before any DDL.
-4. Rollback rehearsed on a **Neon** child branch (this report covers PG18 locally only).
-5. Business-owner approval: Kabin Buri 101 rai verified → pending, green zoning shown.
-6. Vercel env confirmation (I could not read it): Preview `NEON_AUTH_BASE_URL` = UAT branch auth; Preview n8n/DO = non-production; Production `N8N_WEBHOOK_LEADS`, `DO_SPACES_*`, `ADMIN_EMAILS`, `NEON_AUTH_COOKIE_SECRET` (≥32) set; "Automatically expose System Environment Variables" ON.
-7. Real DO Spaces upload + confirm against a **test** bucket (not done anywhere yet), and one real n8n notification to a **test** workflow.
-8. Decide: should buyer requirements and seller submissions notify n8n (P2 gap above)? Should `leads` / `buyer_requirements` be `human: "strict"`?
-9. Supervising assistant reviews this commit, then pushes; Preview redeploy of the new SHA and a short re-smoke (pages, tokenless draft POST 403, one seller draft).
-10. Explicit production release permission.
+In release-phase order (checklist phases A–E). Items 1–5 touch non-production only; nothing in production may change before item 6.
+
+1. **Phase A:** on a disposable child branch of UAT `br-noisy-sun-az5krbgi`, as `landmarketthai_owner`: zoning preflight → migration → postflight → re-apply the patched rate-limit migration → Step 1 verify (`release_verify` bucket only) → zoning rollback rehearsal. 100% pass. Then re-apply the patched rate-limit migration on UAT itself.
+2. **Phase B:** supervising assistant reviews this commit, pushes; Preview redeploy of the reviewed SHA (Preview env stays UAT DB, dummy Turnstile, n8n disabled / test sink, test bucket) and combined browser UAT, including a real-browser PartnerForm (Server Action) submit.
+3. Real DO Spaces upload + confirm against a **test** bucket and one real n8n notification to a **test** workflow. BLOCKED (no test bucket/sink); pass or explicit owner waiver.
+4. Vercel env confirmation (I could not read it): Preview `NEON_AUTH_BASE_URL` = UAT branch auth; Production `N8N_WEBHOOK_LEADS`, `DO_SPACES_*`, `ADMIN_EMAILS`, `NEON_AUTH_COOKIE_SECRET` (≥32), `TURNSTILE_EXPECTED_HOSTNAMES` (apex and `www` if both serve) set; "Automatically expose System Environment Variables" ON.
+5. Owner decisions: should buyer requirements and seller submissions notify n8n (P2 gap above)? Should `leads` / `buyer_requirements` become `human: "strict"` (not needed if the flag is on from the first release, below)?
+6. **Phase C (gate):** business-owner approval of Kabin Buri 101 rai verified → pending with green zoning, and **explicit production release permission**. Neither given as of this report.
+7. **Phase D:** Neon restore point of production `br-solitary-mud-az74nksn` recorded (ID + timestamp); read-only zoning preflight; confirm the production app's `DATABASE_URL` role.
+8. **Phase E:** apply both migrations **as that role** (Step 1 ownership check as that role; verify only with the `release_verify` bucket, never delete live `leads` or `'*'` rows), then deploy the app. Production must have real `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (already in Vercel Production env, not yet built into a deployment) and `HUMAN_VERIFICATION_REQUIRED=true` **before** the first production build, so leads and buyer requirements are never tokenless (quota-exhaustion lockout) in production.
+
+Rollback facts (match the code): unsetting `HUMAN_VERIFICATION_REQUIRED` only disables verification for leads, buyer requirements, lead Server Actions and draft submit. Seller draft create stays verified on Vercel Production regardless; if Turnstile config is broken, fix keys + redeploy or promote the previous known-good deployment. Siteverify down or secret missing = 503 on every verified route (fail closed).
 
 ## 8. Residual risk (accepted unless owner says otherwise)
 
