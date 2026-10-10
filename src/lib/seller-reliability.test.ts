@@ -367,7 +367,7 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
   // Static guard: the only POST to the collection endpoint lives in ensureDraft, never in init.
   const initSource = wizard.slice(wizard.indexOf("async function init()"), wizard.indexOf("  }, [restoreAttempt]);"));
   assert.doesNotMatch(initSource, /property-submissions/);
-  assert.equal(wizard.split('fetch("/api/property-submissions", { method: "POST" })').length - 1, 1);
+  assert.equal(wizard.split('fetch("/api/property-submissions", { method: "POST", headers: human })').length - 1, 1);
 
   // Initial visit: no credentials, so init must not hit the network at all.
   let posts = 0;
@@ -389,7 +389,7 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
   const end = wizard.indexOf("  // Restored local edits", start);
   const run = (formSnapshot: string, saveState = "saved", overrides: Record<string, unknown> = {}) => {
     const timers: unknown[] = []; const effects: (() => void)[] = [];
-    const env = { useEffect: (callback: () => void) => { effects.push(callback); }, loading: false, submitting: false, submitted: false, draftId: null, initFailed: false, saveState, formSnapshot, savedForm: { current: pristine }, AUTOSAVE_DELAY_MS: 1500, saveDraftRef: { current: () => {} }, setTimeout: (fn: unknown) => { timers.push(fn); }, clearTimeout: () => {}, ...overrides };
+    const env = { useEffect: (callback: () => void) => { effects.push(callback); }, loading: false, submitting: false, submitted: false, draftId: null, initFailed: false, saveState, formSnapshot, savedForm: { current: pristine }, AUTOSAVE_DELAY_MS: 1500, saveDraftRef: { current: () => {} }, setTimeout: (fn: unknown) => { timers.push(fn); }, clearTimeout: () => {}, draftTurnstile: { enabled: false, token: null }, ...overrides };
     new Function(...Object.keys(env), stripTypeScriptTypes(wizard.slice(start, end)))(...Object.values(env));
     effects[0](); return timers.length;
   };
@@ -401,6 +401,8 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
   assert.equal(run(edited, "saved", { initFailed: true }), 0, "a failed restore never falls through to creating a new draft");
   assert.equal(run(edited, "saved", { submitted: true }), 0);
   assert.equal(run(edited, "saved", { draftId: "existing" }), 0, "an existing draft uses normal autosave, not create");
+  assert.equal(run(edited, "saved", { draftTurnstile: { enabled: true, token: null } }), 0, "first edit waits for the draft Turnstile token");
+  assert.equal(run(edited, "saved", { draftTurnstile: { enabled: true, token: "cf-token" } }), 1, "token arrival schedules the create");
 
   // ensureDraft: concurrent callers share one POST, a failed POST is retryable, credentials and local edits are stored on success.
   let calls = 0; let fail = true;
@@ -412,6 +414,7 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
     DRAFT_STORAGE_KEY: "credentials", localFormKey: (id: string) => `local:${id}`, localStorage: { setItem: (key: string, value: string) => writes.set(key, value) },
     setError: (message: string) => { state.error = message; }, setDraftId: (id: string) => { state.draftId = id; }, setToken: (value: string) => { state.token = value; },
     fetch: async () => { calls++; await gate.promise; return fail ? response(503) : response(200, { id: "draft-new", token: "tok" }); },
+    draftTurnstile: { enabled: false, headers: () => ({}), reset: () => {} },
   });
   const first = ensureDraft(); const second = ensureDraft();
   gate.resolve(); await assert.rejects(first); await assert.rejects(second);
@@ -423,4 +426,35 @@ test("viewing /sell never creates a draft; the first edit, upload or submit does
   assert.equal(JSON.parse(writes.get("local:draft-new")!).title, "keep me", "unsaved edits are mirrored under the new draft id");
   assert.equal(JSON.parse(writes.get("credentials")!).id, "draft-new");
   assert.equal(state.draftId, "draft-new");
+});
+
+test("draft creation with Turnstile on: no token = no POST; token sent once, widget reset after every attempt; server reason surfaced", async () => {
+  const sent: (Record<string, string> | undefined)[] = [];
+  let resets = 0;
+  let tokenNow: string | null = null;
+  let reply = response(403, { error: "กรุณายืนยันว่าคุณไม่ใช่บอท แล้วลองอีกครั้ง", code: "human_verification_failed" });
+  const state = { draftId: null as string | null };
+  const ensureDraft = handler("ensureDraft", {
+    credentials: { current: null }, creating: { current: null }, draftId: null, token: null, storageId: { current: null }, formRef: { current: {} },
+    DRAFT_STORAGE_KEY: "credentials", localFormKey: (id: string) => `local:${id}`, localStorage: { setItem: () => {} },
+    setError: () => {}, setDraftId: (id: string) => { state.draftId = id; }, setToken: () => {},
+    fetch: async (_url: string, init: RequestInit) => { sent.push(init.headers as Record<string, string>); return reply; },
+    draftTurnstile: { enabled: true, headers: () => (tokenNow ? { "x-turnstile-token": tokenNow } : {}), reset: () => { resets++; tokenNow = null; } },
+  });
+  await assert.rejects(ensureDraft(), /ยืนยันว่าคุณไม่ใช่บอท/);
+  assert.equal(sent.length, 0, "a tokenless create is never sent, so it cannot touch the quota");
+  tokenNow = "cf-1";
+  await assert.rejects(ensureDraft(), (e: Error & { retryable?: boolean }) => /กรุณายืนยันว่าคุณไม่ใช่บอท แล้วลองอีกครั้ง/.test(e.message) && e.retryable === true, "403 reason shown and retried with the next fresh token");
+  assert.deepEqual(sent, [{ "x-turnstile-token": "cf-1" }]);
+  assert.equal(resets, 1, "single-use token reset after a failed attempt");
+  tokenNow = "cf-2"; reply = response(429, { error: "ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่", code: "rate_limited" });
+  await assert.rejects(ensureDraft(), (e: Error & { retryable?: boolean }) => /บ่อยเกินไป/.test(e.message) && e.retryable === false, "429 stops the 5 s auto-retry loop");
+  tokenNow = "cf-3"; reply = response(500, { error: "Unable to create draft" });
+  await assert.rejects(ensureDraft(), /ไม่สามารถสร้างแบบร่างได้/, "5xx keeps the Thai generic message");
+  tokenNow = "cf-4"; reply = response(201, { id: "draft-ok", token: "tok" });
+  assert.deepEqual(await ensureDraft(), { id: "draft-ok", token: "tok" });
+  assert.deepEqual(sent.map((h) => h?.["x-turnstile-token"]), ["cf-1", "cf-2", "cf-3", "cf-4"], "each attempt used a fresh token");
+  assert.equal(resets, 4);
+  assert.equal(state.draftId, "draft-ok");
+  assert.ok(wizard.includes('{!draftId && <div className="px-4 sm:px-8"><TurnstileWidget onToken={draftTurnstile.onToken} action="property-draft" resetKey={draftTurnstile.resetKey} /></div>}'), "draft widget mounted until the draft exists");
 });

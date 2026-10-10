@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import * as validations from "../validations.ts";
+import * as safeRedirect from "../safe-redirect.ts";
 
 // Real route + real guard code; only the limiter, human check and DB are in-memory.
 function load<T>(path: string, modules: Record<string, unknown>): T {
@@ -133,7 +134,7 @@ test("property draft creation uses the shared limiter instead of a per-process M
   // Different spoofed X-Forwarded-For values no longer matter: the decision is the shared limiter's.
   for (const ip of ["1.1.1.1", "2.2.2.2"]) assert.equal((await route.POST(post("{}", { "x-forwarded-for": ip }))).status, 429);
   assert.equal(state.drafts, 1);
-  assert.equal(state.humanChecks, 0, "draft creation is not human-gated; submit is");
+  assert.equal(state.humanChecks, 3, "draft creation is human-checked before the limiter on every attempt");
 });
 
 test("every public write route is guarded and no route keeps a per-process rate-limit Map", () => {
@@ -143,7 +144,7 @@ test("every public write route is guarded and no route keeps a per-process rate-
   const expected: Record<string, RegExp> = {
     "leads/route.ts": /guardPublicWrite\(req, "leads", \{ human: true \}\)/,
     "buyer-requirements/route.ts": /guardPublicWrite\(request, "buyer_requirements", \{ human: true \}\)/,
-    "property-submissions/route.ts": /guardPublicWrite\(request, "property_draft_create"\)/,
+    "property-submissions/route.ts": /guardPublicWrite\(request, "property_draft_create", \{ human: "strict" \}\)/,
     "property-submissions/[id]/submit/route.ts": /guardPublicWrite\(request, "property_draft_submit", \{ human: true \}\)/,
     "property-submissions/[id]/uploads/presign/route.ts": /guardPublicWrite\(request, "submission_upload"\)/,
     "property-submissions/[id]/uploads/confirm/route.ts": /guardPublicWrite\(request, "submission_upload"\)/,
@@ -173,6 +174,7 @@ test("every public write route is guarded and no route keeps a per-process rate-
 test("legacy /auth/callback never redirects off-site", async () => {
   const route = load<{ GET: (request: Request) => Promise<{ location: string }> }>("../../app/auth/callback/route.ts", {
     "next/server": { NextResponse: { redirect: (url: URL) => ({ location: url.href }) } },
+    "@/lib/safe-redirect": safeRedirect,
   });
   const go = async (next: string) => (await route.GET(new Request(`https://landmarketthai.com/auth/callback?next=${encodeURIComponent(next)}`))).location;
   for (const next of ["/\t/evil.com", "/\n/evil.com", "//evil.com", "/\\evil.com", "https://evil.com", "javascript:alert(1)"]) {

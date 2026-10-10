@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { authClient, authConfigured } from "@/lib/auth/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 function GoogleIcon() {
   return (
@@ -38,10 +39,7 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null);
 
   const authError = searchParams.get("error");
-  const requestedNext = searchParams.get("next") ?? "/";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//")
-    ? requestedNext
-    : "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const authErrorMessage =
     authError === "auth_failed"
@@ -52,7 +50,7 @@ export default function LoginClient() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(next === "/login" ? "/" : next);
+      router.replace(next);
     }
   }, [user, loading, router, next]);
 
@@ -66,7 +64,7 @@ export default function LoginClient() {
     setError(null);
 
     try {
-      const callbackURL = `${window.location.origin}${next === "/login" ? "/" : next}`;
+      const callbackURL = `${window.location.origin}${next}`;
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL,

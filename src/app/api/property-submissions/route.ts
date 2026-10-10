@@ -3,7 +3,8 @@ import { createPropertyDraft } from "@/lib/neon/marketplace";
 import { guardPublicWrite } from "@/lib/security/http";
 
 export async function POST(request: NextRequest) {
-  const blocked = await guardPublicWrite(request, "property_draft_create");
+  // Strict: a tokenless bot spread over many IPs must be rejected before it can drain the global draft quota.
+  const blocked = await guardPublicWrite(request, "property_draft_create", { human: "strict" });
   if (blocked) return blocked;
 
   try {

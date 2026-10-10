@@ -22,13 +22,21 @@ export function humanVerificationRequired(): boolean {
   return process.env.HUMAN_VERIFICATION_REQUIRED?.trim() === "true";
 }
 
-export async function verifyHuman(headers: Headers, remoteIp: string): Promise<HumanCheck> {
-  return verifyHumanToken(headers.get(HUMAN_TOKEN_HEADER), remoteIp);
+/**
+ * `strict` routes are always verified on Vercel Production, whatever the flag says, so a missing
+ * flag can never leave them open there (missing secret = 503, fail closed). Elsewhere the flag decides.
+ */
+export function humanVerificationEnforced(strict = false): boolean {
+  return humanVerificationRequired() || (strict && process.env.VERCEL_ENV?.trim() === "production");
+}
+
+export async function verifyHuman(headers: Headers, remoteIp: string, strict = false): Promise<HumanCheck> {
+  return verifyHumanToken(headers.get(HUMAN_TOKEN_HEADER), remoteIp, strict);
 }
 
 /** Same check with an explicit token: Server Actions read it from FormData, not a header. */
-export async function verifyHumanToken(rawToken: unknown, remoteIp: string): Promise<HumanCheck> {
-  if (!humanVerificationRequired()) return { ok: true };
+export async function verifyHumanToken(rawToken: unknown, remoteIp: string, strict = false): Promise<HumanCheck> {
+  if (!humanVerificationEnforced(strict)) return { ok: true };
 
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
   if (!secret) {

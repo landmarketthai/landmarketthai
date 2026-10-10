@@ -170,6 +170,8 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   const [saveRetryable, setSaveRetryable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const turnstile = useTurnstile();
+  // Separate single-use token for draft creation; submit keeps its own.
+  const draftTurnstile = useTurnstile();
   const [uploadBatchCount, setUploadBatchCount] = useState(0);
   const uploading = uploadBatchCount > 0;
   const uploadBatches = useRef(new Set<Promise<boolean>>());
@@ -352,18 +354,24 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
     const existing = credentials.current ?? (draftId && token ? { id: draftId, token } : null);
     if (existing) return Promise.resolve(existing);
     creating.current ??= (async () => {
-      const response = await fetch("/api/property-submissions", { method: "POST" });
-      if (!response.ok) throw new Error("ไม่สามารถสร้างแบบร่างได้ ข้อมูลที่กรอกยังอยู่ในหน้านี้");
-      const created = (await response.json()) as { id: string; token: string };
+      // The server rejects tokenless creates before they touch the shared quota; wait for the widget instead of sending one.
+      const human = draftTurnstile.headers();
+      if (draftTurnstile.enabled && !Object.keys(human).length) throw new Error("กำลังยืนยันว่าคุณไม่ใช่บอทก่อนสร้างแบบร่าง ข้อมูลที่กรอกยังอยู่ในหน้านี้");
+      // Single-use token: reset after every attempt so a retry gets a fresh one.
+      const response = await fetch("/api/property-submissions", { method: "POST", headers: human }).finally(() => draftTurnstile.reset());
+      const created = await response.json().catch(() => null) as { id?: string; token?: string; error?: string } | null;
+      // A 429 here is the hour-long per-IP lock: stop auto-retrying; the manual save button still works.
+      if (!response.ok) throw Object.assign(new Error([403, 429, 503].includes(response.status) && created?.error ? created.error : "ไม่สามารถสร้างแบบร่างได้ ข้อมูลที่กรอกยังอยู่ในหน้านี้"), { retryable: response.status !== 429 });
       if (!created?.id || !created.token) throw new Error("ไม่สามารถสร้างแบบร่างได้ ข้อมูลที่กรอกยังอยู่ในหน้านี้");
-      credentials.current = created;
+      const ready = { id: created.id, token: created.token };
+      credentials.current = ready;
       storageId.current = created.id;
       try {
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(created));
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(ready));
         localStorage.setItem(localFormKey(created.id), JSON.stringify(formRef.current));
       } catch { setError("เก็บข้อมูลในเครื่องไม่สำเร็จ กรุณาบันทึกแบบร่างก่อนปิดหน้านี้"); }
       setDraftId(created.id); setToken(created.token);
-      return created;
+      return ready;
     })().finally(() => { creating.current = null; });
     return creating.current;
   }
@@ -392,7 +400,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
       return true;
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "บันทึกแบบร่างไม่สำเร็จ");
-      setSaveRetryable(retryable);
+      setSaveRetryable(retryable && (reason as { retryable?: boolean })?.retryable !== false);
       setSaveState("error");
       return false;
     }
@@ -413,9 +421,10 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
   // No draft exists until the seller edits something; the first edit creates it, then normal autosave takes over.
   useEffect(() => {
     if (loading || submitting || submitted || draftId || initFailed || saveState === "error" || formSnapshot === savedForm.current) return;
+    if (draftTurnstile.enabled && !draftTurnstile.token) return; // Edits stay local until the widget yields a token.
     const timer = setTimeout(() => void saveDraftRef.current(), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [formSnapshot, loading, submitting, submitted, draftId, initFailed, saveState]);
+  }, [formSnapshot, loading, submitting, submitted, draftId, initFailed, saveState, draftTurnstile.enabled, draftTurnstile.token]);
 
   // Restored local edits are dirty. Re-check after saves so reverting an in-flight edit is saved too.
   useEffect(() => {
@@ -577,7 +586,7 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
 
   const errorCount = Object.keys(fieldErrors).length;
   const pinFromLink = mapsStatus.state === "ok" && form.lat === mapsStatus.lat && form.lng === mapsStatus.lng;
-  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? (draftId ? "บันทึกแล้ว" : "แบบร่างจะถูกสร้างเมื่อเริ่มกรอก") : "ยังไม่ได้บันทึก";
+  const saveLabel = saveState === "saving" ? "กำลังบันทึก..." : saveState === "error" ? (saveRetryable ? "บันทึกไม่สำเร็จ — จะลองใหม่" : "บันทึกไม่สำเร็จ — กรุณาตรวจสอบข้อมูล") : formSnapshot === savedForm.current ? (draftId ? "บันทึกแล้ว" : "แบบร่างจะถูกสร้างเมื่อเริ่มกรอก") : !draftId && draftTurnstile.enabled && !draftTurnstile.token ? "กำลังยืนยันตัวตนก่อนสร้างแบบร่าง..." : "ยังไม่ได้บันทึก";
 
   return (
     <div className="-mx-4 border-b border-slate-200 bg-white sm:mx-0 sm:rounded-3xl sm:border sm:shadow-sm">
@@ -587,6 +596,8 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
           {saveLabel ?? "บันทึกแบบร่างอัตโนมัติ"}
         </span>
       </div>
+      {/* Mounted only until the draft exists: draft creation needs its own token (POST /api/property-submissions). */}
+      {!draftId && <div className="px-4 sm:px-8"><TurnstileWidget onToken={draftTurnstile.onToken} action="property-draft" resetKey={draftTurnstile.resetKey} /></div>}
 
       <fieldset disabled={submitting} className="min-w-0 divide-y divide-slate-100">
         {error && <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-8">{error}</div>}
