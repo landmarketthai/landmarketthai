@@ -20,7 +20,7 @@ test("legacy detail permanently redirects to the resolved canonical listing", ()
 
 test("removed land insights URL redirects permanently to search", () => {
   assert.match(read("../next.config.ts"), /source: "\/land-insights", destination: "\/search", permanent: true/);
-  assert.doesNotMatch(read("../middleware.ts"), /land-insights/);
+  assert.doesNotMatch(read("../src/middleware.ts"), /land-insights/);
 });
 
 test("property type migration preserves buyer demand legacy values and all canonical types", () => {
