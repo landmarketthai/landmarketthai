@@ -115,14 +115,38 @@ Not verified locally: real Google OAuth round-trip, real Turnstile, Neon DB read
 6. Preview deploy of the reviewed SHA; run "Preview browser UAT" below. Real DO Spaces upload and one real n8n event to a test sink are **BLOCKED** (no test bucket/sink yet): they must pass, or the owner must explicitly waive them.
 
 **Phase C — owner authorization (gate)**
-7. Owner signs off Phases A and B and gives **explicit production release permission**, including business approval of Kabin Buri 101 rai verified → pending with green zoning. Neither has been given as of 2026-10-10.
+7. **Business zoning/listing decision received 2026-10-10:** พี่ไกร confirms Kabin Buri 101 rai is **green** and authorizes the **listing review** `verification_status='verified'`. Keep `zoning_info.status='owner_reported'` and `source='พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ'` until independent zoning-map/document evidence exists; `verified` does not mean title deed, ownership or official zoning is authenticated. This business decision **does not** authorize Production mutation. The owner must separately sign off Phases A and B and grant **explicit production release permission** before any Production DDL/DML, environment change, merge or deployment.
 
 **Phase D — production snapshot and read-only preflight**
 8. Neon: create a restore branch/snapshot of production; record ID and timestamp.
 9. `scripts/zoning-preflight.sql` read-only against explicitly identified production `br-solitary-mud-az74nksn` (direct connection). Any STOP row = stop. Confirm which role the production app `DATABASE_URL` uses; it must apply (own) the limiter objects. No writes in this phase.
 
 **Phase E — schema first, then app**
-10. Apply `neon/migrations/202610080001_zoning_info.sql` as the app role; run `scripts/zoning-postflight.sql`. Expected: Kabin 101 rai green / `owner_reported`, verified −1, pending +1.
+10. Apply `neon/migrations/202610080001_zoning_info.sql` as the app role; run `scripts/zoning-postflight.sql`. Immediately after migration, Kabin 101 rai becomes green / `owner_reported` and the zoning-change trigger resets listing review from `verified` to `pending`; this is expected. **After successful postflight and only within an explicitly authorized Production release**, set just that live listing's generic review back to `verified` in a separate guarded update (matching slug, green color, `owner_reported` provenance and `pending` review); verify exactly one row returned. Do not change zoning provenance to `map_checked` or `document_verified` without the required source/date/evidence. Other listings must remain unchanged.
+**Guarded business-review finalization (part of the authorized release only, after step 10 postflight):**
+```sql
+-- NEVER run in Production before explicit Phase C authorization + Neon restore checkpoint.
+DO $review$
+DECLARE changed int;
+BEGIN
+  UPDATE public.lands SET verification_status = 'verified', updated_at = now()
+  WHERE slug = '101-rai-kabin-buri' AND deleted_at IS NULL
+    AND verification_status = 'pending'
+    AND zoning_info->>'status' = 'owner_reported'
+    AND zoning_info->'zones'->0->>'color' = 'green'
+    AND zoning_info->>'source' = 'พี่ไกรแจ้ง ยังไม่มีหลักฐานทางการ';
+  GET DIAGNOSTICS changed = ROW_COUNT;
+  IF changed <> 1 THEN
+    RAISE EXCEPTION 'Kabin review finalization mismatch: expected 1 row, got %', changed;
+  END IF;
+END
+$review$;
+-- Read back exactly one row; confirm listing verified but zoning provenance owner_reported.
+SELECT slug, verification_status, zoning_info->>'status' AS zoning_status,
+       zoning_info->'zones'->0->>'color' AS zoning_color
+FROM public.lands WHERE slug = '101-rai-kabin-buri' AND deleted_at IS NULL;
+```
+
 11. Apply `db/migrations/20261009_public_write_rate_limits.sql` as the app role; run Step 1 verify and ownership check **only with the `release_verify` bucket**. Never delete or update a live bucket (`leads`, `buyer_requirements`, …) or any global `'*'` row in production.
 12. Vercel Production env (real Cloudflare keys are already set there but no deployment has been built with them yet): confirm real `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAMES` (apex and `www` if both serve), **`HUMAN_VERIFICATION_REQUIRED=true` (exactly) from this first release**, `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (≥32), `ADMIN_EMAILS`, `N8N_WEBHOOK_LEADS`, `DO_SPACES_*`, optional `RATE_LIMIT_SECRET`; "Automatically expose System Environment Variables" ON (else `VERCEL_ENV` is missing and strict draft gating silently does nothing; step 14 catches it). The site key is inlined at build time, so it must be present before step 13.
 13. Merge to `main` and production deploy (fresh build).
@@ -132,7 +156,7 @@ Why the flag is on from the first release: with it off, `/api/leads` (300 / 10 m
 
 ### Preview browser UAT
 
-- Public: `/`, `/land`, a `/property/<slug>` for 37 Rai EEC Rayong and 101 Rai Kabin Buri (zoning shown, no invented official facts), `/sitemap.xml`, `/robots.txt`.
+- Public: `/`, `/land`, a `/property/<slug>` for 37 Rai EEC Rayong and 101 Rai Kabin Buri (green / `owner_reported` on Kabin, generic listing review `verified` after owner-approved separate review; no official zoning assertion), `/sitemap.xml`, `/robots.txt`.
 - Lead flow: LeadForm and SubmitLandForm (API), PartnerForm (Server Action path, real browser) and BuyerRequirementForm submit end-to-end on isolated Preview. A test n8n sink is expected to receive events **only for the lead API and lead Server Actions**, not for buyer requirements or seller submissions (their lead rows are instead verified in Neon UAT and the Admin queue). Real webhook delivery is BLOCKED until a dedicated test sink exists; whether those other lead types should notify n8n is a product decision.
 - Seller: open `/sell`, confirm no draft row created on view; edit one field, confirm exactly one draft (POST carries `x-turnstile-token`; status shows verifying until the token arrives); upload to DO Spaces test bucket (BLOCKED until one exists); submit with Turnstile (separate second token).
 - Redirect: logged in, open `/login?next=%2F%5Cevil.example`, `/login?next=%2F%2Fevil.example`, `/login?next=%2Fmanage%2Fzoning`; expect `/`, `/`, `/manage/zoning`.
