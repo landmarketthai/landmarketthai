@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, Loader2, Upload, X } from "lucide-react";
 import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
 import { THAI_PROVINCES, EEC_PROVINCES } from "@/lib/constants/provinces";
+import { TurnstileWidget, useTurnstile } from "@/components/security/TurnstileWidget";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_FILES = 10;
@@ -23,6 +24,7 @@ export default function SubmitLandForm() {
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const turnstile = useTurnstile();
   const [files, setFiles] = useState<FileItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +104,7 @@ export default function SubmitLandForm() {
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...turnstile.headers() },
         body: JSON.stringify({
           lead_type: "owner",
           name: data.name,
@@ -118,6 +120,7 @@ export default function SubmitLandForm() {
           source: window.location.pathname,
         }),
       });
+      turnstile.reset();
 
       if (res.status === 422) {
         const body = await res.json();
@@ -129,7 +132,8 @@ export default function SubmitLandForm() {
       }
 
       if (!res.ok) {
-        setErrorMsg("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+        const body = [403, 413, 429, 503].includes(res.status) ? await res.json().catch(() => null) : null;
+        setErrorMsg(typeof body?.error === "string" ? body.error : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
         setState("error");
         return;
       }
@@ -152,6 +156,7 @@ export default function SubmitLandForm() {
 
       setState("success");
     } catch {
+      turnstile.reset();
       setErrorMsg("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
       setState("error");
     }
@@ -419,9 +424,11 @@ export default function SubmitLandForm() {
         </div>
       )}
 
+      <TurnstileWidget onToken={turnstile.onToken} resetKey={turnstile.resetKey} action="owner-lead" />
+
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || (turnstile.enabled && !turnstile.token)}
         className="btn-primary justify-center disabled:opacity-60"
       >
         {isLoading && <Loader2 size={16} className="animate-spin" aria-hidden />}

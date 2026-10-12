@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertEvent } from "@/lib/neon/mutations";
+import { readJsonBody } from "@/lib/security/http";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { z } from "zod";
 
 const headers = { "Cache-Control": "no-store" };
@@ -20,9 +22,11 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // Fire-and-forget beacon: over-limit, oversized and invalid events are dropped silently.
+    if (!(await checkRateLimit("events", req.headers)).allowed) return NextResponse.json({ ok: true }, { headers });
+    const { tooLarge, body } = await readJsonBody(req, 4_000);
     const result = schema.safeParse(body);
-    if (!result.success) return NextResponse.json({ ok: true }, { headers });
+    if (tooLarge || !result.success) return NextResponse.json({ ok: true }, { headers });
 
     await insertEvent({
       eventType: result.data.event_type,

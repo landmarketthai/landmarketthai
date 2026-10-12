@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { submitDraftSchema } from "@/lib/marketplace/schemas";
 import { submissionReadinessIssues } from "@/lib/marketplace/submission-readiness";
 import { getPropertyDraft, submitPropertyDraft } from "@/lib/neon/marketplace";
+import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
+  const blocked = await guardPublicWrite(request, "property_draft_submit", { human: true });
+  if (blocked) return blocked;
+  const { tooLarge, body } = await readJsonBody(request, 4_000);
+  if (tooLarge) return tooLargeResponse();
   const parsed = submitDraftSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "กรุณายอมรับนโยบายความเป็นส่วนตัว" }, { status: 400 });
 

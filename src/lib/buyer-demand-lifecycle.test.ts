@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createHmac, webcrypto } from "node:crypto";
+import { webcrypto } from "node:crypto";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { z } from "zod";
@@ -13,6 +13,13 @@ import { findBuyerMatches } from "./marketplace/matching.ts";
 import { normalizeVerificationStatus } from "./marketplace/verification.ts";
 import { SEED_PUBLIC_LISTINGS } from "./seed-listings.ts";
 import * as presentation from "./marketplace/presentation.ts";
+
+// Route guards are covered by src/lib/security tests; here they pass the request through.
+const passthroughHttp = {
+  guardPublicWrite: async () => null,
+  readJsonBody: async (request: { json: () => Promise<unknown> }) => ({ tooLarge: false, body: await request.json() }),
+  tooLargeResponse: () => ({ status: 413, body: {} }),
+};
 
 // Run the actual server modules with in-memory dependencies; never connect to a database.
 function loadSource<T>(path: string, modules: Record<string, unknown>, globals: Record<string, unknown> = {}): T {
@@ -132,7 +139,7 @@ test("anonymous submission returns only status and public inventory matches", as
     "next/server": { NextResponse: { json: (body: unknown, options: { status: number }) => ({ body, status: options.status }) } },
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: () => ({ success: true, data: {} }) } },
     "@/lib/neon/marketplace": { createBuyerRequirement: async () => ({ id: "PRIVATE-SOURCE-ID", matches }) },
-    "@/lib/neon/buyer-rate-limit": { allowBuyerSubmission: async () => true },
+    "@/lib/security/http": passthroughHttp,
   });
   const result = await route.POST({ headers: { get: () => "test-ip" }, json: async () => ({}) });
   assert.equal(result.status, 201);
@@ -564,32 +571,6 @@ test("public demand SELECT is an explicit allowlist and sitemap limits exceed 10
   assert.equal(receivedOffset, 0);
 });
 
-test("buyer limiter uses the shared decision and bounds the outage fallback with hashed identifiers", async () => {
-  let now = 0;
-  let unavailable = false;
-  let allowed = true;
-  const limiter = loadSource<typeof import("./neon/buyer-rate-limit.ts")>("./neon/buyer-rate-limit.ts", {
-    "node:crypto": { createHmac },
-    "@/lib/neon/server": { getSql: () => ({ query: async (query: string, values: string[]) => {
-      assert.match(query, /allow_buyer_submission/);
-      assert.match(values[0], /^[0-9a-f]{64}$/);
-      assert.ok(!values[0].includes("test-ip"));
-      if (unavailable) throw new Error("offline");
-      return [{ allowed }];
-    } }) },
-  }, { Date: { now: () => now }, process: { env: { NEON_AUTH_COOKIE_SECRET: "test-secret" } } });
-  assert.equal(await limiter.allowBuyerSubmission("test-ip"), true);
-  allowed = false;
-  assert.equal(await limiter.allowBuyerSubmission("test-ip"), false);
-  unavailable = true;
-  for (let i = 0; i < 6; i++) assert.equal(await limiter.allowBuyerSubmission("test-ip"), true);
-  assert.equal(await limiter.allowBuyerSubmission("test-ip"), false);
-  now = 60_000;
-  assert.equal(await limiter.allowBuyerSubmission("test-ip"), true);
-  for (let i = 0; i < 9999; i++) assert.equal(await limiter.allowBuyerSubmission(String(i)), true);
-  assert.equal(await limiter.allowBuyerSubmission("overflow"), false);
-});
-
 test("criteria invalidation and consent withdrawal precede lifecycle validation and projection sync", () => {
   const sql = lifecycleMigrationSql();
   const guard = sql.split("create or replace function guard_buyer_requirement_lifecycle()")[1].split("create trigger guard_buyer_requirement_lifecycle")[0];
@@ -756,7 +737,7 @@ test("unknown first or later province IDs return 400 before any buyer PII is sav
     "next/server": { NextResponse: { json: (body: unknown, options: { status: number }) => ({ body, status: options.status }) } },
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: (data: unknown) => ({ success: true, data }) } },
     "@/lib/neon/marketplace": marketplace,
-    "@/lib/neon/buyer-rate-limit": { allowBuyerSubmission: async () => true },
+    "@/lib/security/http": passthroughHttp,
   });
   for (const province_ids of [[unknown, known], [known, unknown]]) {
     const response = await route.POST({ headers: { get: () => "test" }, json: async () => ({

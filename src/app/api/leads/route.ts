@@ -11,25 +11,9 @@ import {
   partnerLeadSchema,
 } from "@/lib/validations";
 import type { LeadType } from "@/lib/types/database";
+import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
-const MAX_BODY = 10_000;
-const RATE_LIMIT = 10;
-const RATE_WINDOW_MS = 60_000;
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  if (rateBuckets.size > 10_000) rateBuckets.clear();
-
-  const bucket = rateBuckets.get(ip);
-  if (!bucket || now > bucket.resetAt) {
-    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return false;
-  }
-
-  bucket.count += 1;
-  return bucket.count > RATE_LIMIT;
-}
+const MAX_BODY_BYTES = 10_000;
 
 async function fireWebhook(leadId: string, leadType: string, name: string): Promise<void> {
   const webhookUrl = process.env.N8N_WEBHOOK_LEADS;
@@ -61,17 +45,15 @@ async function fireWebhook(leadId: string, leadType: string, name: string): Prom
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    if (isRateLimited(ip)) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-    }
+    const blocked = await guardPublicWrite(req, "leads", { human: true });
+    if (blocked) return blocked;
 
-    const text = await req.text();
-    if (text.length > MAX_BODY) {
-      return NextResponse.json({ error: "Request too large" }, { status: 413 });
+    const { tooLarge, body: raw } = await readJsonBody(req, MAX_BODY_BYTES);
+    if (tooLarge) return tooLargeResponse();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
-
-    const body = JSON.parse(text) as Record<string, unknown>;
+    const body = raw as Record<string, unknown>;
     if (body._hp) return NextResponse.json({ ok: true });
 
     if (typeof body.phone === "string") {

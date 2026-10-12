@@ -6,6 +6,7 @@ import LineButton from "@/components/ui/LineButton";
 import FieldError from "@/components/forms/FieldError";
 import { submitPartnerLead } from "@/app/actions/leads";
 import type { LeadActionState } from "@/app/actions/leads";
+import { TurnstileWidget, useTurnstile } from "@/components/security/TurnstileWidget";
 
 const WORKING_AREAS = [
   "EEC (ระยอง / ชลบุรี / ฉะเชิงเทรา)",
@@ -39,6 +40,12 @@ interface Props {
 
 export default function PartnerForm({ referralCode }: Props) {
   const [state, formAction, isPending] = useActionState(submitPartnerLead, INITIAL_STATE);
+  const turnstile = useTurnstile();
+  // Tokens are single-use: FormData is already captured, so reset right after every attempt.
+  const submit = (formData: FormData) => {
+    formAction(formData);
+    turnstile.reset();
+  };
 
   if (state.status === "success") {
     return (
@@ -59,9 +66,10 @@ export default function PartnerForm({ referralCode }: Props) {
   const fieldErrors = state.status === "error" ? (state.fieldErrors ?? {}) : {};
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form action={submit} className="flex flex-col gap-4" noValidate>
       {/* Honeypot */}
       <input type="text" name="_hp" className="hidden" tabIndex={-1} autoComplete="off" />
+      <input type="hidden" name="turnstile_token" value={turnstile.token ?? ""} />
       {referralCode && <input type="hidden" name="referral_code" value={referralCode} />}
       <input type="hidden" name="source" value="/become-partner" />
 
@@ -172,6 +180,11 @@ export default function PartnerForm({ referralCode }: Props) {
         <FieldError id="err-partner-pdpa" errors={fieldErrors.consent_pdpa} />
       </div>
 
+      <TurnstileWidget onToken={turnstile.onToken} resetKey={turnstile.resetKey} action="partner_lead" />
+      {turnstile.enabled && !turnstile.token && !isPending && (
+        <p className="text-xs text-slate-500">กำลังยืนยันว่าคุณไม่ใช่บอท หากปุ่มยังกดไม่ได้ กรุณารีเฟรชหน้าแล้วลองใหม่</p>
+      )}
+
       {state.status === "error" && (
         <div
           role="alert"
@@ -184,7 +197,7 @@ export default function PartnerForm({ referralCode }: Props) {
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || (turnstile.enabled && !turnstile.token)}
         className="btn-gold w-full justify-center disabled:opacity-60"
       >
         {isPending && <Loader2 size={16} className="animate-spin" aria-hidden />}
