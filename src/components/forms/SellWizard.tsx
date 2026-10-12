@@ -9,6 +9,7 @@ import { TurnstileWidget, useTurnstile } from "@/components/security/TurnstileWi
 import LocationPicker, { type MapFocus } from "./LocationPicker";
 import ZoningFields from "./ZoningFields";
 import { getZoning, zoningSchema, type ZoningInfo } from "@/lib/zoning";
+import { sellerUploadsEnabled } from "@/lib/marketplace/seller-upload-gate";
 
 interface Props { provinces: Province[]; buyerDemandSlug?: string }
 
@@ -703,13 +704,18 @@ export default function SellWizard({ provinces, buyerDemandSlug }: Props) {
         </section>
 
         <section id="sell-media" className="scroll-mt-20 px-4 py-6 sm:p-8">
-          {heading("media","ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private")}
+          {heading("media", sellerUploadsEnabled ? "ไม่บังคับ · รองรับ JPG, PNG, WebP และ PDF สูงสุด 20MB ต่อไฟล์ เอกสารจะเก็บเป็น Private" : "ยังไม่เปิดรับไฟล์แนบ · ฝากขายโดยไม่ต้องแนบรูปหรือเอกสาร")}
+          {!sellerUploadsEnabled && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">ตอนนี้เว็บไซต์ยังไม่เปิดรับการอัปโหลดรูปหรือเอกสาร กรุณากรอกข้อมูลที่ดินและช่องทางติดต่อให้ครบ ทีมงานจะติดต่อกลับเพื่อขอรูปและเอกสารที่จำเป็นภายหลัง</p>}
+          {sellerUploadsEnabled && (
+            <>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-[#00A859]"><ImagePlus className="text-[#00A859]"/><span className="mt-2 text-sm font-bold">เพิ่มรูปทรัพย์</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "image"); e.target.value = ""; }}/></label>
             <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center hover:border-brand-500"><FileText className="text-brand-600"/><span className="mt-2 text-sm font-bold">เพิ่มเอกสาร</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" disabled={submitting} onChange={(e) => { uploadBatch(Array.from(e.target.files ?? []), "document"); e.target.value = ""; }}/></label>
           </div>
           {uploading && <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><UploadCloud size={16}/>กำลังอัปโหลด...</div>}
           {failedUploads.current.size > 0 && <button type="button" className="mt-3 text-sm font-bold text-red-700" disabled={submitting || uploading} onClick={() => { for (const kind of ["image", "document"] as const) uploadBatch([...failedUploads.current].filter(([, mediaKind]) => mediaKind === kind).map(([file]) => file), kind); }}>ลองอัปโหลดไฟล์ที่ไม่สำเร็จอีกครั้ง</button>}
+            </>
+          )}
           {draft?.media && draft.media.length > 0 && <div className="mt-4 divide-y rounded-2xl border border-slate-200">{draft.media.map((media) => <div key={media.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="truncate">{media.file_name}</span><span className="shrink-0 text-xs text-slate-400">{media.media_kind === "image" ? "รูป" : "เอกสาร"}</span></div>)}</div>}
         </section>
 

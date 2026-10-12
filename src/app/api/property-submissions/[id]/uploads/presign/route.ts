@@ -3,8 +3,10 @@ import { submissionUploadSchema } from "@/lib/marketplace/schemas";
 import { propertyDraftExists } from "@/lib/neon/marketplace";
 import { generatePresignedUpload } from "@/lib/storage/provider";
 import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
+import { sellerUploadsEnabled } from "@/lib/marketplace/seller-upload-gate";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!sellerUploadsEnabled) return NextResponse.json({ error: "ระบบอัปโหลดรูปและเอกสารปิดชั่วคราว กรุณาฝากข้อมูลแล้วรอทีมงานติดต่อกลับ" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const { id } = await params;
   const blocked = await guardPublicWrite(request, "submission_upload");
   if (blocked) return blocked;
