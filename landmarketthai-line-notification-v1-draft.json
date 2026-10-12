@@ -1,0 +1,223 @@
+{
+  "name": "LandmarketThai - LINE Leads Notification V1 (DRAFT UAT / NOT READY)",
+  "nodes": [
+    {
+      "id": "8a2c9851-72db-42ef-aeca-c7810b4e7ed1",
+      "name": "Receive Authenticated Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "landmarketthai-leads-line-v1",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "a8b64db9-111e-4c3d-821d-ed33de46ca92"
+    },
+    {
+      "id": "da8a7719-93bc-437a-a640-e3f691ff872f",
+      "name": "Validate Lead Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json.body ?? {};\nconst validLeadId = typeof input.lead_id === \"string\" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.lead_id);\nconst validType = [\"buyer\", \"owner\", \"partner\"].includes(input.lead_type);\nconst validEnvironment = input.environment === \"preview\";\nconst valid = validLeadId && validType && validEnvironment;\nreturn [{ json: { valid, lead_id: valid ? input.lead_id : null, lead_type: valid ? input.lead_type : null, environment: valid ? \"preview\" : null } }];"
+      }
+    },
+    {
+      "id": "e3b9fd56-44dd-4560-9dc9-a9ccdc1fbce6",
+      "name": "Valid Preview Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "valid-bool-1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f5eea0f7-3603-47a9-9d34-8d03c27d0112",
+      "name": "Respond 202 Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        850,
+        230
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\":true,\"code\":\"PREVIEW_QUEUED\"}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "06f33b69-4ace-4935-b5bf-6474fe796c9f",
+      "name": "Build Safe LINE Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        230
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const e = $input.first().json;\nconst groupId = \"REPLACE_WITH_LINE_GROUP_ID\"; // Must come from verified LINE webhook source.groupId\nif (!/^C[0-9a-f]{32}$/i.test(groupId)) throw new Error(\"LINE GROUP ID NOT CONFIGURED — no message sent\");\nconst type = { buyer: \"ผู้สนใจซื้อ\", owner: \"เจ้าของทรัพย์\", partner: \"นายหน้าพาร์ทเนอร์\" }[e.lead_type];\nif (!type || !e.valid) throw new Error(\"Invalid Lead Event\");\nconst text = \"🔔 LandmarketThai (ทดสอบ)\\\\nมี Lead ใหม่: \" + type + \"\\\\nสถานะ: รอทีมงานตรวจสอบ\\\\nCRM: https://landmarketthai.com/admin/leads\";\nreturn [{json: {to:groupId,messages:[{type:\"text\",text}],lead_id:e.lead_id}}];"
+      }
+    },
+    {
+      "id": "7cbd623d-bbcb-4910-aa1f-577ef4881c86",
+      "name": "LINE Push (Credentials Required)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        230
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Line-Retry-Key",
+              "value": "={{ $json.lead_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.to, messages: $json.messages }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "d89f53fe-e3d5-402d-a1ee-5daa0b1668c7",
+      "name": "Respond 422 Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        850,
+        400
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\":false,\"code\":\"REJECTED\"}",
+        "options": {
+          "responseCode": 422
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Authenticated Lead": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Event": {
+      "main": [
+        [
+          {
+            "node": "Valid Preview Event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Preview Event?": {
+      "main": [
+        [
+          {
+            "node": "Respond 202 Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 422 Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 202 Accepted": {
+      "main": [
+        [
+          {
+            "node": "Build Safe LINE Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Safe LINE Alert": {
+      "main": [
+        [
+          {
+            "node": "LINE Push (Credentials Required)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": []
+}
