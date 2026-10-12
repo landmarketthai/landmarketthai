@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, LogOut, User } from "lucide-react";
-import { useRouter } from "next/navigation";
+
 import LineIcon from "@/components/ui/LineIcon";
 import { LINE_OA } from "@/lib/constants/site";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -21,17 +21,32 @@ const navLinks = [
   { label: "เกี่ยวกับเรา", href: "/about" },
 ];
 
+async function signOutAndReload(): Promise<void> {
+  const result = await authClient.signOut();
+  if (result.error) throw new Error("Sign-out request failed");
+  // A full navigation remounts AuthProvider, whose user is fetched only once on mount.
+  // Client-side route refresh alone leaves its cached user visible after logout.
+  window.location.replace("/login");
+}
+
 function UserMenu({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth();
-  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
 
   async function handleLogout() {
-    await authClient.signOut();
-    setMenuOpen(false);
-    onClose?.();
-    router.push("/");
-    router.refresh();
+    if (logoutPending) return;
+    setLogoutPending(true);
+    setLogoutError(false);
+    try {
+      await signOutAndReload();
+      setMenuOpen(false);
+      onClose?.();
+    } catch {
+      setLogoutError(true);
+      setLogoutPending(false);
+    }
   }
 
   if (!user) return null;
@@ -80,11 +95,13 @@ function UserMenu({ onClose }: { onClose?: () => void }) {
             <hr className="my-1 border-slate-100" />
             <button
               onClick={handleLogout}
-              className="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+              disabled={logoutPending}
+              className="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
             >
               <LogOut size={15} />
-              ออกจากระบบ
+              {logoutPending ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}
             </button>
+            {logoutError && <p role="alert" className="px-4 py-2 text-xs text-red-700">ออกจากระบบไม่สำเร็จ กรุณาลองใหม่</p>}
           </div>
         </>
       )}
@@ -96,13 +113,20 @@ export default function Navbar({ showBlog = true }: { showBlog?: boolean }) {
   const visibleLinks = navLinks.filter(link => link.href !== "/blog" || showBlog);
   const [open, setOpen] = useState(false);
   const { user, loading } = useAuth();
-  const router = useRouter();
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
 
   async function handleMobileLogout() {
-    await authClient.signOut();
-    setOpen(false);
-    router.push("/");
-    router.refresh();
+    if (logoutPending) return;
+    setLogoutPending(true);
+    setLogoutError(false);
+    try {
+      await signOutAndReload();
+      setOpen(false);
+    } catch {
+      setLogoutError(true);
+      setLogoutPending(false);
+    }
   }
 
   return (
@@ -181,10 +205,11 @@ export default function Navbar({ showBlog = true }: { showBlog?: boolean }) {
               (user ? (
                 <button
                   onClick={handleMobileLogout}
-                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                  disabled={logoutPending}
+                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                 >
                   <LogOut size={14} />
-                  ออกจากระบบ
+                  {logoutPending ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}
                 </button>
               ) : (
                 <Link
@@ -205,6 +230,7 @@ export default function Navbar({ showBlog = true }: { showBlog?: boolean }) {
               เพิ่ม LINE OA
             </Link>
           </div>
+          {logoutError && <p role="alert" className="mt-2 text-sm text-red-700">ออกจากระบบไม่สำเร็จ กรุณาลองใหม่</p>}
         </div>
       )}
     </header>
