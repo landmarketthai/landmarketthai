@@ -6,6 +6,8 @@ The [security/consumer runbook](SECURITY_N8N_CLOSEOUT_20261022.md) now defines t
 
 Corrected owner clarification: additional applications/token consumers are **UNKNOWN, not confirmed**; the earlier assertion of additional services was withdrawn. The human administrator is not an application/token consumer or live-send authority for this task. Exact stored-token reuse and the legacy Production target remain unknown under the no-credential-retrieval audit. This packet stays blocked until actual token remediation under an explicitly approved continuity/interruption policy, then fresh no-send verification and the separately dated live-send approval.
 
+The selected remediation proposal is now [owner-operated immediate invalidation with zero grace](OWNER_TOKEN_ROTATION_20261022.md), pending final approval of its interruption impact, operator/window and private handling. It installs no token in this Preview or any obsolete environment and does not authorize UAT inputs/transfers or messages. Paired old-invalid/new-valid evidence must precede the separately approved strict preflight, quota review and job manifest.
+
 ## Verified destination and scope
 
 - Intended channel **2012033225**, OA **ตลาดที่ดินไทย.com**, premium ID **@landmarketthai**, basic ID **@279zzyef**.
