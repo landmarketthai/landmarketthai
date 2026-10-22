@@ -4,6 +4,8 @@
 
 **Identity gate closed:** actual strict preflight **PASS at 2026-10-22T08:31:31.712Z / 15:31:31.712 Bangkok** against original signed event #70. See the closeout below and [the live UAT approval packet](LIVE_UAT_APPROVAL_20261022.md). This supersedes the historical missing-body failure. No live-send approval follows from identity PASS.
 
+**Security/n8n follow-up on bdfc062:** [the sanitized consumer audit and coordinated rotation/retirement runbook](SECURITY_N8N_CLOSEOUT_20261022.md) is prepared. Token replacement/invalidation remains unapproved/unperformed; no Channel Secret exposure is established, so it should remain unchanged. The receiver's inspected behavior is capture-only, but Production's legacy outbound target, external consumer attestation and preservation of #70 prevent complete n8n retirement today. No real preflight with a replacement, quota check or new UAT manifest was run before that security gate.
+
 ## Decision and accepted delay
 
 The owner selected **up to 15 minutes for recovery** on 2026-10-22. Recommend **Vercel Pro native Cron every 15 minutes, the existing immediate `after()` path and durable Neon outbox, and Neon Launch with scale-to-zero retained**. Keep claims, leases, retry keys, request fingerprints, retry ceilings, retention and metrics unchanged. Do not keep the DB deliberately warm. No external scheduler, queue service, self-hosted process or Neon Function is needed.

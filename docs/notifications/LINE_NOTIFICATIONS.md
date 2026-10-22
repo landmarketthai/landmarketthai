@@ -2,7 +2,9 @@
 
 Engineering implementation, 2026-10-22. **Production NO-GO** until the release gates below pass.
 **Latest release decision:** [RELEASE_BLOCKERS_20261022.md](RELEASE_BLOCKERS_20261022.md) records owner-selected 15-minute recovery, actual shared Neon usage and revised budget, plus no-send identity/bounded-UAT tooling. It supersedes earlier one-minute recommendations; the deployed cadence and flags are unchanged.
-Neon remains the source of truth. No Production database, secrets, workflow, receiving webhook or deployment was changed.
+Neon remains the source of truth. No Production database, secrets or deployment was changed. The sole earlier receiver setting exception was an owner-approved approximately 61-second successful-execution retention window, restored and verified; URL/routing/credentials were unchanged.
+
+**Security and complete n8n retirement:** [SECURITY_N8N_CLOSEOUT_20261022.md](SECURITY_N8N_CLOSEOUT_20261022.md) records the exposed long-lived token's known/potential consumers, why Channel Secret rotation is not indicated by current evidence, the unexecuted coordinated replacement procedure, and separate outbound/inbound/account-retirement gates. Current Production still runs the legacy n8n-calling application. The active inbound graph is capture-only, but its configured URL and owner-preserved execution #70 still prevent declaring all n8n dependency removed. No token replacement, webhook switch or n8n deactivation is authorized.
 
 **Current blocker closeout:** [READINESS_20261022.md](READINESS_20261022.md) confirms Hobby, commercial-use restrictions, the one recommended paid scheduling architecture, real isolated Neon UAT results, the approved Preview DB binding, and the bounded real LINE test plan. Its confirmed facts supersede the initial infrastructure unknowns below. No paid plan or scheduler has been activated.
 

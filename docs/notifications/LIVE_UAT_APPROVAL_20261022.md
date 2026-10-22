@@ -2,6 +2,8 @@
 
 Prepared 2026-10-22, Asia/Bangkok, PR #12. **NOT AUTHORIZED / NO SENDS PERFORMED.** Identity verified; delivery readiness remains conditional on credential-security disposition, fresh preflight, quota check and the explicit window below. Both PRs stay DRAFT.
 
+The [security/consumer runbook](SECURITY_N8N_CLOSEOUT_20261022.md) now defines that disposition: approved replacement and proof the exposed token is invalid, exact consumer/storage scopes, unchanged Channel Secret absent new exposure evidence, then a new strict preflight. Metadata inventory alone is not remediation. No replacement-token check or UAT manifest seeding has occurred while this gate is pending.
+
 ## Verified destination and scope
 
 - Intended channel **2012033225**, OA **ตลาดที่ดินไทย.com**, premium ID **@landmarketthai**, basic ID **@279zzyef**.
@@ -57,6 +59,8 @@ After that decision, request a concrete dated window with this scope:
 > Approve five visible test alerts and at most seven LINE Push requests from the verified Landmarketthai OA to only the signed-verified Land Market Thai group, using the five isolated UAT jobs above, during **[date, start–end, Asia/Bangkok, maximum one hour]**. **[named group observer]** will confirm all five receipts and absence of duplicates. Stop on any unexpected result; no automatic extension or restart. This authorizes no Production change, normal worker activation, scheduler, webhook change, paid service, merge or n8n cutover.
 
 Start/end and observer are deliberately unfilled because the owner has not approved a live-send window. Do not reinterpret “continue” or inbound-capture approval as this approval. Immediately before opening: verify current feature deployment/DB identity, exact manifest and fingerprints, valid token/channel/OA/group proof, LINE quota headroom, ordinary workers off, exclusive fresh journal and a private harness that counts every Push. No automatic retry outside the window. New credential storage destinations need their own authorization.
+
+Quota preparation must read the monthly limit, approximate consumption and approved group member count using the replacement token after security closeout. Five visible group alerts are not necessarily five quota units: LINE counts eligible recipients. Reserve sufficient headroom for five group deliveries and concurrent legitimate OA traffic; do not enable paid overage. Freeze all five exact isolated job/lead IDs, persisted retry UUIDs and body fingerprints in the manifest before requesting the dated window. These values remain unfilled because jobs have not been seeded yet. [LINE message-count rules](https://developers.line.biz/en/docs/messaging-api/pricing/).
 
 ## Acceptance, stop and cleanup
 
