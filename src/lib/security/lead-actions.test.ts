@@ -8,7 +8,7 @@ import * as clientIpModule from "./client-ip.ts";
 import * as zoning from "../zoning.ts";
 
 // Executes the real Server Actions (src/app/actions/leads.ts) and the real Turnstile verifier.
-// Only next/headers, the Neon limiter, the DB and the network (Siteverify + n8n) are in-memory.
+// Only next/headers, the Neon limiter, the DB and the network (Siteverify) are in-memory.
 function load<T>(path: string, modules: Record<string, unknown>): T {
   const source = readFileSync(new URL(path, import.meta.url), "utf8");
   const exports = {};
@@ -38,11 +38,12 @@ function harness() {
     limited: [] as { route: string; ip: string }[],
     verifyBodies: [] as Record<string, string>[],
     leads: 0,
-    webhooks: 0,
+    scheduled: 0,
   };
   const human = load<Record<string, unknown>>("./human-verification.ts", {});
   const actions = load<Actions>("../../app/actions/leads.ts", {
     "next/headers": { headers: async () => new Headers({ "x-real-ip": "203.0.113.9", "x-turnstile-token": "header-token-ignored" }) },
+    "@/lib/line/schedule": { scheduleNotifications: () => { state.scheduled++; } },
     "@/lib/neon/mutations": {
       insertLead: async () => { state.leads++; return "lead-1"; },
       insertReferralAttribution: async () => {},
@@ -64,10 +65,8 @@ function harness() {
       state.verifyBodies.push(JSON.parse(String(init?.body)));
       return new Response(JSON.stringify(state.siteverify), { status: 200 });
     }
-    state.webhooks++;
-    return new Response("ok");
+    throw new Error("Unexpected outbound request");
   }) as typeof fetch;
-  process.env.N8N_WEBHOOK_LEADS = "https://n8n.invalid/webhook";
   return { state, actions };
 }
 
@@ -87,7 +86,7 @@ const idle = { status: "idle" };
 
 afterEach(() => {
   globalThis.fetch = realFetch;
-  for (const key of ["HUMAN_VERIFICATION_REQUIRED", "TURNSTILE_SECRET_KEY", "N8N_WEBHOOK_LEADS"]) delete process.env[key];
+  for (const key of ["HUMAN_VERIFICATION_REQUIRED", "TURNSTILE_SECRET_KEY"]) delete process.env[key];
 });
 
 function enableHuman() {
@@ -103,12 +102,12 @@ test("flag off: all three actions stay backward compatible but consume the share
     assert.equal(result.status, "success", name);
   }
   assert.equal(state.leads, 3);
-  assert.equal(state.webhooks, 3);
+  assert.equal(state.scheduled, 3);
   assert.equal(state.verifyBodies.length, 0, "no Siteverify call while the flag is off");
   assert.deepEqual(state.limited, cases.map(() => ({ route: "leads", ip: "203.0.113.9" })));
 });
 
-test("rate-limited: all three actions return an error with no DB write and no n8n webhook", async () => {
+test("rate-limited: all three actions return an error with no DB write and no notification scheduling", async () => {
   const { state, actions } = harness();
   state.limit = { allowed: false, retryAfterSeconds: 30, degraded: false };
   for (const [name, fields] of cases) {
@@ -116,7 +115,7 @@ test("rate-limited: all three actions return an error with no DB write and no n8
     assert.equal(result.status, "error", name);
     assert.match(String(result.message), /บ่อยเกินไป/);
   }
-  assert.equal(state.leads + state.webhooks, 0);
+  assert.equal(state.leads + state.scheduled, 0);
 });
 
 test("rate-limited honeypot submissions are still blocked without writes", async () => {
@@ -125,10 +124,10 @@ test("rate-limited honeypot submissions are still blocked without writes", async
   for (const [name, fields] of cases) {
     assert.equal((await actions[name](idle, form({ ...fields, _hp: "bot" }))).status, "error", name);
   }
-  assert.equal(state.leads + state.webhooks, 0);
+  assert.equal(state.leads + state.scheduled, 0);
 });
 
-test("flag on: missing token (or a forged client boolean / header) is rejected before limiter, DB and webhook", async () => {
+test("flag on: missing token (or a forged client boolean / header) is rejected before limiter, DB and notifications", async () => {
   enableHuman();
   const { state, actions } = harness();
   for (const [name, fields] of cases) {
@@ -138,7 +137,7 @@ test("flag on: missing token (or a forged client boolean / header) is rejected b
   }
   assert.equal(state.verifyBodies.length, 0, "empty token never reaches Siteverify");
   assert.equal(state.limited.length, 0, "token-less bots must not burn the shared ceiling");
-  assert.equal(state.leads + state.webhooks, 0);
+  assert.equal(state.leads + state.scheduled, 0);
 });
 
 test("flag on: FormData token is verified server-side with Siteverify; failure blocks, success writes", async () => {
@@ -148,14 +147,14 @@ test("flag on: FormData token is verified server-side with Siteverify; failure b
   for (const [name, fields] of cases) {
     assert.equal((await actions[name](idle, form({ ...fields, turnstile_token: "bad-token" }))).status, "error", name);
   }
-  assert.equal(state.leads + state.webhooks + state.limited.length, 0);
+  assert.equal(state.leads + state.scheduled + state.limited.length, 0);
 
   state.siteverify = { success: true };
   for (const [name, fields] of cases) {
     assert.equal((await actions[name](idle, form({ ...fields, turnstile_token: `tok-${name}` }))).status, "success", name);
   }
   assert.equal(state.leads, 3);
-  assert.equal(state.webhooks, 3);
+  assert.equal(state.scheduled, 3);
   assert.equal(state.limited.length, 3);
   const lastThree = state.verifyBodies.slice(-3);
   assert.deepEqual(lastThree.map((body) => body.response), cases.map(([name]) => `tok-${name}`));
@@ -168,7 +167,7 @@ test("flag on without TURNSTILE_SECRET_KEY fails closed for server actions", asy
   for (const [name, fields] of cases) {
     assert.equal((await actions[name](idle, form({ ...fields, turnstile_token: "tok" }))).status, "error", name);
   }
-  assert.equal(state.leads + state.webhooks + state.verifyBodies.length, 0);
+  assert.equal(state.leads + state.scheduled + state.verifyBodies.length, 0);
 });
 
 test("every caller of the lead server actions embeds the Turnstile token and resets it after each attempt", () => {

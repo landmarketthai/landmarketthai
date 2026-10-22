@@ -1,5 +1,7 @@
 # landmarketthai
 
+Native LINE notifications: [architecture, scheduling, cutover and rollback](docs/notifications/LINE_NOTIFICATIONS.md); [QA evidence](docs/notifications/QA_20261022.md).
+
 P2 intelligence integration:
 
 - Pure helpers and types: `@/lib/land-intelligence` (overlays, anchors, distances, analytics, forward/reverse matching, validated buyer requirements).

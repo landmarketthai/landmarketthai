@@ -1,5 +1,7 @@
 # LandmarketThai — Non-Production Job Closeout (2026-10-10)
 
+> Historical release evidence/checklist. For native LINE delivery, scheduling and cutover, use [the current notification runbook](../notifications/LINE_NOTIFICATIONS.md). Earlier n8n delivery requirements below are superseded for this feature branch; existing Production deployment holds still apply.
+
 **Engineering/UAT status: PASS for completed, safely isolated engineering gates. Real external integrations remain BLOCKED, so Production remains NO-GO.** This is NOT approval to merge, migrate or deploy Production.
 
 ## Scope and immutable boundaries

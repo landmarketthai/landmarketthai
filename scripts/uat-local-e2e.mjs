@@ -1,7 +1,7 @@
 // LOCAL UAT ONLY: black-box HTTP checks against `next start` + a disposable Docker PostgreSQL.
 // Never point this at Neon, Preview or Production. Requires `npm run build` first and:
 //   docker container  UAT_PG_CONTAINER (default lmt-uat-pg18), database UAT_PG_DB (default e2e) with the full schema,
-//   both release migrations and the two synthetic flagship rows; local-neon-http-proxy on 127.0.0.1:4444.
+//   release migrations and the LINE outbox migration and the two synthetic flagship rows; local-neon-http-proxy on 127.0.0.1:4444.
 // Usage: node scripts/uat-local-e2e.mjs   (see docs/release/LANDMARKETTHAI_UAT_CLOSURE_20261010.md)
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
@@ -49,7 +49,11 @@ const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "star
     VERCEL_ENV: "preview",
     HUMAN_VERIFICATION_REQUIRED: "true",
     TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
-    N8N_WEBHOOK_LEADS: "https://n8n-sink.invalid/uat",
+    NEXT_PUBLIC_SITE_URL: "https://landmarketthai.test",
+    LINE_NOTIFICATIONS_ENABLED: "true",
+    LINE_CHANNEL_ACCESS_TOKEN: "synthetic-token-never-sent",
+    LINE_NOTIFICATION_GROUP_ID: "C00000000000000000000000000000000",
+    CRON_SECRET: "synthetic-local-worker-secret-0123456789",
     RATE_LIMIT_SECRET: "uat-local-rate-limit-secret",
     DO_SPACES_ENDPOINT: "https://sgp1.storage.invalid",
     DO_SPACES_BUCKET: "uat-fake-bucket",
@@ -97,16 +101,16 @@ try {
     assert.equal(count("property_submissions"), before);
   });
 
-  await check("lead without Turnstile token: 403, no row, no n8n", async () => {
+  await check("lead without Turnstile token: 403, no row, no LINE sends", async () => {
     const before = count("leads");
     const r = await call("/api/leads", { method: "POST", body: { lead_type: "buyer", name: "UAT Tokenless", phone: "0899990009", consent_pdpa: true } });
     assert.equal(r.status, 403);
     assert.equal(count("leads"), before);
-    assert.equal(events("n8n").length, 0);
+    assert.equal(events("line").length, 0);
   });
 
   const leadIds = [];
-  await check("buyer / partner / owner leads with token: 200, row, one sanitised n8n event each", async () => {
+  await check("buyer / partner / owner leads with token: 200, row, one transactional notification job each", async () => {
     const bodies = [
       { lead_type: "buyer", name: "UAT Buyer", phone: PII[0], consent_pdpa: true, notes: "UAT synthetic" },
       { lead_type: "partner", name: "UAT Partner", phone: PII[1], consent_pdpa: true, working_area: "UAT" },
@@ -119,9 +123,7 @@ try {
       leadIds.push(r.json.id);
       assert.deepEqual(Object.keys(r.json).sort(), ["id", "ok"]);
     }
-    const sink = events("n8n").map((e) => e.body);
-    assert.deepEqual(sink.map((b) => b.lead_id), leadIds);
-    for (const b of sink) assert.deepEqual(Object.keys(b).sort(), ["lead_id", "lead_type", "name"]);
+    assert.equal(count("line_notification_outbox"), 3);
     assert.equal(count("leads", `id in (${leadIds.map((id) => `'${id}'`).join(",")})`), 3);
   });
 
@@ -245,9 +247,22 @@ try {
     assert.doesNotMatch(search.text, FORBIDDEN_KEYS);
   });
 
-  await check("no unexpected egress; n8n sink got exactly the 3 lead events; Siteverify only via fake", async () => {
+  await check("authenticated worker recovers timeout without traffic; all five notifications sent with no private data", async () => {
+    assert.equal((await call("/api/internal/line-notifications")).status, 401);
+    assert.equal((await call("/api/internal/line-notifications", { headers: { authorization: "Bearer wrong" } })).status, 401);
+    for (let i=0; i<40 && count("line_notification_outbox", "status='processing'"); i++) await new Promise(r=>setTimeout(r,250));
+    db("update line_notification_outbox set available_at=now() where status='retry'");
+    const worker = await call("/api/internal/line-notifications", { method: "POST", headers: { authorization: "Bearer synthetic-local-worker-secret-0123456789" } });
+    assert.equal(worker.status,200,worker.text);
+    assert.equal(count("line_notification_outbox"),5);
+    assert.equal(count("line_notification_outbox", "status='sent'"),5);
+    assert.equal(count("line_notification_outbox", "attempts=2"),1);
+    const pushes=events("line");
+    assert.equal(pushes.length,6);
+    assert.equal(new Set(pushes.map(p=>p.retryKey)).size,5);
+    assert.equal(pushes.filter(p=>p.accepted).length,5);
+    for(const value of [...PII,"UAT Buyer","UAT Owner","UAT Partner","UAT Seller","UAT Requirement",draft.token]) assert.equal(JSON.stringify(pushes).includes(value),false,value);
     assert.deepEqual(events("blocked_egress"), []);
-    assert.equal(events("n8n").length, 3);
     assert.ok(events("siteverify").length >= 10);
   });
 } finally {

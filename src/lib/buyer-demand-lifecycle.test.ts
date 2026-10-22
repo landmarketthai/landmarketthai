@@ -136,6 +136,7 @@ test("buyer actions require approval before publication and keep terminal states
 test("anonymous submission returns only status and public inventory matches", async () => {
   const matches = { full: [], near: [], status: "available" };
   const route = loadSource<{ POST: (request: unknown) => Promise<{ status: number; body: unknown }> }>("../app/api/buyer-requirements/route.ts", {
+    "@/lib/line/schedule": { scheduleNotifications() {} },
     "next/server": { NextResponse: { json: (body: unknown, options: { status: number }) => ({ body, status: options.status }) } },
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: () => ({ success: true, data: {} }) } },
     "@/lib/neon/marketplace": { createBuyerRequirement: async () => ({ id: "PRIVATE-SOURCE-ID", matches }) },
@@ -734,6 +735,7 @@ test("unknown first or later province IDs return 400 before any buyer PII is sav
     "@/lib/marketplace/verification": {}, "@/lib/marketplace/listing-workflow": {},
   });
   const route = loadSource<{ POST: (request: unknown) => Promise<{ status: number; body: { field?: string } }> }>("../app/api/buyer-requirements/route.ts", {
+    "@/lib/line/schedule": { scheduleNotifications() {} },
     "next/server": { NextResponse: { json: (body: unknown, options: { status: number }) => ({ body, status: options.status }) } },
     "@/lib/marketplace/schemas": { buyerRequirementSchema: { safeParse: (data: unknown) => ({ success: true, data }) } },
     "@/lib/neon/marketplace": marketplace,

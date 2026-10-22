@@ -159,7 +159,7 @@ Generate qualified leads. Not a listing portal for browsing. **Lead generation i
 - Referral Attribution
 - Domain Setup & DNS
 - Vercel Deployment
-- n8n Integration
+- Native LINE integration (engineering implementation; Production cutover pending)
 - Production Lead Flow Validation
 
 ### In Progress
@@ -182,9 +182,9 @@ Generate qualified leads. Not a listing portal for browsing. **Lead generation i
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 15, TypeScript, Tailwind CSS v4 |
-| Backend | Supabase, PostgreSQL |
-| Auth | Supabase SSR Auth, Google OAuth |
-| Automation | n8n |
+| Backend | Neon Postgres |
+| Auth | Neon Managed Better Auth, Google OAuth |
+| Notifications | Neon transactional outbox → native LINE worker |
 | Hosting | Vercel |
 | Storage (Planned) | DigitalOcean Spaces |
 
@@ -199,13 +199,13 @@ Website Visitor
        ↓
    Validation
        ↓
-   Supabase
+   Neon Postgres
        ↓
 Referral Attribution
        ↓
-  n8n Webhook
+Durable Notification Outbox
        ↓
-Notification Layer
+Native LINE Worker → LINE Messaging API
        ↓
  Sales Follow-up
 ```

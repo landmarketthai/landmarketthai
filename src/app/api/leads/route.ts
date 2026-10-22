@@ -1,3 +1,4 @@
+import { scheduleNotifications } from "@/lib/line/schedule";
 import { NextRequest, NextResponse } from "next/server";
 import {
   insertLead,
@@ -14,34 +15,6 @@ import type { LeadType } from "@/lib/types/database";
 import { guardPublicWrite, readJsonBody, tooLargeResponse } from "@/lib/security/http";
 
 const MAX_BODY_BYTES = 10_000;
-
-async function fireWebhook(leadId: string, leadType: string, name: string): Promise<void> {
-  const webhookUrl = process.env.N8N_WEBHOOK_LEADS;
-  if (!webhookUrl) return;
-
-  try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lead_id: leadId, lead_type: leadType, name }),
-      signal: AbortSignal.timeout(5_000),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      console.error(
-        `[n8n] webhook failed lead_id=${leadId} lead_type=${leadType} status=${response.status} body=${body}`,
-      );
-    }
-  } catch (error) {
-    const isTimeout = error instanceof Error && error.name === "TimeoutError";
-    if (isTimeout) {
-      console.error(`[n8n] webhook timed out lead_id=${leadId} lead_type=${leadType}`);
-    } else {
-      console.error(`[n8n] webhook error lead_id=${leadId} lead_type=${leadType}`, error);
-    }
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -131,7 +104,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await fireWebhook(leadId, normalizedType, parsed.name as string);
+    scheduleNotifications();
     return NextResponse.json({ ok: true, id: leadId });
   } catch (error) {
     console.error("Lead route error:", error);

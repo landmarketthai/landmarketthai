@@ -3,7 +3,7 @@ import { getSql } from "@/lib/neon/server";
 import { clientIp } from "@/lib/security/client-ip";
 
 export type RateLimitRoute = "leads" | "buyer_requirements" | "property_draft_create" | "property_draft_submit" | "submission_upload" | "lead_upload" | "maps_link" | "events";
-// limit: per client per window. globalLimit: all clients combined per window (caps n8n/DB floods, far above real volume).
+// limit: per client per window. globalLimit: all clients combined per window (caps notification/DB floods, far above real volume).
 export const RATE_LIMITS: Record<RateLimitRoute, { limit: number; windowSeconds: number; globalLimit: number }> = {
   leads: { limit: 5, windowSeconds: 600, globalLimit: 300 },
   buyer_requirements: { limit: 6, windowSeconds: 600, globalLimit: 300 },

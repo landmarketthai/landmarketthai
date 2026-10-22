@@ -1,5 +1,7 @@
 "use server";
 
+import { scheduleNotifications } from "@/lib/line/schedule";
+
 import { zoningFromForm } from "@/lib/zoning";
 
 import {
@@ -30,7 +32,7 @@ function str(formData: FormData, field: string): string | undefined {
 
 // Same gate as POST /api/leads: human check first (no-op unless HUMAN_VERIFICATION_REQUIRED=true) so
 // token-less bots cannot burn the shared "leads" ceiling, then the Neon-backed limiter. Runs before
-// the honeypot and before any DB write or n8n webhook. Returns an error state, or null to proceed.
+// the honeypot and before any DB write or notification scheduling. Returns an error state, or null to proceed.
 async function guardLeadAction(formData: FormData): Promise<LeadActionState | null> {
   const requestHeaders = new Headers(await headers());
   const human = await verifyHumanToken(formData.get("turnstile_token"), clientIp(requestHeaders));
@@ -56,34 +58,6 @@ function toFieldErrors(
     if (value) output[key] = value;
   }
   return output;
-}
-
-async function fireWebhook(leadId: string, leadType: string, name: string): Promise<void> {
-  const webhookUrl = process.env.N8N_WEBHOOK_LEADS;
-  if (!webhookUrl) return;
-
-  try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lead_id: leadId, lead_type: leadType, name }),
-      signal: AbortSignal.timeout(5_000),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      console.error(
-        `[n8n] webhook failed lead_id=${leadId} lead_type=${leadType} status=${response.status} body=${body}`,
-      );
-    }
-  } catch (error) {
-    const isTimeout = error instanceof Error && error.name === "TimeoutError";
-    if (isTimeout) {
-      console.error(`[n8n] webhook timed out lead_id=${leadId} lead_type=${leadType}`);
-    } else {
-      console.error(`[n8n] webhook error lead_id=${leadId} lead_type=${leadType}`, error);
-    }
-  }
 }
 
 async function resolveReferralCode(
@@ -171,7 +145,7 @@ export async function submitPartnerLead(
       consentAt: new Date().toISOString(),
     });
 
-    await fireWebhook(leadId, "partner", result.data.name);
+    scheduleNotifications();
     return { status: "success", id: leadId };
   } catch (error) {
     console.error("Partner lead insert error:", error);
@@ -249,7 +223,7 @@ export async function submitOwnerLead(
       });
     }
 
-    await fireWebhook(leadId, "owner", result.data.name);
+    scheduleNotifications();
     return { status: "success", id: leadId };
   } catch (error) {
     console.error("Owner lead insert error:", error);
@@ -331,7 +305,7 @@ export async function submitBuyerLead(
       });
     }
 
-    await fireWebhook(leadId, "buyer", result.data.name);
+    scheduleNotifications();
     return { status: "success", id: leadId };
   } catch (error) {
     console.error("Buyer lead insert error:", error);
