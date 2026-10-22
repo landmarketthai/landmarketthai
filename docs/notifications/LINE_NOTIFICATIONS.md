@@ -3,6 +3,8 @@
 Engineering implementation, 2026-10-22. **Production NO-GO** until the release gates below pass.
 Neon remains the source of truth. No Production database, secrets, workflow, receiving webhook or deployment was changed.
 
+**Current blocker closeout:** [READINESS_20261022.md](READINESS_20261022.md) confirms Hobby, commercial-use restrictions, the one recommended paid scheduling architecture, real isolated Neon UAT results, the approved Preview DB binding, and the bounded real LINE test plan. Its confirmed facts supersede the initial infrastructure unknowns below. No paid plan or scheduler has been activated.
+
 ```mermaid
 flowchart LR
   Form[Validated customer submission] --> Tx[Neon transaction]
