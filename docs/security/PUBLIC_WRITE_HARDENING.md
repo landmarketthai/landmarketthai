@@ -8,9 +8,9 @@ No production Neon migration, Vercel firewall change, or Cloudflare Turnstile ac
 ## 1. Threat model
 
 Anonymous internet clients can create DB rows (leads, buyer requirements, drafts, events),
-trigger outbound calls (n8n webhook on every accepted lead, Cloudflare siteverify, Google Maps
+trigger outbound calls (native LINE delivery from the durable outbox, Cloudflare siteverify, Google Maps
 short-link expansion) and obtain presigned DigitalOcean Spaces upload URLs. Attacker goals:
-spam the sales pipeline and n8n notifications, fill Neon or Spaces (cost), host files on the
+spam the sales pipeline and LINE notifications, fill Neon or Spaces (cost), host files on the
 public-read CDN, make the lead form unavailable to real users, scrape or enumerate.
 Admin routes are cookie-authenticated and are listed for completeness.
 
@@ -47,7 +47,7 @@ IPv6 is collapsed to /64. Each route also has a global ceiling.
 Does NOT:
 - Stop distributed abuse. A residential-proxy botnet has thousands of IPs; per-IP limits barely slow it.
   Turnstile and Vercel WAF are the real controls; the limiter is a backstop.
-- Come free of a trade-off: the global ceiling protects n8n and the DB but lets one attacker exhaust a
+- Come free of a trade-off: the global ceiling protects notification volume and the DB but lets one attacker exhaust a
   route for everyone (about 300 requests per 10 min makes /api/leads return 429 to real users).
   When human verification is required it runs BEFORE the limiter, so token-less bots cannot consume the
   global budget; with it off, anyone can.

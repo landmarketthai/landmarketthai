@@ -31,7 +31,7 @@ function harness() {
     limited: [] as string[],
     humanChecks: 0,
     leads: 0,
-    webhooks: 0,
+    scheduled: 0,
     drafts: 0,
   };
   const http = load<Record<string, unknown>>("./http.ts", {
@@ -53,6 +53,7 @@ function leadsRoute() {
   const { state, http } = harness();
   const route = load<{ POST: Handler }>("../../app/api/leads/route.ts", {
     "next/server": { NextResponse },
+    "@/lib/line/schedule": { scheduleNotifications: () => { state.scheduled++; } },
     "@/lib/neon/mutations": {
       insertLead: async () => { state.leads++; return "lead-1"; },
       insertReferralAttribution: async () => {},
@@ -61,8 +62,7 @@ function leadsRoute() {
     "@/lib/validations": validations,
     "@/lib/security/http": http,
   });
-  globalThis.fetch = (async () => { state.webhooks++; return new Response("ok"); }) as typeof fetch;
-  process.env.N8N_WEBHOOK_LEADS = "https://n8n.invalid/webhook";
+  globalThis.fetch = (async () => { throw new Error("Unexpected outbound request"); }) as typeof fetch;
   return { state, POST: route.POST };
 }
 
@@ -74,11 +74,11 @@ test("sell wizard forwards the live Turnstile token and resets hook/widget toget
   assert.doesNotMatch(wizard, /cf-turnstile-response/, "must not depend on an injected hidden input");
 });
 
-test("leads: over-limit clients get 429 + Retry-After before any DB write or n8n webhook", async () => {
+test("leads: over-limit clients get 429 + Retry-After before any DB write or notification scheduling", async () => {
   const { state, POST } = leadsRoute();
   assert.equal((await POST(post(validLead))).status, 200);
   assert.equal(state.leads, 1);
-  assert.equal(state.webhooks, 1);
+  assert.equal(state.scheduled, 1);
 
   state.limit = { allowed: false, retryAfterSeconds: 42, degraded: false };
   const response = await POST(post(validLead));
@@ -87,7 +87,7 @@ test("leads: over-limit clients get 429 + Retry-After before any DB write or n8n
   assert.equal(response.headers["Retry-After"], "42");
   assert.equal(response.headers["Cache-Control"], "no-store");
   assert.equal(state.leads, 1, "no insert after 429");
-  assert.equal(state.webhooks, 1, "no webhook amplification after 429");
+  assert.equal(state.scheduled, 1, "no scheduling amplification after 429");
   assert.deepEqual(state.limited, ["leads", "leads"]);
 });
 
@@ -100,7 +100,7 @@ test("leads: failed or unavailable human verification blocks before writes and b
   state.human = { ok: false, status: 503, code: "human_verification_unavailable", error: "down" };
   response = await POST(post(validLead));
   assert.equal(response.status, 503);
-  assert.equal(state.leads + state.webhooks, 0);
+  assert.equal(state.leads + state.scheduled, 0);
   assert.equal(state.limited.length, 0, "token-less bots must not burn the shared per-route ceiling");
 });
 
@@ -119,7 +119,7 @@ test("leads: honeypot still returns a silent ok without writing", async () => {
   const { state, POST } = leadsRoute();
   const response = await POST(post(JSON.stringify({ ...JSON.parse(validLead), _hp: "bot" })));
   assert.equal(response.status, 200);
-  assert.equal(state.leads + state.webhooks, 0);
+  assert.equal(state.leads + state.scheduled, 0);
 });
 
 test("property draft creation uses the shared limiter instead of a per-process Map", async () => {

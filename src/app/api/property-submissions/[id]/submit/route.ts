@@ -1,3 +1,4 @@
+import { scheduleNotifications } from "@/lib/line/schedule";
 import { NextRequest, NextResponse } from "next/server";
 import { submitDraftSchema } from "@/lib/marketplace/schemas";
 import { submissionReadinessIssues } from "@/lib/marketplace/submission-readiness";
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const submitted = await submitPropertyDraft({ id, token: parsed.data.token, consentPdpa: true, source: parsed.data.buyer_demand_slug ? `/buyer-demand/${parsed.data.buyer_demand_slug}` : "/sell" });
     if (!submitted) return NextResponse.json({ error: "ไม่สามารถส่งแบบร่างนี้ได้" }, { status: 409 });
+    scheduleNotifications();
     return NextResponse.json({ ok: true, id: submitted }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Submit property draft error:", error);

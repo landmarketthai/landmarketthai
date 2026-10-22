@@ -24,7 +24,7 @@ Tech Stack
 - Neon Postgres
 - Vercel
 - DigitalOcean Spaces
-- n8n
+- Native LINE notifications via Neon outbox
 
 Database and Auth
 - `DATABASE_URL` is server-only and points to Neon Postgres.
@@ -39,7 +39,7 @@ Branch Strategy
 
 Current Priorities
 1. Lead Capture
-2. n8n Lead Notification
+2. Native LINE Lead Notification (see docs/notifications/LINE_NOTIFICATIONS.md)
 3. DigitalOcean Spaces Upload
 4. Production Verification
 

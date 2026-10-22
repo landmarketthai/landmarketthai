@@ -1,3 +1,4 @@
+import { scheduleNotifications } from "@/lib/line/schedule";
 import { NextRequest, NextResponse } from "next/server";
 import { buyerRequirementSchema } from "@/lib/marketplace/schemas";
 import { createBuyerRequirement, UnknownBuyerProvinceError } from "@/lib/neon/marketplace";
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await createBuyerRequirement(parsed.data);
+    scheduleNotifications();
     const response: BuyerRequirementSubmissionResult = { status: "pending_review", matches: result.matches };
     return NextResponse.json(response, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {

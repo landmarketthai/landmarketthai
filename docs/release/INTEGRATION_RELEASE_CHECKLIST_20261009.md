@@ -1,5 +1,7 @@
 # Integration Release Checklist — codex/release-integration-20261009
 
+> Historical release evidence/checklist. For native LINE delivery, scheduling and cutover, use [the current notification runbook](../notifications/LINE_NOTIFICATIONS.md). Earlier n8n delivery requirements below are superseded for this feature branch; existing Production deployment holds still apply.
+
 > 2026-10-10: UAT closure, fixes and current gate results are in [LANDMARKETTHAI_UAT_CLOSURE_20261010.md](LANDMARKETTHAI_UAT_CLOSURE_20261010.md); its blocker list supersedes the one below.
 
 Scope: integration branch only. Not pushed, not merged to `main`, not deployed.
