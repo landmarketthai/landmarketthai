@@ -75,7 +75,24 @@ The initial transfer of the UAT DB credential into Vercel was rejected by automa
 
 Branch-only configuration now uses the approved disposable DB connection, its existing isolated Auth endpoint, the independent cookie secret, documented Cloudflare dummy test keys, and a Preview site URL. Human verification stays required and **LINE stays disabled**. No Production variable or existing other-branch credential was edited. No LINE token/group credential was copied.
 
-Application form UAT must use this authenticated browser session and the rebuilt feature Preview. Do not extract browser cookies into scripts, disable protection, or create a bypass link. The DB test suite is real Neon integration, but its mocked LINE transport does not establish real LINE acceptance. Record browser submission outcomes and exact synthetic IDs in the follow-up evidence; clean up only those IDs afterward.
+Application UAT used the owner's ordinary authenticated Edge session on commit `a5754e1`, [READY protected Preview](https://landmarketthai-p1bvr0hiw-landmarketthai.vercel.app). No browser cookies were extracted into scripts, protection disabled, or bypass link created. The rebuilt worker again displayed `{"error":"Unauthorized"}` without its separate bearer credential.
+
+Four real browser-to-Vercel-to-Neon submissions passed. Cloudflare verification used its documented dummy keys, while validation, Server Actions/API routes, application SQL and outbox trigger ran on the actual Preview/Neon services. LINE remained disabled throughout. Independent SQL readback found exactly one job per committed lead, all `pending`, with **zero attempts and zero sent jobs**:
+
+| Browser scenario | Synthetic lead ID | Outbox job ID |
+|---|---|---|
+| Buyer `/contact` | `20242c09-91ff-4b8b-b96a-a3905d5cc527` | `d0cf329b-92bf-4fba-919e-3c409a0b64f4` |
+| Partner Server Action `/become-partner` | `91f1d57d-fec0-492d-9f3e-45cc2fe3eccd` | `18b635d3-b955-4b06-b887-ead8cf76c6e8` |
+| Requirement `/buy-request` | `8750604d-c13a-403e-b81d-9e4852d7a51b` | `97c1d8fa-ac20-4ad0-80fd-e852a87b3493` |
+| Seller `/sell`, draft then submit | `2b3c588c-dd7c-40c0-8678-ea36970e2144` | `aff28cfb-97eb-4e7d-954e-b1876d0d9a12` |
+
+Requirement `9a24de2f-3bbb-49a5-bfac-6bb814d6564f` had `pending_review`, PDPA true and public consent false; the browser showed saved/private status and a real inventory match. Seller submission `16be8d63-d0a8-4d2f-81c9-cc35692d54d3` had `pending_review`, linked the expected owner lead, and showed the submitted/not-published confirmation. No property or demand was published. Browser screenshots were retained locally as this run's proof; credentials and test tokens were not captured or logged.
+
+Observed limitations: the first Partner attempt omitted consent and was correctly rejected with no record; the corrected fresh-page submission passed. Automatic test verification sometimes stalled or reported Cloudflare `300030`; a fresh page load resolved the final Partner/Requirement/Seller attempts. [Cloudflare classifies `300*` as generic challenge failure](https://developers.cloudflare.com/turnstile/troubleshooting/client-side-errors/error-codes/); the precise environment/widget cause remains unproven. No challenge was manually solved, verification disabled or token injected. This is not proof of real production-site-key reliability. The standalone owner API/action path passed the real Neon module rehearsal, but was **not** exercised through protected Preview HTTP; no test-only UI or protection bypass was added to expose it.
+
+After closing the UAT forms, one transaction removed only the exact requirement, seller submission and four named lead IDs above; cascading cleanup removed their four jobs. Original counts and complete-row fingerprints matched the pre-rehearsal baseline: leads 4 / `f084b5a39a28c718f743cb97d2da54a5`, requirements 0 / `d41d8cd98f00b204e9800998ecf8427e`, submissions 8 / `3158cb5279a521ac3f1a361461a91ee9`, lands 3 / `2a35320a9f519e89a613700e6ccf2166`, partners and attributions 0 / empty-set fingerprint. Final outbox count: **0**. No existing CRM row was reset, truncated or edited.
+
+These are real application/database results with dummy human verification and disabled LINE. They do not establish real LINE acceptance or provider-scheduled recovery.
 
 ## Five-scenario real LINE UAT packet — prepared, not executed
 
@@ -124,7 +141,7 @@ Release order: retain #11’s Production hold; rehearse all #11 schema prerequis
 | Continuous DB capacity | Approve adequate paid capacity/budget; Free allowance is insufficient for sustained minute polling |
 | Isolated Neon migration/role/concurrency/rollback | **Closed:** nine checks passed on existing disposable branch |
 | Preview DB credential transfer | **Approved and completed**, strictly feature-branch Preview scope |
-| Preview application UAT | Browser worker-auth smoke passed; form outcomes require rebuilt DB-bound Preview evidence |
+| Preview application UAT | **Four browser flows passed** against real Neon, exact synthetic cleanup verified; worker-auth smoke passed. Standalone owner HTTP and production Turnstile reliability remain unverified |
 | Test destination and token | Securely verify exact OA and signed group ID; authorize any credential transfer separately |
 | Real LINE delivery | Approve the explicit five-alert/seven-request window, then observe actual responses/receipt |
 | Independent zero-traffic recovery | Approve scheduler/capacity and isolated test access; actual scheduled evidence still required |
