@@ -1,6 +1,7 @@
 # Native LINE release readiness — blocker closeout
 
 Updated 2026-10-22 (Asia/Bangkok). **ENGINEERING GO / PRODUCTION NO-GO**.
+**Latest decision:** [Cost optimization and bounded external UAT](RELEASE_BLOCKERS_20261022.md) supersedes the one-minute recommendation below: the owner selected 15-minute recovery. It includes actual shared Neon consumption, the no-send identity preflight, request-budget guard, and isolated scheduler test packet. No live window or paid activation is approved.
 This report supersedes the infrastructure unknowns in the initial QA report. No Production change, plan purchase, scheduler activation or real LINE send is authorized or performed.
 
 ## Confirmed infrastructure and decision
