@@ -76,6 +76,8 @@ Expected incremental recurring subscription cost for the implemented code: $0. E
 
 Use `.env.local.example`. Required for sending: `LINE_NOTIFICATIONS_ENABLED=true`, server-only `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_NOTIFICATION_GROUP_ID` (`C` plus 32 hex characters), and an HTTPS `NEXT_PUBLIC_SITE_URL` pointing at that environment. `CRON_SECRET` protects external dispatch. Missing/invalid configuration leaves jobs untouched, skips `after()` delivery and makes authorized worker calls return 503. Use a different secret/destination per environment. Never copy Production secrets into tests.
 
+The feature branch's automatic Preview is configured for build/smoke checks only: independent cookie secret, `.invalid` Auth URL, human verification required and LINE disabled. No isolated database or LINE credentials have been provisioned there. Replace the placeholder with an approved isolated Auth endpoint and configure the isolated DB before any form UAT; never use the Production Auth fallback. See the QA report for the initial build failure and repair.
+
 Migration: `neon/migrations/202610220001_line_notification_outbox.sql`, transaction with lock/statement timeouts. It adds a private table, indexes, function and trigger; no existing lead values are updated. The trigger and table are safe to reapply. No legacy backfill. Rehearsal uses disposable PostgreSQL 18 with the full repository schema chain, synthetic data and the real business SQL. Neon-specific application-role ownership and Data API isolation must still be checked on an isolated Neon branch before release.
 
 Read-only preflight, run through the explicitly selected application role/branch:
