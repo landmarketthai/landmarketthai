@@ -4,6 +4,8 @@ Prepared 2026-10-22, Asia/Bangkok, PR #12. **NOT AUTHORIZED / NO SENDS PERFORMED
 
 The [security/consumer runbook](SECURITY_N8N_CLOSEOUT_20261022.md) now defines that disposition: approved replacement and proof the exposed token is invalid, exact consumer/storage scopes, unchanged Channel Secret absent new exposure evidence, then a new strict preflight. Metadata inventory alone is not remediation. No replacement-token check or UAT manifest seeding has occurred while this gate is pending.
 
+Corrected owner clarification: additional applications/token consumers are **UNKNOWN, not confirmed**; the earlier assertion of additional services was withdrawn. The human administrator is not an application/token consumer or live-send authority for this task. Exact stored-token reuse and the legacy Production target remain unknown under the no-credential-retrieval audit. This packet stays blocked until actual token remediation under an explicitly approved continuity/interruption policy, then fresh no-send verification and the separately dated live-send approval.
+
 ## Verified destination and scope
 
 - Intended channel **2012033225**, OA **ตลาดที่ดินไทย.com**, premium ID **@landmarketthai**, basic ID **@279zzyef**.
